@@ -19,6 +19,8 @@ package controllers
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"testing"
 	"time"
 
@@ -50,6 +52,16 @@ var (
 func TestMain(m *testing.M) {
 	fmt.Println("Creating new test environment")
 	testEnv = helpers.NewTestEnvironment()
+
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		fmt.Println("Received interrupt, tearing down test suite")
+		if err := testEnv.Stop(); err != nil {
+			fmt.Printf("error stopping test env: %v\n", err)
+		}
+	}()
 
 	// Set up a ClusterCacheTracker and ClusterCacheReconciler to provide to controllers
 	// requiring a connection to a remote cluster
