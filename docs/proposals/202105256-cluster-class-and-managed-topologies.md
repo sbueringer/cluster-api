@@ -47,6 +47,7 @@ replaces:
         - [Behaviors](#behaviors)
             - [Create a new Cluster using ClusterClass object](#create-a-new-cluster-using-clusterclass-object)
             - [Update an existing Cluster using ClusterClass](#update-an-existing-cluster-using-clusterclass)
+            - [Change an exiting Cluster's underlying ClusterClass](#change-an-existing-clusters-underlying-clusterlass)
         - [Provider implementation](#provider-implementation)
             - [For infrastructure providers](#for-infrastructure-providers)
             - [For Control plane providers](#for-control-plane-providers)
@@ -449,6 +450,23 @@ This section talks about updating a cluster which was created using a `ClusterCl
     1. Updating the Machine Deployment object in the API server.
 
 ![Update cluster with ClusterClass](./images/cluster-class/update.png)
+
+##### Change an existing cluster's underlying clusterclass
+This section talks about editing a cluster to change the spec.topology.clusterclass field from one reference to another.
+1. User updates the `cluster.spec.topology` field adhering to the update validation [criteria](#clusterclass-2)
+2. For the ControlPlane object in `spec.topology.controlPlane`, the cluster controller checks for the presence of the control plane object using the name `<cluster-name>`. If found,
+    1. Compares and updates the number of replicas, if necessary.
+    1. Compares and updates the k8s version, if necessary.
+    1. Updates the KCP object in the API server.
+3. The cluster controller reconciles the list of required machine deployments with the current list of managed machine deployments by:
+    1. Adding/Removing MachineDeployment if necessary.
+    1. Comparing and updating the number of replicas, if necessary.
+    1. Comparing and updating the k8s version for the MD, if necessary.
+    1. Updating the Machine Deployment object in the API server.
+
+
+
+
 
 #### Provider implementation
 ##### For infrastructure providers
