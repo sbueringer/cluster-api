@@ -47,7 +47,7 @@ replaces:
         - [Behaviors](#behaviors)
             - [Create a new Cluster using ClusterClass object](#create-a-new-cluster-using-clusterclass-object)
             - [Update an existing Cluster using ClusterClass](#update-an-existing-cluster-using-clusterclass)
-            - [Change an exiting Cluster's underlying ClusterClass](#change-an-existing-clusters-underlying-clusterlass)
+            - [Change an exiting Cluster's underlying ClusterClass](#change-an-existing-clusters-underlying-clusterclass)
         - [Provider implementation](#provider-implementation)
             - [For infrastructure providers](#for-infrastructure-providers)
             - [For Control plane providers](#for-control-plane-providers)
