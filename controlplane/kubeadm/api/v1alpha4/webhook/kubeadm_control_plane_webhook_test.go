@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha4
+package webhook
 
 import (
 	"testing"
@@ -26,26 +26,30 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1alpha4"
+	"sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1alpha4"
 	utildefaulting "sigs.k8s.io/cluster-api/util/defaulting"
 )
 
 func TestKubeadmControlPlaneDefault(t *testing.T) {
+	// This is broken because utildefaulting.DefaultValidateTest is doing a DeepCopy and the Copy is a KubeadmControlPlane not
+	/// a KubeadmControlPlaneWebhook
+	//t.Skip()
 	g := NewWithT(t)
 
-	kcp := &KubeadmControlPlane{
+	kcp := &v1alpha4.KubeadmControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "foo",
 		},
-		Spec: KubeadmControlPlaneSpec{
+		Spec: v1alpha4.KubeadmControlPlaneSpec{
 			Version: "v1.18.3",
-			MachineTemplate: KubeadmControlPlaneMachineTemplate{
+			MachineTemplate: v1alpha4.KubeadmControlPlaneMachineTemplate{
 				InfrastructureRef: corev1.ObjectReference{
 					APIVersion: "test/v1alpha1",
 					Kind:       "UnknownInfraMachine",
 					Name:       "foo",
 				},
 			},
-			RolloutStrategy: &RolloutStrategy{},
+			RolloutStrategy: &v1alpha4.RolloutStrategy{},
 		},
 	}
 	updateDefaultingValidationKCP := kcp.DeepCopy()
@@ -56,23 +60,24 @@ func TestKubeadmControlPlaneDefault(t *testing.T) {
 		Name:       "foo",
 		Namespace:  "foo",
 	}
-	t.Run("for KubeadmControlPLane", utildefaulting.DefaultValidateTest(updateDefaultingValidationKCP))
-	kcp.Default()
+	updateDefaultingValidationKCPWebhook := &KubeadmControlPlaneWebhook{updateDefaultingValidationKCP}
+	t.Run("for KubeadmControlPLane", utildefaulting.DefaultValidateTest(updateDefaultingValidationKCPWebhook))
+	(&KubeadmControlPlaneWebhook{kcp}).Default()
 
 	g.Expect(kcp.Spec.MachineTemplate.InfrastructureRef.Namespace).To(Equal(kcp.Namespace))
 	g.Expect(kcp.Spec.Version).To(Equal("v1.18.3"))
-	g.Expect(kcp.Spec.RolloutStrategy.Type).To(Equal(RollingUpdateStrategyType))
+	g.Expect(kcp.Spec.RolloutStrategy.Type).To(Equal(v1alpha4.RollingUpdateStrategyType))
 	g.Expect(kcp.Spec.RolloutStrategy.RollingUpdate.MaxSurge.IntVal).To(Equal(int32(1)))
 }
 
 func TestKubeadmControlPlaneValidateCreate(t *testing.T) {
-	valid := &KubeadmControlPlane{
+	valid := &v1alpha4.KubeadmControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			Namespace: "foo",
 		},
-		Spec: KubeadmControlPlaneSpec{
-			MachineTemplate: KubeadmControlPlaneMachineTemplate{
+		Spec: v1alpha4.KubeadmControlPlaneSpec{
+			MachineTemplate: v1alpha4.KubeadmControlPlaneMachineTemplate{
 				InfrastructureRef: corev1.ObjectReference{
 					APIVersion: "test/v1alpha1",
 					Kind:       "UnknownInfraMachine",
@@ -82,9 +87,9 @@ func TestKubeadmControlPlaneValidateCreate(t *testing.T) {
 			},
 			Replicas: pointer.Int32Ptr(1),
 			Version:  "v1.19.0",
-			RolloutStrategy: &RolloutStrategy{
-				Type: RollingUpdateStrategyType,
-				RollingUpdate: &RollingUpdate{
+			RolloutStrategy: &v1alpha4.RolloutStrategy{
+				Type: v1alpha4.RollingUpdateStrategyType,
+				RollingUpdate: &v1alpha4.RollingUpdate{
 					MaxSurge: &intstr.IntOrString{
 						IntVal: 1,
 					},
@@ -129,7 +134,7 @@ func TestKubeadmControlPlaneValidateCreate(t *testing.T) {
 	tests := []struct {
 		name      string
 		expectErr bool
-		kcp       *KubeadmControlPlane
+		kcp       *v1alpha4.KubeadmControlPlane
 	}{
 		{
 			name:      "should succeed when given a valid config",
@@ -187,23 +192,25 @@ func TestKubeadmControlPlaneValidateCreate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
+			kcpWebhook := &KubeadmControlPlaneWebhook{tt.kcp}
+
 			if tt.expectErr {
-				g.Expect(tt.kcp.ValidateCreate()).NotTo(Succeed())
+				g.Expect(kcpWebhook.ValidateCreate()).NotTo(Succeed())
 			} else {
-				g.Expect(tt.kcp.ValidateCreate()).To(Succeed())
+				g.Expect(kcpWebhook.ValidateCreate()).To(Succeed())
 			}
 		})
 	}
 }
 
 func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
-	before := &KubeadmControlPlane{
+	before := &v1alpha4.KubeadmControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			Namespace: "foo",
 		},
-		Spec: KubeadmControlPlaneSpec{
-			MachineTemplate: KubeadmControlPlaneMachineTemplate{
+		Spec: v1alpha4.KubeadmControlPlaneSpec{
+			MachineTemplate: v1alpha4.KubeadmControlPlaneMachineTemplate{
 				InfrastructureRef: corev1.ObjectReference{
 					APIVersion: "test/v1alpha1",
 					Kind:       "UnknownInfraMachine",
@@ -212,9 +219,9 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 				},
 			},
 			Replicas: pointer.Int32Ptr(1),
-			RolloutStrategy: &RolloutStrategy{
-				Type: RollingUpdateStrategyType,
-				RollingUpdate: &RollingUpdate{
+			RolloutStrategy: &v1alpha4.RolloutStrategy{
+				Type: v1alpha4.RollingUpdateStrategyType,
+				RollingUpdate: &v1alpha4.RollingUpdate{
 					MaxSurge: &intstr.IntOrString{
 						IntVal: 1,
 					},
@@ -368,7 +375,7 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 	kubernetesVersion := before.DeepCopy()
 	kubernetesVersion.Spec.KubeadmConfigSpec.ClusterConfiguration.KubernetesVersion = "some kubernetes version"
 
-	prevKCPWithVersion := func(version string) *KubeadmControlPlane {
+	prevKCPWithVersion := func(version string) *v1alpha4.KubeadmControlPlane {
 		prev := before.DeepCopy()
 		prev.Spec.Version = version
 		return prev
@@ -534,8 +541,8 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 	tests := []struct {
 		name      string
 		expectErr bool
-		before    *KubeadmControlPlane
-		kcp       *KubeadmControlPlane
+		before    *v1alpha4.KubeadmControlPlane
+		kcp       *v1alpha4.KubeadmControlPlane
 	}{
 		{
 			name:      "should succeed when given a valid config",
@@ -825,7 +832,8 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			err := tt.kcp.ValidateUpdate(tt.before.DeepCopy())
+			kcpWebhook := &KubeadmControlPlaneWebhook{tt.kcp}
+			err := kcpWebhook.ValidateUpdate(tt.before.DeepCopy())
 			if tt.expectErr {
 				g.Expect(err).To(HaveOccurred())
 			} else {
@@ -836,14 +844,14 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 }
 
 func TestKubeadmControlPlaneValidateUpdateAfterDefaulting(t *testing.T) {
-	before := &KubeadmControlPlane{
+	before := &v1alpha4.KubeadmControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			Namespace: "foo",
 		},
-		Spec: KubeadmControlPlaneSpec{
+		Spec: v1alpha4.KubeadmControlPlaneSpec{
 			Version: "v1.19.0",
-			MachineTemplate: KubeadmControlPlaneMachineTemplate{
+			MachineTemplate: v1alpha4.KubeadmControlPlaneMachineTemplate{
 				InfrastructureRef: corev1.ObjectReference{
 					APIVersion: "test/v1alpha1",
 					Kind:       "UnknownInfraMachine",
@@ -855,13 +863,14 @@ func TestKubeadmControlPlaneValidateUpdateAfterDefaulting(t *testing.T) {
 	}
 
 	afterDefault := before.DeepCopy()
-	afterDefault.Default()
+	kcpWebhook := &KubeadmControlPlaneWebhook{afterDefault}
+	kcpWebhook.Default()
 
 	tests := []struct {
 		name      string
 		expectErr bool
-		before    *KubeadmControlPlane
-		kcp       *KubeadmControlPlane
+		before    *v1alpha4.KubeadmControlPlane
+		kcp       *v1alpha4.KubeadmControlPlane
 	}{
 		{
 			name:      "update should succeed after defaulting",
@@ -874,14 +883,15 @@ func TestKubeadmControlPlaneValidateUpdateAfterDefaulting(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
-			err := tt.kcp.ValidateUpdate(tt.before.DeepCopy())
+			kcpWebhook := &KubeadmControlPlaneWebhook{tt.kcp}
+			err := kcpWebhook.ValidateUpdate(tt.before.DeepCopy())
 			if tt.expectErr {
 				g.Expect(err).To(HaveOccurred())
 			} else {
 				g.Expect(err).To(Succeed())
 				g.Expect(tt.kcp.Spec.MachineTemplate.InfrastructureRef.Namespace).To(Equal(tt.before.Namespace))
 				g.Expect(tt.kcp.Spec.Version).To(Equal("v1.19.0"))
-				g.Expect(tt.kcp.Spec.RolloutStrategy.Type).To(Equal(RollingUpdateStrategyType))
+				g.Expect(tt.kcp.Spec.RolloutStrategy.Type).To(Equal(v1alpha4.RollingUpdateStrategyType))
 				g.Expect(tt.kcp.Spec.RolloutStrategy.RollingUpdate.MaxSurge.IntVal).To(Equal(int32(1)))
 				g.Expect(tt.kcp.Spec.Replicas).To(Equal(pointer.Int32Ptr(1)))
 			}

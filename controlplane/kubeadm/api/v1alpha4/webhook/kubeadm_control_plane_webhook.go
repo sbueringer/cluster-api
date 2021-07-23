@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha4
+package webhook
 
 import (
 	"encoding/json"
@@ -27,28 +27,54 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1alpha4"
 	"sigs.k8s.io/cluster-api/util/container"
 	"sigs.k8s.io/cluster-api/util/version"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-func (in *KubeadmControlPlane) SetupWebhookWithManager(mgr ctrl.Manager) error {
+var (
+	// GroupVersion is group version used to register these objects.
+	GroupVersion = schema.GroupVersion{Group: "controlplane.cluster.x-k8s.io", Version: "v1alpha4"}
+
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
+	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
+)
+
+func init() {
+	SchemeBuilder.Register(&KubeadmControlPlaneWebhook{})
+}
+
+type KubeadmControlPlaneWebhook struct {
+	*v1alpha4.KubeadmControlPlane
+}
+
+func (in *KubeadmControlPlaneWebhook) DeepCopyObject() runtime.Object {
+	return &KubeadmControlPlaneWebhook{in.DeepCopy()}
+}
+
+func (in *KubeadmControlPlaneWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(in).
 		Complete()
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-controlplane-cluster-x-k8s-io-v1alpha4-kubeadmcontrolplane,mutating=true,failurePolicy=fail,matchPolicy=Equivalent,groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes,versions=v1alpha4,name=default.kubeadmcontrolplane.controlplane.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
-// +kubebuilder:webhook:verbs=create;update,path=/validate-controlplane-cluster-x-k8s-io-v1alpha4-kubeadmcontrolplane,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes;kubeadmcontrolplanes/scale,versions=v1alpha4,name=validation.kubeadmcontrolplane.controlplane.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-controlplane-cluster-x-k8s-io-v1alpha4-kubeadmcontrolplanewebhook,mutating=true,failurePolicy=fail,matchPolicy=Equivalent,groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes,versions=v1alpha4,name=default.kubeadmcontrolplane.controlplane.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-controlplane-cluster-x-k8s-io-v1alpha4-kubeadmcontrolplanewebhook,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes;kubeadmcontrolplanes/scale,versions=v1alpha4,name=validation.kubeadmcontrolplane.controlplane.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
 
-var _ webhook.Defaulter = &KubeadmControlPlane{}
-var _ webhook.Validator = &KubeadmControlPlane{}
+var _ webhook.Defaulter = &KubeadmControlPlaneWebhook{}
+var _ webhook.Validator = &KubeadmControlPlaneWebhook{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type.
-func (in *KubeadmControlPlane) Default() {
+func (in *KubeadmControlPlaneWebhook) Default() {
 	if in.Spec.Replicas == nil {
 		replicas := int32(1)
 		in.Spec.Replicas = &replicas
@@ -65,17 +91,17 @@ func (in *KubeadmControlPlane) Default() {
 	ios1 := intstr.FromInt(1)
 
 	if in.Spec.RolloutStrategy == nil {
-		in.Spec.RolloutStrategy = &RolloutStrategy{}
+		in.Spec.RolloutStrategy = &v1alpha4.RolloutStrategy{}
 	}
 
 	// Enforce RollingUpdate strategy and default MaxSurge if not set.
 	if in.Spec.RolloutStrategy != nil {
 		if len(in.Spec.RolloutStrategy.Type) == 0 {
-			in.Spec.RolloutStrategy.Type = RollingUpdateStrategyType
+			in.Spec.RolloutStrategy.Type = v1alpha4.RollingUpdateStrategyType
 		}
-		if in.Spec.RolloutStrategy.Type == RollingUpdateStrategyType {
+		if in.Spec.RolloutStrategy.Type == v1alpha4.RollingUpdateStrategyType {
 			if in.Spec.RolloutStrategy.RollingUpdate == nil {
-				in.Spec.RolloutStrategy.RollingUpdate = &RollingUpdate{}
+				in.Spec.RolloutStrategy.RollingUpdate = &v1alpha4.RollingUpdate{}
 			}
 			in.Spec.RolloutStrategy.RollingUpdate.MaxSurge = intstr.ValueOrDefault(in.Spec.RolloutStrategy.RollingUpdate.MaxSurge, ios1)
 		}
@@ -83,11 +109,11 @@ func (in *KubeadmControlPlane) Default() {
 }
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (in *KubeadmControlPlane) ValidateCreate() error {
+func (in *KubeadmControlPlaneWebhook) ValidateCreate() error {
 	allErrs := in.validateCommon()
 	allErrs = append(allErrs, in.validateEtcd(nil)...)
 	if len(allErrs) > 0 {
-		return apierrors.NewInvalid(GroupVersion.WithKind("KubeadmControlPlane").GroupKind(), in.Name, allErrs)
+		return apierrors.NewInvalid(v1alpha4.GroupVersion.WithKind("KubeadmControlPlane").GroupKind(), in.Name, allErrs)
 	}
 
 	return nil
@@ -111,7 +137,7 @@ const (
 )
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
+func (in *KubeadmControlPlaneWebhook) ValidateUpdate(old runtime.Object) error {
 	// add a * to indicate everything beneath is ok.
 	// For example, {"spec", "*"} will allow any path under "spec" to change.
 	allowedPaths := [][]string{
@@ -143,7 +169,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
 
 	allErrs := in.validateCommon()
 
-	prev := old.(*KubeadmControlPlane)
+	prev := old.(*KubeadmControlPlaneWebhook)
 
 	originalJSON, err := json.Marshal(prev)
 	if err != nil {
@@ -184,7 +210,7 @@ func (in *KubeadmControlPlane) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, in.validateCoreDNSVersion(prev)...)
 
 	if len(allErrs) > 0 {
-		return apierrors.NewInvalid(GroupVersion.WithKind("KubeadmControlPlane").GroupKind(), in.Name, allErrs)
+		return apierrors.NewInvalid(v1alpha4.GroupVersion.WithKind("KubeadmControlPlane").GroupKind(), in.Name, allErrs)
 	}
 
 	return nil
@@ -236,7 +262,7 @@ func paths(path []string, diff map[string]interface{}) [][]string {
 	return allPaths
 }
 
-func (in *KubeadmControlPlane) validateCommon() (allErrs field.ErrorList) {
+func (in *KubeadmControlPlaneWebhook) validateCommon() (allErrs field.ErrorList) {
 	if in.Spec.Replicas == nil {
 		allErrs = append(
 			allErrs,
@@ -313,7 +339,7 @@ func (in *KubeadmControlPlane) validateCommon() (allErrs field.ErrorList) {
 	}
 
 	if in.Spec.RolloutStrategy != nil {
-		if in.Spec.RolloutStrategy.Type != RollingUpdateStrategyType {
+		if in.Spec.RolloutStrategy.Type != v1alpha4.RollingUpdateStrategyType {
 			allErrs = append(
 				allErrs,
 				field.Required(
@@ -352,7 +378,7 @@ func (in *KubeadmControlPlane) validateCommon() (allErrs field.ErrorList) {
 	return allErrs
 }
 
-func (in *KubeadmControlPlane) validateCoreDNSImage() (allErrs field.ErrorList) {
+func (in *KubeadmControlPlaneWebhook) validateCoreDNSImage() (allErrs field.ErrorList) {
 	if in.Spec.KubeadmConfigSpec.ClusterConfiguration == nil {
 		return allErrs
 	}
@@ -369,7 +395,7 @@ func (in *KubeadmControlPlane) validateCoreDNSImage() (allErrs field.ErrorList) 
 	return allErrs
 }
 
-func (in *KubeadmControlPlane) validateCoreDNSVersion(prev *KubeadmControlPlane) (allErrs field.ErrorList) {
+func (in *KubeadmControlPlaneWebhook) validateCoreDNSVersion(prev *KubeadmControlPlaneWebhook) (allErrs field.ErrorList) {
 	if in.Spec.KubeadmConfigSpec.ClusterConfiguration == nil || prev.Spec.KubeadmConfigSpec.ClusterConfiguration == nil {
 		return allErrs
 	}
@@ -415,7 +441,7 @@ func (in *KubeadmControlPlane) validateCoreDNSVersion(prev *KubeadmControlPlane)
 	return allErrs
 }
 
-func (in *KubeadmControlPlane) validateEtcd(prev *KubeadmControlPlane) (allErrs field.ErrorList) {
+func (in *KubeadmControlPlaneWebhook) validateEtcd(prev *KubeadmControlPlaneWebhook) (allErrs field.ErrorList) {
 	if in.Spec.KubeadmConfigSpec.ClusterConfiguration == nil {
 		return allErrs
 	}
@@ -467,7 +493,7 @@ func (in *KubeadmControlPlane) validateEtcd(prev *KubeadmControlPlane) (allErrs 
 	return allErrs
 }
 
-func (in *KubeadmControlPlane) validateVersion(previousVersion string) (allErrs field.ErrorList) {
+func (in *KubeadmControlPlaneWebhook) validateVersion(previousVersion string) (allErrs field.ErrorList) {
 	fromVersion, err := version.ParseMajorMinorPatch(previousVersion)
 	if err != nil {
 		allErrs = append(allErrs,
@@ -522,6 +548,6 @@ func (in *KubeadmControlPlane) validateVersion(previousVersion string) (allErrs 
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (in *KubeadmControlPlane) ValidateDelete() error {
+func (in *KubeadmControlPlaneWebhook) ValidateDelete() error {
 	return nil
 }

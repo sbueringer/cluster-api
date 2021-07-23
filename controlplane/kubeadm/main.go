@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	kubeadmcontrolplanev1old "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1alpha3"
 	kubeadmcontrolplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1alpha4"
+	kubeadmcontrolplanewebhookv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1alpha4/webhook"
 	kubeadmcontrolplanecontrollers "sigs.k8s.io/cluster-api/controlplane/kubeadm/controllers"
 	"sigs.k8s.io/cluster-api/version"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -60,6 +61,7 @@ func init() {
 	_ = clusterv1.AddToScheme(scheme)
 	_ = kubeadmcontrolplanev1old.AddToScheme(scheme)
 	_ = kubeadmcontrolplanev1.AddToScheme(scheme)
+	_ = kubeadmcontrolplanewebhookv1.AddToScheme(scheme)
 	_ = kubeadmbootstrapv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
@@ -227,7 +229,7 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
 }
 
 func setupWebhooks(mgr ctrl.Manager) {
-	if err := (&kubeadmcontrolplanev1.KubeadmControlPlane{}).SetupWebhookWithManager(mgr); err != nil {
+	if err := (&kubeadmcontrolplanewebhookv1.KubeadmControlPlaneWebhook{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "KubeadmControlPlane")
 		os.Exit(1)
 	}
