@@ -23,6 +23,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -36,6 +37,7 @@ import (
 	clusterv1old "sigs.k8s.io/cluster-api/api/v1alpha3"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/cluster-api/api/v1alpha4/index"
+	variableswebhook "sigs.k8s.io/cluster-api/api/v1alpha4/variables/webhook"
 	"sigs.k8s.io/cluster-api/controllers"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	"sigs.k8s.io/cluster-api/controllers/topology"
@@ -46,10 +48,12 @@ import (
 	expv1 "sigs.k8s.io/cluster-api/exp/api/v1alpha4"
 	expcontrollers "sigs.k8s.io/cluster-api/exp/controllers"
 	"sigs.k8s.io/cluster-api/feature"
+	"sigs.k8s.io/cluster-api/util/secret"
 	"sigs.k8s.io/cluster-api/version"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -207,6 +211,22 @@ func main() {
 	setupChecks(mgr)
 	setupIndexes(ctx, mgr)
 	setupReconcilers(ctx, mgr)
+	if _, err := os.Stat(webhookCertDir); err != nil {
+		klog.Infof("Cert dir does not exist, generating certificates")
+		cert := secret.Certificate{}
+		if err := cert.Generate(); err != nil {
+			panic(fmt.Errorf("problem running manager: %v", err))
+		}
+		if err := os.MkdirAll(webhookCertDir, 0750); err != nil {
+			panic(fmt.Errorf("problem running manager: %v", err))
+		}
+		if err := os.WriteFile(path.Join(webhookCertDir, "tls.crt"), cert.KeyPair.Cert, 0777); err != nil {
+			panic(fmt.Errorf("problem running manager: %v", err))
+		}
+		if err := os.WriteFile(path.Join(webhookCertDir, "tls.key"), cert.KeyPair.Key, 0777); err != nil {
+			panic(fmt.Errorf("problem running manager: %v", err))
+		}
+	}
 	setupWebhooks(mgr)
 
 	// +kubebuilder:scaffold:builder
@@ -368,6 +388,16 @@ func setupWebhooks(mgr ctrl.Manager) {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
 		os.Exit(1)
 	}
+	mgr.GetWebhookServer().Register("/validate-variables-cluster-x-k8s-io-v1alpha4-cluster", &webhook.Admission{
+		Handler: &variableswebhook.ClusterValidator{
+			Client: mgr.GetClient(),
+		},
+	})
+	mgr.GetWebhookServer().Register("/mutate-variables-cluster-x-k8s-io-v1alpha4-cluster", &webhook.Admission{
+		Handler: &variableswebhook.ClusterDefaulter{
+			Client: mgr.GetClient(),
+		},
+	})
 
 	if err := (&clusterv1.Machine{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Machine")

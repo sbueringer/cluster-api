@@ -38,6 +38,7 @@ require (
 	k8s.io/cluster-bootstrap v0.21.2
 	k8s.io/component-base v0.21.3
 	k8s.io/klog/v2 v2.9.0
+	k8s.io/kube-openapi v0.0.0-20210305001622-591a79e4bda7
 	k8s.io/kubectl v0.21.2
 	k8s.io/utils v0.0.0-20210722164352-7f3ee0f31471
 	sigs.k8s.io/controller-runtime v0.9.6

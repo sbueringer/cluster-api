@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/cluster-api/api/v1alpha4/variables/validation"
 	"sigs.k8s.io/cluster-api/feature"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -105,6 +106,8 @@ func (in *ClusterClass) validate(old *ClusterClass) error {
 
 	// Ensure spec changes are compatible.
 	allErrs = append(allErrs, in.validateCompatibleSpecChanges(old)...)
+
+	allErrs = append(allErrs, validation.ValidateVariableClasses(in.Spec.Variables.Definitions, field.NewPath("spec", "variables"))...)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(GroupVersion.WithKind("ClusterClass").GroupKind(), in.Name, allErrs)

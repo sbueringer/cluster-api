@@ -204,6 +204,89 @@ spec:
                 required:
                 - ref
                 type: object
+              variables:
+                description: Variables defines the variables which can be configured
+                  in the Cluster topology and used in patches.
+                properties:
+                  definitions:
+                    description: Definitions define the variables inline.
+                    items:
+                      description: VariableDefinitionClass defines a variable which
+                        can be configured in the Cluster topology and used in patches.
+                      properties:
+                        name:
+                          description: Name of the variable.
+                          type: string
+                        required:
+                          description: 'Required specifies if the variable is required.
+                            Note: this applies to the variable as a whole and thus
+                            the top-level object defined in the schema. If nested
+                            fields are required, this will be specified inside the
+                            schema.'
+                          type: boolean
+                        schema:
+                          description: "TODO(tbd-proposal): We might want to drop
+                            support for some of the fields of the Kubernetes JSONSchemaProps.
+                            This could be                     done either by blocking
+                            them in the webhook or dropping the fields in case we're
+                            using our own JSONSchemaProps struct.                     Fields
+                            to drop: (TBD) * Fields which are already blocked by Kubernetes:
+                            \  * validation.go (via CRD and OpenAPI schema v3 validation):
+                            \    * ID, AdditionalItems, PatternProperties, Definitions,
+                            Dependencies, Ref, UniqueItems, Items.JSONSchemas   *
+                            convert.go (NewStructural / validateUnsupportedFields)
+                            \    * ID, AdditionalItems, PatternProperties, Definitions,
+                            Dependencies, Ref, Schema \n   * To keep it as simple
+                            as possible, we might want to drop metadata/documentation
+                            fields which are not strictly necessary:     * Description
+                            \    * Title     * External docs     * Example \n   *
+                            Kubernetes specific “features”     * XPreserveUnknownFields
+                            (pruning): could be useful to support unspecified objects,
+                            Should we support unknown fields, what about pruning?
+                            \    * XEmbeddedResource: doesn't make sense imho     *
+                            XIntOrString: would require anyOf, allOf in our struct.
+                            So I would only support it when we support anyOf, allOf,
+                            cleanly validated via structural schema, otherwise probably
+                            hard to validate     * XListMapKeys: doesn't make sense
+                            in our case     * XListType: doesn't make sense in our
+                            case     * XMapType: doesn't make sense in our case \n
+                            * So, what is left?     * Basic types: configured via
+                            Type \n     * Complex Types:       * Object: via Properties
+                            \      * Array: via Items       * Map: via AdditionalProperties:
+                            \        * They are intended for map[string]interface{}.
+                            While maps with structs as values are against the Kubernetes
+                            \        * API conventions we also would need them to
+                            support e.g. map[string]string (for labels/annotations)
+                            \        * See comment in variable_class.go:175-180       *
+                            Composition: via OneOf, AnyOf         * Imho we can only
+                            make this safe via structural schema (we shouldn't reinvent
+                            it)         * Unlikely that we already need them / have
+                            use cases or them. \n     * Defaulting: via Default \n
+                            \    * Basic validation via:       * Format, Maximum,
+                            ExclusiveMaximum, Minimum, ExclusiveMinimum, MaxLength,
+                            MinLength       * Pattern, MaxItems, MinItems, MultipleOf,
+                            Enum, MaxProperties, MinProperties       * Required \n
+                            \    * AllOf, Not: not sure for what we would need them
+                            \n     * Nullable: we would need Nullable to be able to
+                            set null values (otherwise they are pruned, if we prune)
+                            \      * https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable"
+                          properties:
+                            openAPIV3Schema:
+                              description: OpenAPIV3Schema defines the schema of a
+                                variable via OpenAPI v3 schema. The schema is a subset
+                                of the schema used in Kubernetes CRDs.
+                              type: object
+                              x-kubernetes-preserve-unknown-fields: true
+                          required:
+                          - openAPIV3Schema
+                          type: object
+                      required:
+                      - name
+                      - required
+                      - schema
+                      type: object
+                    type: array
+                type: object
               workers:
                 description: Workers describes the worker nodes for the cluster. It
                   is a collection of node types which can be used to create the worker

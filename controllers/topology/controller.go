@@ -23,8 +23,11 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/cluster-api/api/v1alpha4/index"
+	"sigs.k8s.io/cluster-api/api/v1alpha4/variables/defaulting"
+	"sigs.k8s.io/cluster-api/api/v1alpha4/variables/validation"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	"sigs.k8s.io/cluster-api/controllers/topology/internal/scope"
 	"sigs.k8s.io/cluster-api/util"
@@ -134,6 +137,23 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, s *scope.Scope) (ctrl
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "error reading the ClusterClass")
 	}
+
+	// FIXME: validation test - this is not necessarily intended to stay here
+	clusterClass := s.Blueprint.ClusterClass
+	cluster := s.Current.Cluster
+
+	// Validate variableSpecs.
+	validateVariableSpecsErrors := validation.ValidateVariableClasses(clusterClass.Spec.Variables.Definitions, field.NewPath("spec", "variables"))
+	fmt.Println(validateVariableSpecsErrors)
+
+	// Validate variables.
+	validateVariablesErrors := validation.ValidateVariableTopologies(cluster.Spec.Topology.Variables, clusterClass.Spec.Variables.Definitions, field.NewPath("spec", "topology", "variables"))
+	fmt.Println(validateVariablesErrors)
+
+	// Default variables.
+	defaultedVariables, defaultVariablesErrors := defaulting.DefaultVariableTopologies(cluster.Spec.Topology.Variables, clusterClass.Spec.Variables.Definitions)
+	fmt.Println(defaultVariablesErrors)
+	fmt.Println(defaultedVariables)
 
 	// Gets the current state of the Cluster and store it in the request scope.
 	s.Current, err = r.getCurrentState(ctx, s)

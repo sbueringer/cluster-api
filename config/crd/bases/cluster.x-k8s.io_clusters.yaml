@@ -482,6 +482,28 @@ spec:
                       deployments.
                     format: date-time
                     type: string
+                  variables:
+                    description: Variables can be used to customize the Cluster through
+                      patches. They must comply to the corresponding VariableClasses
+                      defined in the ClusterClass.
+                    items:
+                      description: VariableTopology can be used to customize the Cluster
+                        through patches. It must comply to the corresponding VariableDefinitionClass
+                        defined in the ClusterClass.
+                      properties:
+                        name:
+                          description: Name of the variable.
+                          type: string
+                        value:
+                          description: 'Value of the variable. Note: the value will
+                            be validated against the schema of the corresponding VariableDefinitionClass
+                            from the ClusterClass.'
+                          x-kubernetes-preserve-unknown-fields: true
+                      required:
+                      - name
+                      - value
+                      type: object
+                    type: array
                   version:
                     description: The Kubernetes version of the cluster.
                     type: string

@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/cluster-api/api/v1alpha4/variables"
 
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
@@ -89,6 +90,11 @@ type Topology struct {
 	// for the cluster.
 	// +optional
 	Workers *WorkersTopology `json:"workers,omitempty"`
+
+	// Variables can be used to customize the Cluster through
+	// patches. They must comply to the corresponding
+	// VariableClasses defined in the ClusterClass.
+	Variables []variables.VariableTopology `json:"variables,omitempty"`
 }
 
 // ControlPlaneTopology specifies the parameters for the control plane nodes in the cluster.

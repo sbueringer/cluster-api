@@ -44,6 +44,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
+	variableswebhook "sigs.k8s.io/cluster-api/api/v1alpha4/variables/webhook"
 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1alpha4"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/log"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1alpha4"
@@ -55,6 +56,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 func init() {
@@ -220,6 +222,21 @@ func new(uncachedObjs ...client.Object) *Environment {
 	if err := (&clusterv1.ClusterClass{}).SetupWebhookWithManager(mgr); err != nil {
 		klog.Fatalf("unable to create webhook: %+v", err)
 	}
+	mgr.GetWebhookServer().Register("/validate-variables-cluster-x-k8s-io-v1alpha4-cluster", &webhook.Admission{
+		Handler: &variableswebhook.ClusterValidator{
+			Client: mgr.GetClient(),
+		},
+	})
+	mgr.GetWebhookServer().Register("/mutate-variables-cluster-x-k8s-io-v1alpha4-cluster", &webhook.Admission{
+		Handler: &variableswebhook.ClusterDefaulter{
+			Client: mgr.GetClient(),
+		},
+	})
+
+	if err := (&clusterv1.ClusterClass{}).SetupWebhookWithManager(mgr); err != nil {
+		klog.Fatalf("unable to create webhook: %+v", err)
+	}
+
 	if err := (&clusterv1.Machine{}).SetupWebhookWithManager(mgr); err != nil {
 		klog.Fatalf("unable to create webhook: %+v", err)
 	}

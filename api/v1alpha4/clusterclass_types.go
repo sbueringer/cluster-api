@@ -19,6 +19,7 @@ package v1alpha4
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/cluster-api/api/v1alpha4/variables"
 )
 
 // +kubebuilder:object:root=true
@@ -51,6 +52,32 @@ type ClusterClassSpec struct {
 	// the worker nodes of the cluster.
 	// +optional
 	Workers WorkersClass `json:"workers,omitempty"`
+
+	// Variables defines the variables which can be configured
+	// in the Cluster topology and are then used in patches.
+	Variables VariablesClass `json:"variables,omitempty"`
+
+	// Patches defines the patches which are applied to customize
+	// referenced templates of a ClusterClass.
+	// Note: Patches will be applied in the order of the array.
+	Patches []PatchClass `json:"patches,omitempty"`
+}
+
+// VariablesClass defines the variables which can be configured
+// in the Cluster topology and used in patches.
+type VariablesClass struct {
+	// Definitions define the variables inline.
+	Definitions []variables.VariableDefinitionClass `json:"definitions,omitempty"`
+}
+
+// PatchClass defines a patch which is applied to customize the referenced templates.
+type PatchClass struct {
+	// Name of the patch.
+	Name string `json:"name"`
+
+	// Definitions define the patches inline.
+	// Note: Patches will be applied in the order of the array.
+	Definitions []variables.PatchDefinitionClass `json:"definitions,omitempty"`
 }
 
 // ControlPlaneClass defines the class for the control plane.
