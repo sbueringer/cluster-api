@@ -18,11 +18,14 @@ package remote
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/cluster-api/test/infrastructure/container"
 	kcfg "sigs.k8s.io/cluster-api/util/kubeconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -57,6 +60,21 @@ func RESTConfig(ctx context.Context, sourceName string, c client.Reader, cluster
 	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeConfig)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create REST configuration for Cluster %s/%s", cluster.Namespace, cluster.Name)
+	}
+
+	if os.Getenv("CAPI_MAC_FIX_REST_CONFIG") != "" {
+		containerRuntime, err := container.NewDockerClient()
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create REST configuration for Cluster %s/%s", cluster.Namespace, cluster.Name)
+		}
+		lbContainerName := cluster.Name + "-lb"
+		port, err := containerRuntime.GetHostPort(ctx, lbContainerName, "6443/tcp")
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create REST configuration for Cluster %s/%s", cluster.Namespace, cluster.Name)
+		}
+		restConfig.Host = fmt.Sprintf("https://127.0.0.1:%s", port)
+		restConfig.Insecure = true
+		restConfig.CAData = nil
 	}
 
 	restConfig.UserAgent = DefaultClusterAPIUserAgent(sourceName)

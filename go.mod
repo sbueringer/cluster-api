@@ -11,10 +11,8 @@ require (
 	github.com/drone/envsubst/v2 v2.0.0-20210615175204-7bf45dbf5372
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/fatih/color v1.12.0
-	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/go-logr/logr v0.4.0
 	github.com/gobuffalo/flect v0.2.3
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-cmp v0.5.6
 	github.com/google/go-github/v33 v33.0.0
 	github.com/google/gofuzz v1.2.0
@@ -40,6 +38,9 @@ require (
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kubectl v0.21.2
 	k8s.io/utils v0.0.0-20210722164352-7f3ee0f31471
+	sigs.k8s.io/cluster-api/test v0.4.0
 	sigs.k8s.io/controller-runtime v0.9.6
 	sigs.k8s.io/yaml v1.2.0
 )
+
+replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.0
