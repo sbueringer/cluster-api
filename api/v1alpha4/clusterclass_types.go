@@ -55,11 +55,13 @@ type ClusterClassSpec struct {
 
 	// Variables defines the variables which can be configured
 	// in the Cluster topology and are then used in patches.
-	Variables VariablesClass `json:"variables,omitempty"`
+	// +optional
+	Variables *VariablesClass `json:"variables,omitempty"`
 
 	// Patches defines the patches which are applied to customize
 	// referenced templates of a ClusterClass.
 	// Note: Patches will be applied in the order of the array.
+	// +optional
 	Patches []PatchClass `json:"patches,omitempty"`
 }
 

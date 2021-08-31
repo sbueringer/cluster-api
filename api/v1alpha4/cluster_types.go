@@ -94,6 +94,7 @@ type Topology struct {
 	// Variables can be used to customize the Cluster through
 	// patches. They must comply to the corresponding
 	// VariableClasses defined in the ClusterClass.
+	// +optional
 	Variables []variables.VariableTopology `json:"variables,omitempty"`
 }
 

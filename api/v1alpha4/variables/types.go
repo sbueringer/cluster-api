@@ -136,24 +136,28 @@ type PatchDefinitionTargetClass struct {
 
 	// Selector filters templates based on where they are referenced.
 	// Note: If selector is not set, all templates matching APIVersion and Kind are patched.
-	Selector *PatchDefinitionTargetSelectorClass `json:"selector"`
+	// +optional
+	Selector *PatchDefinitionTargetSelectorClass `json:"selector,omitempty"`
 }
 
 // PatchDefinitionTargetSelectorClass selects templates based on where they are referenced.
 type PatchDefinitionTargetSelectorClass struct {
 	// MatchResources selects templates based on where they are referenced.
-	MatchResources PatchDefinitionTargetSelectorResourcesClass `json:"matchResources"`
+	// +optional
+	MatchResources *PatchDefinitionTargetSelectorResourcesClass `json:"matchResources,omitempty"`
 }
 
 // PatchDefinitionTargetSelectorResourcesClass selects templates based on where they are referenced.
 // Note: The results of controlPlane and machineDeploymentClass are ORed.
 type PatchDefinitionTargetSelectorResourcesClass struct {
 	// ControlPlane selects templates referenced in .spec.ControlPlane.
-	ControlPlane bool `json:"controlPlane"`
+	// +optional
+	ControlPlane *bool `json:"controlPlane,omitempty"`
 
 	// MachineDeploymentClass selects templates referenced in specific MachineDeploymentClasses in
 	// .spec.workers.machineDeployments.
-	MachineDeploymentClass PatchDefinitionTargetSelectorResourcesMachineDeploymentClass `json:"machineDeploymentClass"`
+	// +optional
+	MachineDeploymentClass *PatchDefinitionTargetSelectorResourcesMachineDeploymentClass `json:"machineDeploymentClass,omitempty"`
 }
 
 // PatchDefinitionTargetSelectorResourcesMachineDeploymentClass selects templates referenced
@@ -166,7 +170,7 @@ type PatchDefinitionTargetSelectorResourcesMachineDeploymentClass struct {
 // PatchDefinitionJSONPatchClass defines a JSON patch.
 type PatchDefinitionJSONPatchClass struct {
 	// Op defines the operation of the patch.
-	// Note: valid values are: add, replace and remove.
+	// Note: Only add, replace and remove are supported.
 	Op string `json:"op"`
 
 	// Path defines the path of the patch.
@@ -175,12 +179,14 @@ type PatchDefinitionJSONPatchClass struct {
 	// Value defines the value of the patch.
 	// Note: Either Value or ValueFrom is required for add and replace
 	// operations. Only one of them is allowed to be set at the same time.
-	Value apiextensionsv1.JSON `json:"value"`
+	// +optional
+	Value *apiextensionsv1.JSON `json:"value,omitempty"`
 
 	// ValueFrom defines the value of the patch.
 	// Note: Either Value or ValueFrom is required for add and replace
 	// operations. Only one of them is allowed to be set at the same time.
-	ValueFrom PatchDefinitionJSONPatchValueClass `json:"valueFrom"`
+	// +optional
+	ValueFrom *PatchDefinitionJSONPatchValueClass `json:"valueFrom,omitempty"`
 }
 
 // PatchDefinitionJSONPatchValueClass defines the value of a patch.
@@ -189,11 +195,13 @@ type PatchDefinitionJSONPatchValueClass struct {
 	// Variable is the variable to be used as value.
 	// Variable can be one of the variables defined in .spec.variables or a builtin variable.
 	// Note: builtin variables are described further in the CAPI book.
-	Variable string `json:"variable"`
+	// +optional
+	Variable *string `json:"variable,omitempty"`
 
 	// Template is the Go template to be used to calculate the value.
 	// A template can reference variables defined in .spec.variables and builtin variables.
 	// Note: builtin variables are described further in the CAPI book.
 	// Note: the template must evaluate to a valid YAML or JSON value.
-	Template string `json:"template"`
+	// +optional
+	Template *string `json:"template,omitempty"`
 }

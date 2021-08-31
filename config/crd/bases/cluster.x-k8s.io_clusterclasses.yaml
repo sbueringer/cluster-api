@@ -204,9 +204,129 @@ spec:
                 required:
                 - ref
                 type: object
+              patches:
+                description: 'Patches defines the patches which are applied to customize
+                  referenced templates of a ClusterClass. Note: Patches will be applied
+                  in the order of the array.'
+                items:
+                  description: PatchClass defines a patch which is applied to customize
+                    the referenced templates.
+                  properties:
+                    definitions:
+                      description: 'Definitions define the patches inline. Note: Patches
+                        will be applied in the order of the array.'
+                      items:
+                        description: PatchDefinitionClass defines a patch which is
+                          applied to customize the referenced templates.
+                        properties:
+                          jsonPatches:
+                            description: 'JSONPatches defines the patches which should
+                              be applied on the target. Note: patches will be applied
+                              in the order of the array.'
+                            items:
+                              description: PatchDefinitionJSONPatchClass defines a
+                                JSON patch.
+                              properties:
+                                op:
+                                  description: 'Op defines the operation of the patch.
+                                    Note: Only add, replace and remove are supported.'
+                                  type: string
+                                path:
+                                  description: Path defines the path of the patch.
+                                  type: string
+                                value:
+                                  description: 'Value defines the value of the patch.
+                                    Note: Either Value or ValueFrom is required for
+                                    add and replace operations. Only one of them is
+                                    allowed to be set at the same time.'
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  description: 'ValueFrom defines the value of the
+                                    patch. Note: Either Value or ValueFrom is required
+                                    for add and replace operations. Only one of them
+                                    is allowed to be set at the same time.'
+                                  properties:
+                                    template:
+                                      description: 'Template is the Go template to
+                                        be used to calculate the value. A template
+                                        can reference variables defined in .spec.variables
+                                        and builtin variables. Note: builtin variables
+                                        are described further in the CAPI book. Note:
+                                        the template must evaluate to a valid YAML
+                                        or JSON value.'
+                                      type: string
+                                    variable:
+                                      description: 'Variable is the variable to be
+                                        used as value. Variable can be one of the
+                                        variables defined in .spec.variables or a
+                                        builtin variable. Note: builtin variables
+                                        are described further in the CAPI book.'
+                                      type: string
+                                  type: object
+                              required:
+                              - op
+                              - path
+                              type: object
+                            type: array
+                          target:
+                            description: Target defines on which templates the patch
+                              should be applied.
+                            properties:
+                              apiVersion:
+                                description: APIVersion filters templates by apiVersion.
+                                type: string
+                              kind:
+                                description: Kind filters templates by kind.
+                                type: string
+                              selector:
+                                description: 'Selector filters templates based on
+                                  where they are referenced. Note: If selector is
+                                  not set, all templates matching APIVersion and Kind
+                                  are patched.'
+                                properties:
+                                  matchResources:
+                                    description: MatchResources selects templates
+                                      based on where they are referenced.
+                                    properties:
+                                      controlPlane:
+                                        description: ControlPlane selects templates
+                                          referenced in .spec.ControlPlane.
+                                        type: boolean
+                                      machineDeploymentClass:
+                                        description: MachineDeploymentClass selects
+                                          templates referenced in specific MachineDeploymentClasses
+                                          in .spec.workers.machineDeployments.
+                                        properties:
+                                          names:
+                                            description: Names selects templates by
+                                              class names.
+                                            items:
+                                              type: string
+                                            type: array
+                                        required:
+                                        - names
+                                        type: object
+                                    type: object
+                                type: object
+                            required:
+                            - apiVersion
+                            - kind
+                            type: object
+                        required:
+                        - jsonPatches
+                        - target
+                        type: object
+                      type: array
+                    name:
+                      description: Name of the patch.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               variables:
                 description: Variables defines the variables which can be configured
-                  in the Cluster topology and used in patches.
+                  in the Cluster topology and are then used in patches.
                 properties:
                   definitions:
                     description: Definitions define the variables inline.
