@@ -128,19 +128,39 @@ type PatchDefinitionClass struct {
 
 // PatchDefinitionTargetClass defines on which templates the patch should be applied.
 type PatchDefinitionTargetClass struct {
-	// APIVersion defines the apiVersion to filter on.
+	// APIVersion filters templates by apiVersion.
 	APIVersion string `json:"apiVersion"`
 
-	// Kind defines the kind to filter on.
+	// Kind filters templates by kind.
 	Kind string `json:"kind"`
 
-	// Selector selects on which referenced templates
-	// the patch is applied to.
-	Selector PatchDefinitionTargetSelectorClass `json:"selector"`
+	// Selector filters templates based on where they are referenced.
+	// Note: If selector is not set, all templates matching APIVersion and Kind are patched.
+	Selector *PatchDefinitionTargetSelectorClass `json:"selector"`
 }
 
+// PatchDefinitionTargetSelectorClass selects templates based on where they are referenced.
 type PatchDefinitionTargetSelectorClass struct {
+	// MatchResources selects templates based on where they are referenced.
+	MatchResources PatchDefinitionTargetSelectorResourcesClass `json:"matchResources"`
+}
 
+// PatchDefinitionTargetSelectorResourcesClass selects templates based on where they are referenced.
+// Note: The results of controlPlane and machineDeploymentClass are ORed.
+type PatchDefinitionTargetSelectorResourcesClass struct {
+	// ControlPlane selects templates referenced in .spec.ControlPlane.
+	ControlPlane bool `json:"controlPlane"`
+
+	// MachineDeploymentClass selects templates referenced in specific MachineDeploymentClasses in
+	// .spec.workers.machineDeployments.
+	MachineDeploymentClass PatchDefinitionTargetSelectorResourcesMachineDeploymentClass `json:"machineDeploymentClass"`
+}
+
+// PatchDefinitionTargetSelectorResourcesMachineDeploymentClass selects templates referenced
+// in specific MachineDeploymentClasses in .spec.workers.machineDeployments.
+type PatchDefinitionTargetSelectorResourcesMachineDeploymentClass struct {
+	// Names selects templates by class names.
+	Names []string `json:"names"`
 }
 
 // PatchDefinitionJSONPatchClass defines a JSON patch.
