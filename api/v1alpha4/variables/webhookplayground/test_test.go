@@ -11,10 +11,10 @@ import (
 )
 
 var tpl = `
-contentFrom:
-  secret:
-    key: control-plane-azure.json
-    name: {{ .builtin.cluster.name }}-control-plane-azure-json
+- contentFrom:
+    secret:
+      key: control-plane-azure.json
+      name: {{ .builtin.cluster.name }}-control-plane-azure-json
 `
 
 func TestPatchTemplating(t *testing.T) {

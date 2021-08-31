@@ -127,6 +127,7 @@ type PatchDefinitionClass struct {
 }
 
 // PatchDefinitionTargetClass defines on which templates the patch should be applied.
+// +k8s:deepcopy-gen=true
 type PatchDefinitionTargetClass struct {
 	// APIVersion filters templates by apiVersion.
 	APIVersion string `json:"apiVersion"`
@@ -141,6 +142,7 @@ type PatchDefinitionTargetClass struct {
 }
 
 // PatchDefinitionTargetSelectorClass selects templates based on where they are referenced.
+// +k8s:deepcopy-gen=true
 type PatchDefinitionTargetSelectorClass struct {
 	// MatchResources selects templates based on where they are referenced.
 	// +optional
@@ -149,6 +151,7 @@ type PatchDefinitionTargetSelectorClass struct {
 
 // PatchDefinitionTargetSelectorResourcesClass selects templates based on where they are referenced.
 // Note: The results of controlPlane and machineDeploymentClass are ORed.
+// +k8s:deepcopy-gen=true
 type PatchDefinitionTargetSelectorResourcesClass struct {
 	// ControlPlane selects templates referenced in .spec.ControlPlane.
 	// +optional
@@ -162,18 +165,22 @@ type PatchDefinitionTargetSelectorResourcesClass struct {
 
 // PatchDefinitionTargetSelectorResourcesMachineDeploymentClass selects templates referenced
 // in specific MachineDeploymentClasses in .spec.workers.machineDeployments.
+// +k8s:deepcopy-gen=true
 type PatchDefinitionTargetSelectorResourcesMachineDeploymentClass struct {
 	// Names selects templates by class names.
 	Names []string `json:"names"`
 }
 
 // PatchDefinitionJSONPatchClass defines a JSON patch.
+// +k8s:deepcopy-gen=true
 type PatchDefinitionJSONPatchClass struct {
 	// Op defines the operation of the patch.
 	// Note: Only add, replace and remove are supported.
 	Op string `json:"op"`
 
 	// Path defines the path of the patch.
+	// Note: Array modifications are not supported for now, so indices and `-`
+	// are not allowed in path.
 	Path string `json:"path"`
 
 	// Value defines the value of the patch.
@@ -191,6 +198,7 @@ type PatchDefinitionJSONPatchClass struct {
 
 // PatchDefinitionJSONPatchValueClass defines the value of a patch.
 // Note: only one of the fields is allowed to be set at the same time.
+// +k8s:deepcopy-gen=true
 type PatchDefinitionJSONPatchValueClass struct {
 	// Variable is the variable to be used as value.
 	// Variable can be one of the variables defined in .spec.variables or a builtin variable.
