@@ -51,6 +51,10 @@ type logger interface {
 	// a resources being part of the Cluster by reconciled.
 	WithObject(obj client.Object) logger
 
+	// WithRef adds to the logger information about the object ref being modified by reconcile, which in most case it is
+	// a resources being part of the Cluster by reconciled.
+	WithRef(ref *corev1.ObjectReference) logger
+
 	// WithMachineDeployment adds to the logger information about the MachineDeployment object being processed.
 	WithMachineDeployment(md *clusterv1.MachineDeployment) logger
 
@@ -80,6 +84,17 @@ func (l *topologyReconcileLogger) WithObject(obj client.Object) logger {
 		"object groupVersion", obj.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 		"object kind", obj.GetObjectKind().GroupVersionKind().Kind,
 		"object", obj.GetName(),
+	)
+	return l
+}
+
+// WithRef adds to the logger information about the object ref being modified by reconcile, which in most case it is
+// a resources being part of the Cluster by reconciled.
+func (l *topologyReconcileLogger) WithRef(ref *corev1.ObjectReference) logger {
+	l.Logger = l.Logger.WithValues(
+		"object groupVersion", ref.APIVersion,
+		"object kind", ref.Kind,
+		"object", ref.Name,
 	)
 	return l
 }

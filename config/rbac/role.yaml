@@ -63,10 +63,24 @@ rules:
   - update
   - watch
 - apiGroups:
+  - bootstrap.cluster.x-k8s.io
+  - infrastructure.cluster.x-k8s.io
+  - resources=*
+  verbs:
+  - delete
+- apiGroups:
   - cluster.x-k8s.io
   resources:
   - clusterclasses
   - machinedeployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - clusters
   verbs:
   - get
   - list
@@ -92,6 +106,18 @@ rules:
   - clusters/status
   verbs:
   - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - machinedeployments
+  - machinedeployments/finalizers
+  verbs:
   - delete
   - get
   - list
@@ -161,6 +187,18 @@ rules:
   - delete
   - get
   - list
+  - watch
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - machinesets
+  - machinesets/finalizers
+  verbs:
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - cluster.x-k8s.io

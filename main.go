@@ -58,26 +58,27 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 
 	// flags.
-	metricsBindAddr               string
-	enableLeaderElection          bool
-	leaderElectionLeaseDuration   time.Duration
-	leaderElectionRenewDeadline   time.Duration
-	leaderElectionRetryPeriod     time.Duration
-	watchNamespace                string
-	watchFilterValue              string
-	profilerAddress               string
-	clusterTopologyConcurrency    int
-	clusterConcurrency            int
-	machineConcurrency            int
-	machineSetConcurrency         int
-	machineDeploymentConcurrency  int
-	machinePoolConcurrency        int
-	clusterResourceSetConcurrency int
-	machineHealthCheckConcurrency int
-	syncPeriod                    time.Duration
-	webhookPort                   int
-	webhookCertDir                string
-	healthAddr                    string
+	metricsBindAddr                      string
+	enableLeaderElection                 bool
+	leaderElectionLeaseDuration          time.Duration
+	leaderElectionRenewDeadline          time.Duration
+	leaderElectionRetryPeriod            time.Duration
+	watchNamespace                       string
+	watchFilterValue                     string
+	profilerAddress                      string
+	clusterTopologyConcurrency           int
+	machineDeploymentTopologyConcurrency int
+	clusterConcurrency                   int
+	machineConcurrency                   int
+	machineSetConcurrency                int
+	machineDeploymentConcurrency         int
+	machinePoolConcurrency               int
+	clusterResourceSetConcurrency        int
+	machineHealthCheckConcurrency        int
+	syncPeriod                           time.Duration
+	webhookPort                          int
+	webhookCertDir                       string
+	healthAddr                           string
 )
 
 func init() {
@@ -122,6 +123,9 @@ func InitFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&clusterTopologyConcurrency, "clustertopology-concurrency", 10,
 		"Number of clusters to process simultaneously")
+
+	fs.IntVar(&machineDeploymentTopologyConcurrency, "machinedeploymenttopology-concurrency", 10,
+		"Number of machine deployments to process simultaneously")
 
 	fs.IntVar(&clusterConcurrency, "cluster-concurrency", 10,
 		"Number of clusters to process simultaneously")
@@ -282,6 +286,14 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
 			WatchFilterValue:          watchFilterValue,
 		}).SetupWithManager(ctx, mgr, concurrency(clusterTopologyConcurrency)); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ClusterTopology")
+			os.Exit(1)
+		}
+
+		if err := (&topology.MachineDeploymentReconciler{
+			Client:           mgr.GetClient(),
+			WatchFilterValue: watchFilterValue,
+		}).SetupWithManager(ctx, mgr, concurrency(machineDeploymentTopologyConcurrency)); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "MachineDeploymentTopology")
 			os.Exit(1)
 		}
 	}
