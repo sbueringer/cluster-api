@@ -63,12 +63,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - bootstrap.cluster.x-k8s.io
-  - infrastructure.cluster.x-k8s.io
-  - resources=*
-  verbs:
-  - delete
-- apiGroups:
   - cluster.x-k8s.io
   resources:
   - clusterclasses
