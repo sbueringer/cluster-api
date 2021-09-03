@@ -201,7 +201,7 @@ func (r *MachineDeploymentReconciler) isClusterPaused(ctx context.Context, md *c
 		return false, errors.Errorf("couldn't find a Cluster to check if it is paused")
 	}
 
-	return annotations.IsPaused(cluster, md), nil
+	return annotations.IsPaused(cluster, cluster), nil
 }
 
 // calculateTemplatesInUse returns all templates referenced in non-deleting MachineDeployment and MachineSets.
