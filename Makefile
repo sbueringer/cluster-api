@@ -56,12 +56,15 @@ BIN_DIR := bin
 TEST_DIR := test
 TOOLS_DIR := hack/tools
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
+LINTERS_DIR := hack/tools/linters
 E2E_FRAMEWORK_DIR := $(TEST_DIR)/framework
 CAPD_DIR := $(TEST_DIR)/infrastructure/docker
 GO_APIDIFF_BIN := $(BIN_DIR)/go-apidiff
 GO_APIDIFF := $(TOOLS_DIR)/$(GO_APIDIFF_BIN)
 ENVSUBST_BIN := $(BIN_DIR)/envsubst
 ENVSUBST := $(TOOLS_DIR)/$(ENVSUBST_BIN)
+LINTERS_CONVERSION_BIN := $(BIN_DIR)/conversion.so
+LINTERS_CONVERSION := $(LINTERS_DIR)/$(LINTERS_CONVERSION_BIN)
 
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
@@ -210,6 +213,10 @@ $(GO_APIDIFF): $(TOOLS_DIR)/go.mod
 $(ENVSUBST): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR) && go build -tags=tools -o $(ENVSUBST_BIN) github.com/drone/envsubst/v2/cmd/envsubst
 
+# TODO: maybe use -tags
+$(LINTERS_CONVERSION): $(LINTERS_DIR)/go.mod
+	CGO_ENABLED=1 cd $(LINTERS_DIR) && go build -buildmode=plugin -o $(LINTERS_CONVERSION_BIN)  ./conversion/conversion.go
+
 $(KUSTOMIZE): # Download kustomize using hack script into tools folder.
 	hack/ensure-kustomize.sh
 
@@ -234,7 +241,7 @@ e2e-framework: ## Builds the CAPI e2e framework
 ## --------------------------------------
 
 .PHONY: lint
-lint: $(GOLANGCI_LINT) ## Lint codebase
+lint: $(GOLANGCI_LINT) $(LINTERS_CONVERSION) ## Lint codebase
 	$(GOLANGCI_LINT) run -v $(GOLANGCI_LINT_EXTRA_ARGS)
 	cd $(TEST_DIR); $(GOLANGCI_LINT) run -v $(GOLANGCI_LINT_EXTRA_ARGS)
 
@@ -396,6 +403,7 @@ generate-manifests-kcp: $(CONTROLLER_GEN)
 modules: ## Runs go mod to ensure modules are up to date.
 	go mod tidy
 	cd $(TOOLS_DIR); go mod tidy
+	cd $(LINTERS_DIR); go mod tidy
 	cd $(TEST_DIR); go mod tidy
 
 ## --------------------------------------
@@ -660,6 +668,10 @@ verify:
 .PHONY: verify-modules
 verify-modules: modules
 	@if !(git diff --quiet HEAD -- go.sum go.mod $(TOOLS_DIR)/go.mod $(TOOLS_DIR)/go.sum); then \
+		git diff; \
+		echo "go module files are out of date"; exit 1; \
+	fi
+	@if !(git diff --quiet HEAD -- go.sum go.mod $(LINTERS_DIR)/go.mod $(LINTERS_DIR)/go.sum); then \
 		git diff; \
 		echo "go module files are out of date"; exit 1; \
 	fi

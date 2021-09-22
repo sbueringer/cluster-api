@@ -39,6 +39,10 @@ linters:
   - whitespace
 
 linters-settings:
+  custom:
+    conversion:
+      path: ./hack/tools/linters/bin/conversion.so
+      description: Validate if we implement conversion.Hub and conversion.Convertible correctly.
   ifshort:
     # Maximum length of variable declaration measured in number of characters, after which linter won't suggest using short syntax.
     max-decl-chars: 50
