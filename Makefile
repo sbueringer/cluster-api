@@ -82,6 +82,7 @@ CONTROLLER_GEN := $(abspath $(TOOLS_BIN_DIR)/controller-gen)
 GOTESTSUM := $(abspath $(TOOLS_BIN_DIR)/gotestsum)
 GOLANGCI_LINT := $(abspath $(TOOLS_BIN_DIR)/golangci-lint)
 CONVERSION_GEN := $(abspath $(TOOLS_BIN_DIR)/conversion-gen)
+STRUCT_VERIFIER := $(abspath $(TOOLS_BIN_DIR)/struct-verifier)
 ENVSUBST := $(abspath $(TOOLS_BIN_DIR)/envsubst)
 
 # clusterctl.
@@ -204,6 +205,9 @@ $(GOTESTSUM): $(TOOLS_DIR)/go.mod # Build gotestsum from tools folder.
 $(CONVERSION_GEN): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR); go build -tags=tools -o $(BIN_DIR)/conversion-gen k8s.io/code-generator/cmd/conversion-gen
 
+$(STRUCT_VERIFIER): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR); go build -tags=tools -o $(BIN_DIR)/struct-verifier sigs.k8s.io/cluster-api/hack/tools/struct-verifier
+
 $(GO_APIDIFF): $(TOOLS_DIR)/go.mod
 	cd $(TOOLS_DIR) && go build -tags=tools -o $(GO_APIDIFF_BIN) github.com/joelanford/go-apidiff
 
@@ -223,6 +227,7 @@ kustomize: $(KUSTOMIZE) ## Build a local copy of kustomize.
 setup-envtest: $(SETUP_ENVTEST) ## Build a local copy of setup-envtest.
 controller-gen: $(CONTROLLER_GEN) ## Build a local copy of controller-gen.
 conversion-gen: $(CONVERSION_GEN) ## Build a local copy of conversion-gen.
+struct-verifier: $(STRUCT_VERIFIER) ## Build a local copy of struct-verifier.
 gotestsum: $(GOTESTSUM) ## Build a local copy of gotestsum.
 
 .PHONY: e2e-framework
