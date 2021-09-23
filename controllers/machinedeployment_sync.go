@@ -396,16 +396,21 @@ func calculateStatus(allMSs []*clusterv1.MachineSet, newMS *clusterv1.MachineSet
 	// Calculate the label selector. We check the error in the MD reconcile function, ignore here.
 	selector, _ := metav1.LabelSelectorAsSelector(&deployment.Spec.Selector)
 
+	i := mdutil.GetActualReplicaCountForMachineSets(allMSs)
 	status := clusterv1.MachineDeploymentStatus{
 		// TODO: Ensure that if we start retrying status updates, we won't pick up a new Generation value.
-		ObservedGeneration:  deployment.Generation,
-		Selector:            selector.String(),
-		Replicas:            mdutil.GetActualReplicaCountForMachineSets(allMSs),
-		UpdatedReplicas:     mdutil.GetActualReplicaCountForMachineSets([]*clusterv1.MachineSet{newMS}),
-		ReadyReplicas:       mdutil.GetReadyReplicaCountForMachineSets(allMSs),
-		AvailableReplicas:   availableReplicas,
-		UnavailableReplicas: unavailableReplicas,
-		Conditions:          deployment.Status.Conditions,
+		ObservedGeneration:           deployment.Generation,
+		Selector:                     selector.String(),
+		Replicas:                     mdutil.GetActualReplicaCountForMachineSets(allMSs),
+		TestReplicas:                 i,
+		TestReplicasOmitEmpty:        i,
+		TestReplicasPointer:          &i,
+		TestReplicasPointerOmitEmpty: &i,
+		UpdatedReplicas:              mdutil.GetActualReplicaCountForMachineSets([]*clusterv1.MachineSet{newMS}),
+		ReadyReplicas:                mdutil.GetReadyReplicaCountForMachineSets(allMSs),
+		AvailableReplicas:            availableReplicas,
+		UnavailableReplicas:          unavailableReplicas,
+		Conditions:                   deployment.Status.Conditions,
 	}
 
 	if *deployment.Spec.Replicas == status.ReadyReplicas {

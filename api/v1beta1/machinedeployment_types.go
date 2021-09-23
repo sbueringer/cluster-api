@@ -198,6 +198,21 @@ type MachineDeploymentStatus struct {
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas"`
 
+	// Note: shows up in status
+	// +optional
+	TestReplicas int32 `json:"testReplicas"`
+
+	// +optional
+	TestReplicasOmitEmpty int32 `json:"testReplicasOmitEmpty,omitempty"`
+
+	// Note: shows up in status
+	// +optional
+	TestReplicasPointer *int32 `json:"testReplicasPointer"`
+
+	// Note: shows up in status
+	// +optional
+	TestReplicasPointerOmitEmpty *int32 `json:"testReplicasPointerOmitEmpty,omitempty"`
+
 	// Total number of ready machines targeted by this deployment.
 	// +optional
 	ReadyReplicas int32 `json:"readyReplicas"`

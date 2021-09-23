@@ -1402,6 +1402,21 @@ spec:
                   be in the same format as the query-param syntax. More info about
                   label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors'
                 type: string
+              testReplicas:
+                description: 'Note: shows up in status'
+                format: int32
+                type: integer
+              testReplicasOmitEmpty:
+                format: int32
+                type: integer
+              testReplicasPointer:
+                description: 'Note: shows up in status'
+                format: int32
+                type: integer
+              testReplicasPointerOmitEmpty:
+                description: 'Note: shows up in status'
+                format: int32
+                type: integer
               unavailableReplicas:
                 description: Total number of unavailable machines targeted by this
                   deployment. This is the total number of machines that are still
