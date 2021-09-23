@@ -193,7 +193,7 @@ type Condition struct {
 
    // LastTransitionTime is the last time the condition transitioned from one status to another.
    // +required
-   LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+   LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 
    // The reason for the condition's last transition.
    // Reasons should be CamelCase.
