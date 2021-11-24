@@ -31,6 +31,10 @@ var _ = Describe("When testing clusterctl upgrades [clusterctl-Upgrade]", func()
 			BootstrapClusterProxy: bootstrapClusterProxy,
 			ArtifactFolder:        artifactFolder,
 			SkipCleanup:           skipCleanup,
+			// Also copy cluster-template + ClusterClass to v1.0.x folder in local clusterctl repository + drop patches/variable from both, ref:
+			// /Users/buringerst/code/src/sigs.k8s.io/cluster-api/_artifacts/repository/infrastructure-docker/v1.1.99/cluster-template-topology.yaml
+			// Deploy ClusterClass somewhere in the middle (when deploying the workload cluster) because clusterctl v1.0.x doesn't do it automatically.
+			WorkloadFlavor:        "topology",
 		}
 	})
 })
