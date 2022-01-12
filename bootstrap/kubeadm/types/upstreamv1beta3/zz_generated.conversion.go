@@ -635,6 +635,7 @@ func autoConvert_upstreamv1beta3_InitConfiguration_To_v1beta1_InitConfiguration(
 	}
 	// WARNING: in.CertificateKey requires manual conversion: does not exist in peer-type
 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
+	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -672,6 +673,7 @@ func autoConvert_upstreamv1beta3_JoinConfiguration_To_v1beta1_JoinConfiguration(
 		out.ControlPlane = nil
 	}
 	// WARNING: in.SkipPhases requires manual conversion: does not exist in peer-type
+	// WARNING: in.Patches requires manual conversion: does not exist in peer-type
 	return nil
 }
 
