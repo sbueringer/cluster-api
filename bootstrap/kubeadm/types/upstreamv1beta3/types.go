@@ -62,9 +62,9 @@ type InitConfiguration struct {
 	SkipPhases []string `json:"skipPhases,omitempty"`
 
 	// Patches contains options related to applying patches to components deployed by kubeadm during
-	// "kubeadm join". The minimum kubernetes version needed to support Patches is v1.22
+	// "kubeadm init".
 	// +optional
-	Patches Patches `json:"patches,omitempty"`
+	Patches *Patches `json:"patches,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -353,9 +353,9 @@ type JoinConfiguration struct {
 	SkipPhases []string `json:"skipPhases,omitempty"`
 
 	// Patches contains options related to applying patches to components deployed by kubeadm during
-	// "kubeadm init". The minimum kubernetes version needed to support Patches is v1.22
+	// "kubeadm join".
 	// +optional
-	Patches Patches `json:"patches,omitempty"`
+	Patches *Patches `json:"patches,omitempty"`
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
