@@ -45,6 +45,11 @@ const (
 	// alpha: v0.4
 	ClusterTopology featuregate.Feature = "ClusterTopology"
 
+	// RuntimeExtension is a feature gate for the Runtime hooks and extensions functionality.
+	//
+	// alpha: v1.1
+	RuntimeExtension featuregate.Feature = "RuntimeExtension"
+
 	// KubeadmBootstrapFormatIgnition is a feature gate for the Ignition bootstrap format
 	// functionality.
 	//
@@ -64,4 +69,5 @@ var defaultClusterAPIFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ClusterResourceSet:             {Default: true, PreRelease: featuregate.Beta},
 	ClusterTopology:                {Default: false, PreRelease: featuregate.Alpha},
 	KubeadmBootstrapFormatIgnition: {Default: false, PreRelease: featuregate.Alpha},
+	RuntimeExtension:               {Default: false, PreRelease: featuregate.Alpha},
 }
