@@ -81,7 +81,7 @@ type WebhookClientConfig struct {
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
 }
 
-// ServiceReference holds a reference to Service.legacy.k8s.io.
+// ServiceReference holds a reference to a Kubernetes Service.
 type ServiceReference struct {
 	// `namespace` is the namespace of the service.
 	// Required

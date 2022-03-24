@@ -312,15 +312,6 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
 		Registry: registry,
 	})
 
-	// if err := (&runtimecontrollers.ExtensionReconciler{
-	//	Client:        mgr.GetClient(),
-	//	RuntimeClient: runtimeClient,
-	//	Registry:      registry,
-	//}).SetupWithManager(ctx, mgr, concurrency(1)); err != nil {
-	//	setupLog.Error(err, "unable to create controller", "controller", "Extension")
-	//	os.Exit(1)
-	//}
-
 	if feature.Gates.Enabled(feature.ClusterTopology) {
 		unstructuredCachingClient, err := client.NewDelegatingClient(
 			client.NewDelegatingClientInput{
@@ -464,6 +455,13 @@ func setupWebhooks(mgr ctrl.Manager) {
 		os.Exit(1)
 	}
 
+	// NOTE: Extensions are behind the RuntimeSDK feature gate flag; the webhook will prevent creation or updates of
+	// Extension objects if the flag is disabled.
+	if err := (&expruntimev1.Extension{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Extension")
+		os.Exit(1)
+	}
+
 	if err := (&clusterv1.Machine{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Machine")
 		os.Exit(1)
@@ -489,13 +487,6 @@ func setupWebhooks(mgr ctrl.Manager) {
 	if feature.Gates.Enabled(feature.ClusterResourceSet) {
 		if err := (&addonsv1.ClusterResourceSet{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterResourceSet")
-			os.Exit(1)
-		}
-	}
-
-	if feature.Gates.Enabled(feature.RuntimeExtension) {
-		if err := (&expruntimev1.Extension{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Extension")
 			os.Exit(1)
 		}
 	}

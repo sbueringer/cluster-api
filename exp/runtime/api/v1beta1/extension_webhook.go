@@ -51,12 +51,12 @@ func (e *Extension) Default() {
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
 func (e *Extension) ValidateCreate() error {
-	// NOTE: Extensions is behind the RuntimeExtension feature gate flag; the web hook
+	// NOTE: Extensions is behind the RuntimeSDK feature gate flag; the web hook
 	// must prevent creating new objects in case the feature flag is disabled.
-	if !feature.Gates.Enabled(feature.RuntimeExtension) {
+	if !feature.Gates.Enabled(feature.RuntimeSDK) {
 		return field.Forbidden(
 			field.NewPath("spec"),
-			"can be set only if the RuntimeExtension feature flag is enabled",
+			"can be set only if the RuntimeSDK feature flag is enabled",
 		)
 	}
 	return nil
@@ -64,8 +64,14 @@ func (e *Extension) ValidateCreate() error {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
 func (e *Extension) ValidateUpdate(old runtime.Object) error {
+	if !feature.Gates.Enabled(feature.RuntimeSDK) {
+		return field.Forbidden(
+			field.NewPath("spec"),
+			"can be set only if the RuntimeSDK feature flag is enabled",
+		)
+	}
 	if _, ok := old.(*Extension); !ok {
-		return apierrors.NewBadRequest(fmt.Sprintf("expected a Machine but got a %T", old))
+		return apierrors.NewBadRequest(fmt.Sprintf("expected an Extension but got a %T", old))
 	}
 	return nil
 }
