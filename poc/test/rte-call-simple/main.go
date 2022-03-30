@@ -8,8 +8,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
 	"sigs.k8s.io/cluster-api/exp/runtime/controllers"
+	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	rtclient "sigs.k8s.io/cluster-api/internal/runtime/client"
@@ -21,11 +24,28 @@ import (
 var c = catalog.New()
 
 func init() {
+	_ = v1alpha1.AddToCatalog(c)
+	_ = v1alpha2.AddToCatalog(c)
 	_ = v1alpha3.AddToCatalog(c)
 }
 
 func main() {
 	ctx := context.Background()
+
+	//scheme := runtime.NewScheme()
+	//clusterv1.AddToScheme(scheme)
+
+	c1 := &v1alpha3.BeforeClusterCreateRequest{
+		Cluster:  clusterv1.Cluster{
+			Spec: clusterv1.ClusterSpec{
+				Paused: true,
+			},
+		},
+	}
+	c2 := &v1alpha1.BeforeClusterCreateRequest{}
+
+	err := c.Convert(c1, c2, context.Background())
+	fmt.Println(err)
 
 	// Note: this example is not functional anymore as it requires an entire manager to run the extension controller
 	// which we currently don't setup correctly here.

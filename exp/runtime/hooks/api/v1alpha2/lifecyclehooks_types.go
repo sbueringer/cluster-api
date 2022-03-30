@@ -14,15 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 
-	clusterv1alpha4 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
 )
 
@@ -61,6 +58,8 @@ type NonBlockingResponse struct {
 type BeforeClusterCreateRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
+	First string `json:"first"`
+
 	// The cluster object the lifecycle hook corresponds to.
 	Cluster clusterv1.Cluster `json:"cluster"`
 }
@@ -88,7 +87,7 @@ type BeforeClusterUpgradeRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// The cluster object the lifecycle hook corresponds to.
-	Cluster clusterv1alpha4.Cluster `json:"cluster"`
+	Cluster clusterv1.Cluster `json:"cluster"`
 
 	// The current version of the cluster.
 	FromKubernetesVersion string `json:"fromKubernetesVersion"`
@@ -177,21 +176,4 @@ func init() {
 		Summary:     "Called before the Cluster is deleted",
 		Description: "This blocking hook is called after the Cluster has been deleted by the user, and immediately before objects existing in the Cluster are going to be deleted",
 	})
-}
-
-func Convert_v1alpha3_BeforeClusterCreateRequest_To_v1alpha1_BeforeClusterCreateRequest(in *v1alpha3.BeforeClusterCreateRequest, out *BeforeClusterCreateRequest, s conversion.Scope) error {
-
-	if err := autoConvert_v1alpha3_BeforeClusterCreateRequest_To_v1alpha1_BeforeClusterCreateRequest(in, out, s); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func Convert_v1alpha4_Cluster_To_v1beta1_Cluster(in *clusterv1alpha4.Cluster, out *clusterv1.Cluster, s conversion.Scope) error {
-	return clusterv1alpha4.Convert_v1alpha4_Cluster_To_v1beta1_Cluster(in, out, s)
-}
-
-func Convert_v1beta1_Cluster_To_v1alpha4_Cluster(in *clusterv1.Cluster, out *clusterv1alpha4.Cluster, s conversion.Scope) error {
-	return clusterv1alpha4.Convert_v1beta1_Cluster_To_v1alpha4_Cluster(in, out, s)
 }

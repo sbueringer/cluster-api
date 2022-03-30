@@ -32,7 +32,7 @@ import (
 type ExtensionReconciler struct {
 	Client        client.Client
 	RuntimeClient runtimeclient.Client
-	Registry      registry.Registry
+	Registry      registry.ExtensionRegistry
 }
 
 func (r *ExtensionReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {

@@ -21,12 +21,13 @@ import (
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	expv1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
-	runtimeclient "sigs.k8s.io/cluster-api/internal/runtime/client"
-	"sigs.k8s.io/cluster-api/internal/runtime/registry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+
+	expv1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
+	runtimeclient "sigs.k8s.io/cluster-api/internal/runtime/client"
+	"sigs.k8s.io/cluster-api/internal/runtime/registry"
 )
 
 // +kubebuilder:rbac:groups=runtime.cluster.x-k8s.io,resources=extension,verbs=get;list;watch;create;update;patch;delete
@@ -35,7 +36,7 @@ import (
 type ExtensionReconciler struct {
 	Client        client.Client
 	RuntimeClient runtimeclient.Client
-	Registry      registry.Registry
+	Registry      registry.ExtensionRegistry
 }
 
 func (r *ExtensionReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -77,7 +78,7 @@ func (r *ExtensionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 func (r *ExtensionReconciler) reconcileDelete(ctx context.Context, ext *expv1.Extension) (ctrl.Result, error) {
-	r.Registry.RemoveRuntimeExtension(ext)
+	r.Registry.Remove(ext)
 
 	return ctrl.Result{}, nil
 }
@@ -88,7 +89,7 @@ func (r *ExtensionReconciler) reconcile(ctx context.Context, ext *expv1.Extensio
 	// Note: Has to work with ext.Spec.ClientConfig without underlying registry
 	// Q: Is it enough to do the Discovery only once initially or on each reconcile
 
-	r.Registry.RegisterRuntimeExtension(ext)
+	r.Registry.Add(ext)
 
 	return ctrl.Result{}, nil
 }

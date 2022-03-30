@@ -35,7 +35,7 @@ type Builder struct {
 	// SchemeBuilder are the functions which are used
 	// to add the types of Hook requests and responses to
 	// the scheme of a catalog.
-	SchemeBuilder runtime.SchemeBuilder
+	schemeBuilder runtime.SchemeBuilder
 }
 
 // RegisterHook registers a Hook and its request and response types.
@@ -65,7 +65,11 @@ func (bld *Builder) AddToCatalog(catalog *Catalog) error {
 	for _, addTo := range bld.catalogBuilder {
 		addTo(catalog)
 	}
-	return bld.SchemeBuilder.AddToScheme(catalog.scheme)
+	return bld.schemeBuilder.AddToScheme(catalog.scheme)
+}
+
+func (bld *Builder) Register(f func(*runtime.Scheme) error) {
+	bld.schemeBuilder.Register(f)
 }
 
 // Build returns a new Catalog containing all registered Hooks their request and response types

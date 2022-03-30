@@ -34,6 +34,76 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*AfterClusterUpgradeRequest)(nil), (*v1alpha3.AfterClusterUpgradeRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_AfterClusterUpgradeRequest_To_v1alpha3_AfterClusterUpgradeRequest(a.(*AfterClusterUpgradeRequest), b.(*v1alpha3.AfterClusterUpgradeRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.AfterClusterUpgradeRequest)(nil), (*AfterClusterUpgradeRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_AfterClusterUpgradeRequest_To_v1alpha2_AfterClusterUpgradeRequest(a.(*v1alpha3.AfterClusterUpgradeRequest), b.(*AfterClusterUpgradeRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*AfterControlPlaneInitializedRequest)(nil), (*v1alpha3.AfterControlPlaneInitializedRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_AfterControlPlaneInitializedRequest_To_v1alpha3_AfterControlPlaneInitializedRequest(a.(*AfterControlPlaneInitializedRequest), b.(*v1alpha3.AfterControlPlaneInitializedRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.AfterControlPlaneInitializedRequest)(nil), (*AfterControlPlaneInitializedRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_AfterControlPlaneInitializedRequest_To_v1alpha2_AfterControlPlaneInitializedRequest(a.(*v1alpha3.AfterControlPlaneInitializedRequest), b.(*AfterControlPlaneInitializedRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*AfterControlPlaneUpgradeRequest)(nil), (*v1alpha3.AfterControlPlaneUpgradeRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_AfterControlPlaneUpgradeRequest_To_v1alpha3_AfterControlPlaneUpgradeRequest(a.(*AfterControlPlaneUpgradeRequest), b.(*v1alpha3.AfterControlPlaneUpgradeRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.AfterControlPlaneUpgradeRequest)(nil), (*AfterControlPlaneUpgradeRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_AfterControlPlaneUpgradeRequest_To_v1alpha2_AfterControlPlaneUpgradeRequest(a.(*v1alpha3.AfterControlPlaneUpgradeRequest), b.(*AfterControlPlaneUpgradeRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*BeforeClusterCreateRequest)(nil), (*v1alpha3.BeforeClusterCreateRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_BeforeClusterCreateRequest_To_v1alpha3_BeforeClusterCreateRequest(a.(*BeforeClusterCreateRequest), b.(*v1alpha3.BeforeClusterCreateRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.BeforeClusterCreateRequest)(nil), (*BeforeClusterCreateRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_BeforeClusterCreateRequest_To_v1alpha2_BeforeClusterCreateRequest(a.(*v1alpha3.BeforeClusterCreateRequest), b.(*BeforeClusterCreateRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*BeforeClusterDeleteRequest)(nil), (*v1alpha3.BeforeClusterDeleteRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_BeforeClusterDeleteRequest_To_v1alpha3_BeforeClusterDeleteRequest(a.(*BeforeClusterDeleteRequest), b.(*v1alpha3.BeforeClusterDeleteRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.BeforeClusterDeleteRequest)(nil), (*BeforeClusterDeleteRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_BeforeClusterDeleteRequest_To_v1alpha2_BeforeClusterDeleteRequest(a.(*v1alpha3.BeforeClusterDeleteRequest), b.(*BeforeClusterDeleteRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*BeforeClusterUpgradeRequest)(nil), (*v1alpha3.BeforeClusterUpgradeRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_BeforeClusterUpgradeRequest_To_v1alpha3_BeforeClusterUpgradeRequest(a.(*BeforeClusterUpgradeRequest), b.(*v1alpha3.BeforeClusterUpgradeRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.BeforeClusterUpgradeRequest)(nil), (*BeforeClusterUpgradeRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_BeforeClusterUpgradeRequest_To_v1alpha2_BeforeClusterUpgradeRequest(a.(*v1alpha3.BeforeClusterUpgradeRequest), b.(*BeforeClusterUpgradeRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*BlockingResponse)(nil), (*v1alpha3.BlockingResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_BlockingResponse_To_v1alpha3_BlockingResponse(a.(*BlockingResponse), b.(*v1alpha3.BlockingResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.BlockingResponse)(nil), (*BlockingResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_BlockingResponse_To_v1alpha2_BlockingResponse(a.(*v1alpha3.BlockingResponse), b.(*BlockingResponse), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*DiscoveryHookRequest)(nil), (*v1alpha3.DiscoveryHookRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha2_DiscoveryHookRequest_To_v1alpha3_DiscoveryHookRequest(a.(*DiscoveryHookRequest), b.(*v1alpha3.DiscoveryHookRequest), scope)
 	}); err != nil {
@@ -54,7 +124,171 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*NonBlockingResponse)(nil), (*v1alpha3.NonBlockingResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_NonBlockingResponse_To_v1alpha3_NonBlockingResponse(a.(*NonBlockingResponse), b.(*v1alpha3.NonBlockingResponse), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.NonBlockingResponse)(nil), (*NonBlockingResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_NonBlockingResponse_To_v1alpha2_NonBlockingResponse(a.(*v1alpha3.NonBlockingResponse), b.(*NonBlockingResponse), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
+}
+
+func autoConvert_v1alpha2_AfterClusterUpgradeRequest_To_v1alpha3_AfterClusterUpgradeRequest(in *AfterClusterUpgradeRequest, out *v1alpha3.AfterClusterUpgradeRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	out.KubernetesVersion = in.KubernetesVersion
+	return nil
+}
+
+// Convert_v1alpha2_AfterClusterUpgradeRequest_To_v1alpha3_AfterClusterUpgradeRequest is an autogenerated conversion function.
+func Convert_v1alpha2_AfterClusterUpgradeRequest_To_v1alpha3_AfterClusterUpgradeRequest(in *AfterClusterUpgradeRequest, out *v1alpha3.AfterClusterUpgradeRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha2_AfterClusterUpgradeRequest_To_v1alpha3_AfterClusterUpgradeRequest(in, out, s)
+}
+
+func autoConvert_v1alpha3_AfterClusterUpgradeRequest_To_v1alpha2_AfterClusterUpgradeRequest(in *v1alpha3.AfterClusterUpgradeRequest, out *AfterClusterUpgradeRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	out.KubernetesVersion = in.KubernetesVersion
+	return nil
+}
+
+// Convert_v1alpha3_AfterClusterUpgradeRequest_To_v1alpha2_AfterClusterUpgradeRequest is an autogenerated conversion function.
+func Convert_v1alpha3_AfterClusterUpgradeRequest_To_v1alpha2_AfterClusterUpgradeRequest(in *v1alpha3.AfterClusterUpgradeRequest, out *AfterClusterUpgradeRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha3_AfterClusterUpgradeRequest_To_v1alpha2_AfterClusterUpgradeRequest(in, out, s)
+}
+
+func autoConvert_v1alpha2_AfterControlPlaneInitializedRequest_To_v1alpha3_AfterControlPlaneInitializedRequest(in *AfterControlPlaneInitializedRequest, out *v1alpha3.AfterControlPlaneInitializedRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	return nil
+}
+
+// Convert_v1alpha2_AfterControlPlaneInitializedRequest_To_v1alpha3_AfterControlPlaneInitializedRequest is an autogenerated conversion function.
+func Convert_v1alpha2_AfterControlPlaneInitializedRequest_To_v1alpha3_AfterControlPlaneInitializedRequest(in *AfterControlPlaneInitializedRequest, out *v1alpha3.AfterControlPlaneInitializedRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha2_AfterControlPlaneInitializedRequest_To_v1alpha3_AfterControlPlaneInitializedRequest(in, out, s)
+}
+
+func autoConvert_v1alpha3_AfterControlPlaneInitializedRequest_To_v1alpha2_AfterControlPlaneInitializedRequest(in *v1alpha3.AfterControlPlaneInitializedRequest, out *AfterControlPlaneInitializedRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	return nil
+}
+
+// Convert_v1alpha3_AfterControlPlaneInitializedRequest_To_v1alpha2_AfterControlPlaneInitializedRequest is an autogenerated conversion function.
+func Convert_v1alpha3_AfterControlPlaneInitializedRequest_To_v1alpha2_AfterControlPlaneInitializedRequest(in *v1alpha3.AfterControlPlaneInitializedRequest, out *AfterControlPlaneInitializedRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha3_AfterControlPlaneInitializedRequest_To_v1alpha2_AfterControlPlaneInitializedRequest(in, out, s)
+}
+
+func autoConvert_v1alpha2_AfterControlPlaneUpgradeRequest_To_v1alpha3_AfterControlPlaneUpgradeRequest(in *AfterControlPlaneUpgradeRequest, out *v1alpha3.AfterControlPlaneUpgradeRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	out.KubernetesVersion = in.KubernetesVersion
+	return nil
+}
+
+// Convert_v1alpha2_AfterControlPlaneUpgradeRequest_To_v1alpha3_AfterControlPlaneUpgradeRequest is an autogenerated conversion function.
+func Convert_v1alpha2_AfterControlPlaneUpgradeRequest_To_v1alpha3_AfterControlPlaneUpgradeRequest(in *AfterControlPlaneUpgradeRequest, out *v1alpha3.AfterControlPlaneUpgradeRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha2_AfterControlPlaneUpgradeRequest_To_v1alpha3_AfterControlPlaneUpgradeRequest(in, out, s)
+}
+
+func autoConvert_v1alpha3_AfterControlPlaneUpgradeRequest_To_v1alpha2_AfterControlPlaneUpgradeRequest(in *v1alpha3.AfterControlPlaneUpgradeRequest, out *AfterControlPlaneUpgradeRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	out.KubernetesVersion = in.KubernetesVersion
+	return nil
+}
+
+// Convert_v1alpha3_AfterControlPlaneUpgradeRequest_To_v1alpha2_AfterControlPlaneUpgradeRequest is an autogenerated conversion function.
+func Convert_v1alpha3_AfterControlPlaneUpgradeRequest_To_v1alpha2_AfterControlPlaneUpgradeRequest(in *v1alpha3.AfterControlPlaneUpgradeRequest, out *AfterControlPlaneUpgradeRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha3_AfterControlPlaneUpgradeRequest_To_v1alpha2_AfterControlPlaneUpgradeRequest(in, out, s)
+}
+
+func autoConvert_v1alpha2_BeforeClusterCreateRequest_To_v1alpha3_BeforeClusterCreateRequest(in *BeforeClusterCreateRequest, out *v1alpha3.BeforeClusterCreateRequest, s conversion.Scope) error {
+	out.First = in.First
+	out.Cluster = in.Cluster
+	return nil
+}
+
+// Convert_v1alpha2_BeforeClusterCreateRequest_To_v1alpha3_BeforeClusterCreateRequest is an autogenerated conversion function.
+func Convert_v1alpha2_BeforeClusterCreateRequest_To_v1alpha3_BeforeClusterCreateRequest(in *BeforeClusterCreateRequest, out *v1alpha3.BeforeClusterCreateRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha2_BeforeClusterCreateRequest_To_v1alpha3_BeforeClusterCreateRequest(in, out, s)
+}
+
+func autoConvert_v1alpha3_BeforeClusterCreateRequest_To_v1alpha2_BeforeClusterCreateRequest(in *v1alpha3.BeforeClusterCreateRequest, out *BeforeClusterCreateRequest, s conversion.Scope) error {
+	out.First = in.First
+	out.Cluster = in.Cluster
+	return nil
+}
+
+// Convert_v1alpha3_BeforeClusterCreateRequest_To_v1alpha2_BeforeClusterCreateRequest is an autogenerated conversion function.
+func Convert_v1alpha3_BeforeClusterCreateRequest_To_v1alpha2_BeforeClusterCreateRequest(in *v1alpha3.BeforeClusterCreateRequest, out *BeforeClusterCreateRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha3_BeforeClusterCreateRequest_To_v1alpha2_BeforeClusterCreateRequest(in, out, s)
+}
+
+func autoConvert_v1alpha2_BeforeClusterDeleteRequest_To_v1alpha3_BeforeClusterDeleteRequest(in *BeforeClusterDeleteRequest, out *v1alpha3.BeforeClusterDeleteRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	return nil
+}
+
+// Convert_v1alpha2_BeforeClusterDeleteRequest_To_v1alpha3_BeforeClusterDeleteRequest is an autogenerated conversion function.
+func Convert_v1alpha2_BeforeClusterDeleteRequest_To_v1alpha3_BeforeClusterDeleteRequest(in *BeforeClusterDeleteRequest, out *v1alpha3.BeforeClusterDeleteRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha2_BeforeClusterDeleteRequest_To_v1alpha3_BeforeClusterDeleteRequest(in, out, s)
+}
+
+func autoConvert_v1alpha3_BeforeClusterDeleteRequest_To_v1alpha2_BeforeClusterDeleteRequest(in *v1alpha3.BeforeClusterDeleteRequest, out *BeforeClusterDeleteRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	return nil
+}
+
+// Convert_v1alpha3_BeforeClusterDeleteRequest_To_v1alpha2_BeforeClusterDeleteRequest is an autogenerated conversion function.
+func Convert_v1alpha3_BeforeClusterDeleteRequest_To_v1alpha2_BeforeClusterDeleteRequest(in *v1alpha3.BeforeClusterDeleteRequest, out *BeforeClusterDeleteRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha3_BeforeClusterDeleteRequest_To_v1alpha2_BeforeClusterDeleteRequest(in, out, s)
+}
+
+func autoConvert_v1alpha2_BeforeClusterUpgradeRequest_To_v1alpha3_BeforeClusterUpgradeRequest(in *BeforeClusterUpgradeRequest, out *v1alpha3.BeforeClusterUpgradeRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	out.FromKubernetesVersion = in.FromKubernetesVersion
+	out.ToKubernetesVersion = in.ToKubernetesVersion
+	return nil
+}
+
+// Convert_v1alpha2_BeforeClusterUpgradeRequest_To_v1alpha3_BeforeClusterUpgradeRequest is an autogenerated conversion function.
+func Convert_v1alpha2_BeforeClusterUpgradeRequest_To_v1alpha3_BeforeClusterUpgradeRequest(in *BeforeClusterUpgradeRequest, out *v1alpha3.BeforeClusterUpgradeRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha2_BeforeClusterUpgradeRequest_To_v1alpha3_BeforeClusterUpgradeRequest(in, out, s)
+}
+
+func autoConvert_v1alpha3_BeforeClusterUpgradeRequest_To_v1alpha2_BeforeClusterUpgradeRequest(in *v1alpha3.BeforeClusterUpgradeRequest, out *BeforeClusterUpgradeRequest, s conversion.Scope) error {
+	out.Cluster = in.Cluster
+	out.FromKubernetesVersion = in.FromKubernetesVersion
+	out.ToKubernetesVersion = in.ToKubernetesVersion
+	return nil
+}
+
+// Convert_v1alpha3_BeforeClusterUpgradeRequest_To_v1alpha2_BeforeClusterUpgradeRequest is an autogenerated conversion function.
+func Convert_v1alpha3_BeforeClusterUpgradeRequest_To_v1alpha2_BeforeClusterUpgradeRequest(in *v1alpha3.BeforeClusterUpgradeRequest, out *BeforeClusterUpgradeRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha3_BeforeClusterUpgradeRequest_To_v1alpha2_BeforeClusterUpgradeRequest(in, out, s)
+}
+
+func autoConvert_v1alpha2_BlockingResponse_To_v1alpha3_BlockingResponse(in *BlockingResponse, out *v1alpha3.BlockingResponse, s conversion.Scope) error {
+	out.Status = v1alpha3.ResponseStatus(in.Status)
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	out.Message = in.Message
+	return nil
+}
+
+// Convert_v1alpha2_BlockingResponse_To_v1alpha3_BlockingResponse is an autogenerated conversion function.
+func Convert_v1alpha2_BlockingResponse_To_v1alpha3_BlockingResponse(in *BlockingResponse, out *v1alpha3.BlockingResponse, s conversion.Scope) error {
+	return autoConvert_v1alpha2_BlockingResponse_To_v1alpha3_BlockingResponse(in, out, s)
+}
+
+func autoConvert_v1alpha3_BlockingResponse_To_v1alpha2_BlockingResponse(in *v1alpha3.BlockingResponse, out *BlockingResponse, s conversion.Scope) error {
+	out.Status = ResponseStatus(in.Status)
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	out.Message = in.Message
+	return nil
+}
+
+// Convert_v1alpha3_BlockingResponse_To_v1alpha2_BlockingResponse is an autogenerated conversion function.
+func Convert_v1alpha3_BlockingResponse_To_v1alpha2_BlockingResponse(in *v1alpha3.BlockingResponse, out *BlockingResponse, s conversion.Scope) error {
+	return autoConvert_v1alpha3_BlockingResponse_To_v1alpha2_BlockingResponse(in, out, s)
 }
 
 func autoConvert_v1alpha2_DiscoveryHookRequest_To_v1alpha3_DiscoveryHookRequest(in *DiscoveryHookRequest, out *v1alpha3.DiscoveryHookRequest, s conversion.Scope) error {
@@ -97,4 +331,26 @@ func autoConvert_v1alpha3_DiscoveryHookResponse_To_v1alpha2_DiscoveryHookRespons
 // Convert_v1alpha3_DiscoveryHookResponse_To_v1alpha2_DiscoveryHookResponse is an autogenerated conversion function.
 func Convert_v1alpha3_DiscoveryHookResponse_To_v1alpha2_DiscoveryHookResponse(in *v1alpha3.DiscoveryHookResponse, out *DiscoveryHookResponse, s conversion.Scope) error {
 	return autoConvert_v1alpha3_DiscoveryHookResponse_To_v1alpha2_DiscoveryHookResponse(in, out, s)
+}
+
+func autoConvert_v1alpha2_NonBlockingResponse_To_v1alpha3_NonBlockingResponse(in *NonBlockingResponse, out *v1alpha3.NonBlockingResponse, s conversion.Scope) error {
+	out.Status = v1alpha3.ResponseStatus(in.Status)
+	out.Message = in.Message
+	return nil
+}
+
+// Convert_v1alpha2_NonBlockingResponse_To_v1alpha3_NonBlockingResponse is an autogenerated conversion function.
+func Convert_v1alpha2_NonBlockingResponse_To_v1alpha3_NonBlockingResponse(in *NonBlockingResponse, out *v1alpha3.NonBlockingResponse, s conversion.Scope) error {
+	return autoConvert_v1alpha2_NonBlockingResponse_To_v1alpha3_NonBlockingResponse(in, out, s)
+}
+
+func autoConvert_v1alpha3_NonBlockingResponse_To_v1alpha2_NonBlockingResponse(in *v1alpha3.NonBlockingResponse, out *NonBlockingResponse, s conversion.Scope) error {
+	out.Status = ResponseStatus(in.Status)
+	out.Message = in.Message
+	return nil
+}
+
+// Convert_v1alpha3_NonBlockingResponse_To_v1alpha2_NonBlockingResponse is an autogenerated conversion function.
+func Convert_v1alpha3_NonBlockingResponse_To_v1alpha2_NonBlockingResponse(in *v1alpha3.NonBlockingResponse, out *NonBlockingResponse, s conversion.Scope) error {
+	return autoConvert_v1alpha3_NonBlockingResponse_To_v1alpha2_NonBlockingResponse(in, out, s)
 }
