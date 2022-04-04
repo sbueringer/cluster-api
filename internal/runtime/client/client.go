@@ -190,6 +190,8 @@ func (e *extensionClient) Discover(ctx context.Context) (*runtimev1.Extension, e
 	}
 
 	request := &hooksv1alpha1.DiscoveryHookRequest{}
+	request.Kind = "Discovery"
+	request.APIVersion = "v1alpha1"
 	response := &hooksv1alpha1.DiscoveryHookResponse{}
 
 	// Future work: The discovery runtime extension could be operating on a different hook version than
@@ -201,6 +203,11 @@ func (e *extensionClient) Discover(ctx context.Context) (*runtimev1.Extension, e
 		gvh:     gvh,
 		timeout: defaultDiscoveryTimeout,
 	}
+
+	// FIXME: Do we need to set the apiversion and kind here?
+	request.Kind = "Discovery"
+	request.APIVersion = "v1alpha1"
+
 	if err := httpCall(ctx, request, response, opts); err != nil {
 		return nil, errors.Wrap(err, "failed to call the discovery extension")
 	}
@@ -325,6 +332,7 @@ func httpCall(ctx context.Context, request, response runtime.Object, opts *httpC
 
 func urlForExtension(config runtimev1.ExtensionClientConfig, gvh catalog.GroupVersionHook, name string) (*url.URL, error) {
 	var u *url.URL
+	// TODO: Add additional validation here - webhook should make this safe, but for now it might be good to do url validation in here.
 	if config.Service != nil {
 		svc := config.Service
 		host := svc.Name + "." + svc.Namespace + ".svc"
