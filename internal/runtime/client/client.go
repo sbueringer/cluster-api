@@ -100,7 +100,7 @@ type HookClient interface {
 	// CallAll calls all the extension registered for the hook.
 	CallAll(ctx context.Context, request, response runtime.Object) error
 
-	// CallExtension calls only the extension with the given name.
+	// Call calls only the extension with the given name.
 	Call(ctx context.Context, name string, request, response runtime.Object) error
 }
 
@@ -163,6 +163,8 @@ func (h *hookClient) Call(ctx context.Context, name string, request, response ru
 	return nil
 }
 
+// ExtensionClient
+// TODO: Discuss API here. Decide whether to use a builder pattern or to pass the extension as a function parameter.
 type ExtensionClient interface {
 	// Discover makes the discovery call on the extension and updates the runtime extensions
 	// information in the extension status.
@@ -190,8 +192,6 @@ func (e *extensionClient) Discover(ctx context.Context) (*runtimev1.Extension, e
 	}
 
 	request := &hooksv1alpha1.DiscoveryHookRequest{}
-	request.Kind = "Discovery"
-	request.APIVersion = "v1alpha1"
 	response := &hooksv1alpha1.DiscoveryHookResponse{}
 
 	// Future work: The discovery runtime extension could be operating on a different hook version than
@@ -203,10 +203,6 @@ func (e *extensionClient) Discover(ctx context.Context) (*runtimev1.Extension, e
 		gvh:     gvh,
 		timeout: defaultDiscoveryTimeout,
 	}
-
-	// FIXME: Do we need to set the apiversion and kind here?
-	request.Kind = "Discovery"
-	request.APIVersion = "v1alpha1"
 
 	if err := httpCall(ctx, request, response, opts); err != nil {
 		return nil, errors.Wrap(err, "failed to call the discovery extension")

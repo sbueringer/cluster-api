@@ -62,13 +62,30 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 			NamespaceSelector: nil,
 		},
 	}
-	extensionWithDiscovery := &runtimev1.Extension{
+	extensionWithDiscovery1 := &runtimev1.Extension{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Extension",
 			APIVersion: "runtime.cluster.x-k8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "extension-with-discovery",
+			Namespace: ns.Name,
+		},
+		Spec: runtimev1.ExtensionSpec{
+			ClientConfig: runtimev1.ExtensionClientConfig{
+				URL: pointer.String("http://localhost:39999"),
+			},
+			NamespaceSelector: nil,
+		},
+	}
+
+	extensionWithDiscovery2 := &runtimev1.Extension{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Extension",
+			APIVersion: "runtime.cluster.x-k8s.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "extension-with-discovery-but-again",
 			Namespace: ns.Name,
 		},
 		Spec: runtimev1.ExtensionSpec{
@@ -263,16 +280,30 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 			}),
 		}
 
-		// Reconcile initially to warm up.
-		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(extensionWithDiscovery)})
-
-		g.Expect(env.CreateAndWait(ctx, extensionWithDiscovery.DeepCopy())).To(Succeed())
-		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(extensionWithDiscovery)})
+		g.Expect(env.CreateAndWait(ctx, extensionWithDiscovery1.DeepCopy())).To(Succeed())
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(extensionWithDiscovery1)})
 		g.Expect(err).To(BeNil())
+
+		g.Expect(env.CreateAndWait(ctx, extensionWithDiscovery2.DeepCopy())).To(Succeed())
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(extensionWithDiscovery2)})
+		g.Expect(err).To(BeNil())
+
+		// Do a number of additional reconciles to see that the extension isn't deregistered.
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(extensionWithDiscovery1)})
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(brokenExtension)})
 
 		g.Expect(env.GetAPIReader().List(ctx, &results)).To(Succeed())
 		for _, extension := range results.Items {
-			if extension.Name == extensionWithDiscovery.Name {
+			if extension.Name == extensionWithDiscovery1.Name {
+				g.Expect(len(extension.GetConditions())).To(Not(Equal(0)))
+				for _, condition := range extension.GetConditions() {
+					if condition.Type == runtimev1.RuntimeExtensionDiscovered {
+						g.Expect(condition.Status).To(Equal(corev1.ConditionTrue))
+					}
+					g.Expect(len(extension.Status.RuntimeExtensions)).To(Equal(1))
+				}
+			}
+			if extension.Name == extensionWithDiscovery2.Name {
 				g.Expect(len(extension.GetConditions())).To(Not(Equal(0)))
 				for _, condition := range extension.GetConditions() {
 					if condition.Type == runtimev1.RuntimeExtensionDiscovered {

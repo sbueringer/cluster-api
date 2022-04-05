@@ -34,9 +34,8 @@ import (
 	"sigs.k8s.io/cluster-api/util/predicates"
 )
 
-// FIXME: Replace all direct calls to registry with Client equivalents when available.
-
 // +kubebuilder:rbac:groups=runtime.cluster.x-k8s.io,resources=extensions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=runtime.cluster.x-k8s.io,resources=extensions;extensions/status,verbs=get;list;watch;create;update;patch;delete
 
 // Reconciler reconciles an Extension object.
 type Reconciler struct {
@@ -59,13 +58,17 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	return nil
 }
 
-func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var errs []error
+	// TODO: check that this doesn't happen multiple times at startup due to concurrent reconciliation of existing Extensions.
+	// Add sync.Mutex to warmupRegistry
 	if !r.RuntimeClient.IsReady() {
-		err := r.syncRegistry(ctx)
+		err := r.warmupRegistry(ctx)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "extensions controller not initialized")
 		}
 		// After the reconciler is warmed up requeue the request straight away.
+		// This is important if e.g. the task is delete. Alternatively we could go directly into reconcile here.
 		return ctrl.Result{Requeue: true}, nil
 	}
 
@@ -80,116 +83,114 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 			}
 			return ctrl.Result{}, nil
 		}
-
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
 	}
-
-	original := extension.DeepCopy()
-	// Initialize the patch helper
-	patchHelper, err := patch.NewHelper(original, r.Client)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	defer func() {
-		// Always attempt to patch the object and status after each reconciliation.
-		// Patch ObservedGeneration only if the reconciliation completed successfully
-		patchOpts := []patch.Option{}
-		patchOpts = append(patchOpts, patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
-			runtimev1.RuntimeExtensionDiscovered,
-		}})
-		if err := patchExtension(ctx, patchHelper, extension, patchOpts...); err != nil {
-			reterr = kerrors.NewAggregate([]error{reterr, err})
-		}
-	}()
 
 	// Handle deletion reconciliation loop.
 	if !extension.ObjectMeta.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, extension)
 	}
 
-	if extension, err = r.discoverRuntimeExtensions(ctx, extension); err != nil {
-		extension = original
-		conditions.MarkFalse(extension, runtimev1.RuntimeExtensionDiscovered, "DiscoveryFailed", clusterv1.ConditionSeverityError, "error in discovery: %v", err)
-		return ctrl.Result{}, err
+	// Make a copy of the extension to use as a base for patching.
+	original := extension.DeepCopy()
+
+	// discover will return a discovered Extension with the appropriate conditions.
+	if extension, err = r.discoverExtension(ctx, extension); err != nil {
+		errs = append(errs, err)
 	}
-	conditions.MarkTrue(extension, runtimev1.RuntimeExtensionDiscovered)
+
+	// Always patch the Extension as it may contain updates in conditions.
+	if err = r.patchExtension(ctx, original, extension); err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) != 0 {
+		return ctrl.Result{}, kerrors.NewAggregate(errs)
+	}
+
+	// Register the extension if it was found and patched without error.
+	if err = r.RuntimeClient.Extension(extension).Register(); err != nil {
+		return ctrl.Result{}, errors.Wrap(err, "failed to register extension")
+	}
 	return ctrl.Result{}, nil
 }
 
-func patchExtension(ctx context.Context, patchHelper *patch.Helper, ext *runtimev1.Extension, options ...patch.Option) error {
-	// Can add errors and waits here to the Extension object.
+func (r *Reconciler) patchExtension(ctx context.Context, original *runtimev1.Extension, ext *runtimev1.Extension, options ...patch.Option) error {
+	patchHelper, err := patch.NewHelper(original, r.Client)
+
+	options = append(options, patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
+		runtimev1.RuntimeExtensionDiscovered,
+	}})
+	if err != nil {
+		return err
+	}
 	return patchHelper.Patch(ctx, ext, options...)
 }
 
 func (r *Reconciler) reconcileDelete(_ context.Context, extension *runtimev1.Extension) (ctrl.Result, error) {
-	// FIXME: This isn't implemented on the client/registry.
 	if err := r.RuntimeClient.Extension(extension).Unregister(); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
 }
 
-// syncRegistry only does one full, error-free, read of all Extensions and re-registers them in the Registry through
-// the client. It does not discover any new extensions.
-func (r *Reconciler) syncRegistry(ctx context.Context) (reterr error) {
+// warmupRegistry attempts to discover all existing Extensions and patch their Status with discovered RuntimeExtensions.
+// it warms up the registry by passing it the updated list of Extensions.
+func (r *Reconciler) warmupRegistry(ctx context.Context) error {
+	var errs []error
+
 	extensionList := runtimev1.ExtensionList{}
 	if err := r.APIReader.List(ctx, &extensionList); err != nil {
 		return err
 	}
 
-	// A mix of calls that mutate and calls that return (e.g. WarmUp vs Discovery) make this more difficult to understand.
-	// IMO it would be better to always return the updated object or list.
-	// The below means that any failure in WarmUp will result in no extensions being updated - no partial WarmUp.
-	originalList := extensionList.DeepCopy()
-	if err := r.RuntimeClient.WarmUp(&extensionList); err != nil {
-		return err
-	}
+	for i := range extensionList.Items {
+		extension := &extensionList.Items[i]
+		original := extension.DeepCopy()
 
-	var errs []error
-	for i, ext := range originalList.Items {
-		// Initialize the patch helper for this extension.
-		extension := extensionList.Items[i].DeepCopy()
-		patchHelper, err := patch.NewHelper(ext.DeepCopy(), r.Client)
+		extension, err := r.discoverExtension(ctx, extension)
 		if err != nil {
 			errs = append(errs, err)
 		}
 
-		// At this point all extensions in the list have been discovered correctly.
-		conditions.MarkTrue(extension, runtimev1.RuntimeExtensionDiscovered)
-
-		defer func(extension runtimev1.Extension) { //nolint:gocritic
-			// Always attempt to patch the object and status after each reconciliation.
-			patchOpts := []patch.Option{}
-			patchOpts = append(patchOpts, patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
-				runtimev1.RuntimeExtensionDiscovered,
-			}})
-			if err = patchExtension(ctx, patchHelper, &extension, patchOpts...); err != nil {
-				reterr = kerrors.NewAggregate([]error{reterr, err})
-			}
-		}(*extension)
+		// Patch the extension with the updated condition and RuntimeExtensions if discovered.
+		if err = r.patchExtension(ctx, original, extension); err != nil {
+			errs = append(errs, err)
+		}
+		extensionList.Items[i] = *extension
 	}
 
+	// If there was some error in discovery or patching return before committing to the Registry.
 	if len(errs) != 0 {
 		return kerrors.NewAggregate(errs)
 	}
-	// If all extensions are listed and discovered successfully the reconciler is now ready.
+
+	if err := r.RuntimeClient.WarmUp(&extensionList); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (r Reconciler) discoverRuntimeExtensions(ctx context.Context, extension *runtimev1.Extension) (*runtimev1.Extension, error) {
-	var err error
-	extension, err = r.RuntimeClient.Extension(extension).Discover(ctx)
+// discoverExtension attempts to discover the RuntimeExtensions for a passed Extension.
+// If discovery succeeds it returns the Extension with RuntimeExtensions updated in Status and an updated Condition.
+// If discovery fails it returns the extension with no update to RuntimeExtensions and a Failed Condition.
+func (r Reconciler) discoverExtension(ctx context.Context, extension *runtimev1.Extension) (*runtimev1.Extension, error) {
+	discoveredExtension, err := r.RuntimeClient.Extension(extension).Discover(ctx)
 	if err != nil {
-		return nil, err
+		conditions.MarkFalse(extension, runtimev1.RuntimeExtensionDiscovered, "DiscoveryFailed", clusterv1.ConditionSeverityError, "error in discovery: %v", err)
+		return extension, errors.Wrap(err, "failed to discover extension")
 	}
+
 	if err = validateRuntimeExtensionDiscovery(extension); err != nil {
-		return nil, err
+		conditions.MarkFalse(extension, runtimev1.RuntimeExtensionDiscovered, "DiscoveryFailed", clusterv1.ConditionSeverityError, "error in discovery: %v", err)
+		return extension, errors.Wrap(err, "failed to validate RuntimeExtension")
 	}
-	if err = r.RuntimeClient.Extension(extension).Register(); err != nil {
-		return nil, errors.Wrap(err, "failed to register extension")
-	}
+
+	extension = discoveredExtension
+	conditions.MarkTrue(extension, runtimev1.RuntimeExtensionDiscovered)
+
 	return extension, nil
 }
 
@@ -198,7 +199,10 @@ func (r Reconciler) discoverRuntimeExtensions(ctx context.Context, extension *ru
 // RuntimeExtension registrations are not removed from the registry or the object's status.
 func validateRuntimeExtensionDiscovery(ext *runtimev1.Extension) error {
 	for _, runtimeExtension := range ext.Status.RuntimeExtensions {
+		// TODO: Extend the validation to cover more cases.
+
 		// simple dummy check to show how and where RuntimeExtension validation works.
+		// this should aggregate the errors on validation.
 		if len(runtimeExtension.Name) > 63 {
 			return errors.New("RuntimeExtension name must be less than 64 characters")
 		}
