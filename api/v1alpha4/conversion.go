@@ -49,6 +49,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
 			for i := range restored.Spec.Topology.Workers.MachineDeployments {
 				dst.Spec.Topology.Workers.MachineDeployments[i].FailureDomain = restored.Spec.Topology.Workers.MachineDeployments[i].FailureDomain
 				dst.Spec.Topology.Workers.MachineDeployments[i].Variables = restored.Spec.Topology.Workers.MachineDeployments[i].Variables
+				dst.Spec.Topology.Workers.MachineDeployments[i].NodeDrainTimeout = restored.Spec.Topology.Workers.MachineDeployments[i].NodeDrainTimeout
 			}
 		}
 	}
@@ -316,4 +317,9 @@ func Convert_v1beta1_MachineDeploymentClass_To_v1alpha4_MachineDeploymentClass(i
 func Convert_v1beta1_ControlPlaneClass_To_v1alpha4_ControlPlaneClass(in *clusterv1.ControlPlaneClass, out *ControlPlaneClass, s apiconversion.Scope) error {
 	// controlPlaneClass.machineHealthCheck has been added with v1beta1.
 	return autoConvert_v1beta1_ControlPlaneClass_To_v1alpha4_ControlPlaneClass(in, out, s)
+}
+
+func Convert_v1beta1_ControlPlaneTopology_To_v1alpha4_ControlPlaneTopology(in *clusterv1.ControlPlaneTopology, out *ControlPlaneTopology, s apiconversion.Scope) error {
+	// controlPlaneTopology.nodeDrainTimeout has been added with v1beta1.
+	return autoConvert_v1beta1_ControlPlaneTopology_To_v1alpha4_ControlPlaneTopology(in, out, s)
 }
