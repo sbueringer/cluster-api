@@ -42,6 +42,11 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
 			dst.Spec.Topology = &clusterv1.Topology{}
 		}
 		dst.Spec.Topology.Variables = restored.Spec.Topology.Variables
+
+		if restored.Spec.Topology.ControlPlane.NodeDrainTimeout != nil {
+			dst.Spec.Topology.ControlPlane.NodeDrainTimeout = restored.Spec.Topology.ControlPlane.NodeDrainTimeout
+		}
+
 		if restored.Spec.Topology.Workers != nil {
 			if dst.Spec.Topology.Workers == nil {
 				dst.Spec.Topology.Workers = &clusterv1.WorkersTopology{}

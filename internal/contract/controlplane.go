@@ -76,13 +76,6 @@ func (c *ControlPlaneContract) Replicas() *Int64 {
 	}
 }
 
-// NodeDrainTimeout provides access to the nodeDrainTimeout of a ControlPlane.
-func (c *ControlPlaneContract) NodeDrainTimeout() *Duration {
-	return &Duration{
-		path: []string{"spec", "nodeDrainTimeout"},
-	}
-}
-
 // StatusReplicas provide access to status.replicas field  in a ControlPlane object, if any.
 func (c *ControlPlaneContract) StatusReplicas() *Int64 {
 	return &Int64{

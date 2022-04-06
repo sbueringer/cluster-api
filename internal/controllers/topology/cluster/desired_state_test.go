@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -234,7 +235,8 @@ func TestComputeControlPlane(t *testing.T) {
 	// current cluster objects
 	version := "v1.21.2"
 	replicas := int32(3)
-	nodeDrainTimeout := metav1.Duration{Duration: 10 * time.Second}
+	duration := 10 * time.Second
+	nodeDrainTimeout := metav1.Duration{Duration: duration}
 	cluster := &clusterv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster1",
@@ -248,7 +250,7 @@ func TestComputeControlPlane(t *testing.T) {
 						Labels:      map[string]string{"l2": ""},
 						Annotations: map[string]string{"a2": ""},
 					},
-					Replicas: &replicas,
+					Replicas:         &replicas,
 					NodeDrainTimeout: &nodeDrainTimeout,
 				},
 			},
@@ -284,7 +286,7 @@ func TestComputeControlPlane(t *testing.T) {
 
 		assertNestedField(g, obj, version, contract.ControlPlane().Version().Path()...)
 		assertNestedField(g, obj, int64(replicas), contract.ControlPlane().Replicas().Path()...)
-		assertNestedField(g, obj, nodeDrainTimeout, contract.ControlPlane().NodeDrainTimeout().Path()...)
+		assertNestedField(g, obj, fmt.Sprintf("%q", duration), contract.ControlPlane().MachineTemplate().NodeDrainTimeout().Path()...)
 		assertNestedFieldUnset(g, obj, contract.ControlPlane().MachineTemplate().InfrastructureRef().Path()...)
 
 		// Ensure no ownership is added to generated ControlPlane.
@@ -758,10 +760,10 @@ func TestComputeMachineDeployment(t *testing.T) {
 		Metadata: clusterv1.ObjectMeta{
 			Labels: map[string]string{"foo": "baz"},
 		},
-		Class:         "linux-worker",
-		Name:          "big-pool-of-machines",
-		Replicas:      &replicas,
-		FailureDomain: &failureDomain,
+		Class:            "linux-worker",
+		Name:             "big-pool-of-machines",
+		Replicas:         &replicas,
+		FailureDomain:    &failureDomain,
 		NodeDrainTimeout: &nodeDrainTimeout,
 	}
 
