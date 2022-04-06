@@ -155,11 +155,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ControlPlaneTopology)(nil), (*ControlPlaneTopology)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ControlPlaneTopology_To_v1alpha4_ControlPlaneTopology(a.(*v1beta1.ControlPlaneTopology), b.(*ControlPlaneTopology), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*FailureDomainSpec)(nil), (*v1beta1.FailureDomainSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha4_FailureDomainSpec_To_v1beta1_FailureDomainSpec(a.(*FailureDomainSpec), b.(*v1beta1.FailureDomainSpec), scope)
 	}); err != nil {
@@ -457,6 +452,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*v1beta1.ControlPlaneClass)(nil), (*ControlPlaneClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_ControlPlaneClass_To_v1alpha4_ControlPlaneClass(a.(*v1beta1.ControlPlaneClass), b.(*ControlPlaneClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.ControlPlaneTopology)(nil), (*ControlPlaneTopology)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ControlPlaneTopology_To_v1alpha4_ControlPlaneTopology(a.(*v1beta1.ControlPlaneTopology), b.(*ControlPlaneTopology), scope)
 	}); err != nil {
 		return err
 	}
