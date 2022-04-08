@@ -29,3 +29,23 @@ Deploy
 # Deploy Extension
 kubectl apply -f ./extension.yaml
 ```
+
+# Secure one
+
+```sh
+# to create service and certitficate
+kubectl apply -f secure-infra.yaml
+
+# fetch certificate
+mkdir -p /tmp/rte-implementation-secure
+for f in $(kubectl get secret my-local-extension-cert -o json | jq '.data | keys | .[]' -r); do 
+  kubectl get secret my-local-extension-cert -o json | jq '.data["'$f'"]' -r | base64 -d > "/tmp/rte-implementation-secure/$f"
+done
+
+# replace caBundle in `secure-extension.yaml` with base64 encoded content of /tmp/rte-implementation-secure/ca.crt
+
+# start webserver now (IDE?) rte-implementation-v1alpha1-secure
+
+# Deploy Extension
+kubectl apply -f secure-extension.yaml
+```

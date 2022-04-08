@@ -31,6 +31,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/transport"
 
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
 	hooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
@@ -307,9 +308,24 @@ func httpCall(ctx context.Context, request, response runtime.Object, opts *httpC
 	if err != nil {
 		return errors.Wrap(err, "failed to create http request")
 	}
-	// TODO: Switch to building a a client to deal with HTTPS,
-	// certificates and protocol.
-	resp, err := http.DefaultClient.Do(httpRequest)
+
+	// use client-go's transport.TLSConfigureFor to ensure good defaults for tls
+	client := http.DefaultClient
+	if opts.config.CABundle != nil {
+		tlsConfig, err := transport.TLSConfigFor(&transport.Config{
+			TLS: transport.TLSConfig{
+				CAData:     opts.config.CABundle,
+				ServerName: url.Hostname(),
+			},
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to create tls config")
+		}
+		client.Transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+	}
+	resp, err := client.Do(httpRequest)
 	// TODO:  handle error in conjunction with FailurePolicy
 	if err != nil {
 		return err
@@ -338,9 +354,12 @@ func urlForExtension(config runtimev1.ExtensionClientConfig, gvh catalog.GroupVe
 		if svc.Port != nil {
 			host = net.JoinHostPort(host, strconv.Itoa(int(*svc.Port)))
 		}
-		// TODO: add support for https scheme
+		// TODO: decide if we want to enforce https
 		scheme := "http"
-		u := url.URL{
+		if len(config.CABundle) > 0 {
+			scheme = "https"
+		}
+		u = &url.URL{
 			Scheme: scheme,
 			Host:   host,
 		}
