@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -41,8 +42,9 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 			Namespace: ns.Name,
 		},
 		Spec: runtimev1.ExtensionSpec{
-			ClientConfig:      runtimev1.ExtensionClientConfig{},
-			NamespaceSelector: nil,
+			ClientConfig: runtimev1.ExtensionClientConfig{
+				URL: pointer.String("https://extension-address.com"),
+			},
 		},
 	}
 	workingExtension2 := workingExtension1.DeepCopy()
@@ -57,7 +59,9 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 			Namespace: ns.Name,
 		},
 		Spec: runtimev1.ExtensionSpec{
-			ClientConfig:      runtimev1.ExtensionClientConfig{},
+			ClientConfig: runtimev1.ExtensionClientConfig{
+				URL: pointer.String("https://extension-address.com"),
+			},
 			NamespaceSelector: nil,
 		},
 	}
@@ -161,8 +165,8 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 		g.Expect(env.CreateAndWait(ctx, brokenExtension.DeepCopy())).To(Succeed())
 		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(brokenExtension)})
 		g.Expect(err).NotTo(BeNil())
-
-		g.Expect(env.GetAPIReader().List(ctx, &results)).To(Succeed())
+		time.Sleep(time.Millisecond * 500)
+		g.Expect(env.List(ctx, &results)).To(Succeed())
 		for _, extension := range results.Items {
 			if extension.Name == workingExtension1.Name {
 				g.Expect(len(extension.GetConditions())).To(Not(Equal(0)))

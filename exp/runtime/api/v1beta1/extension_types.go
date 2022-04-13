@@ -93,7 +93,7 @@ type ServiceReference struct {
 	Path *string `json:"path,omitempty"`
 
 	// Port is the port on the service that hosting extension.
-	// Default to 443 for backward compatibility.
+	// Default to 8443 for backward compatibility.
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
 	Port *int32 `json:"port,omitempty"`
