@@ -29,12 +29,13 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	srv := webhook.Server{
-		Host:       "127.0.0.1",
-		Port:       8083,
-		CertDir:    *certDir,
-		CertName:   "tls.crt",
-		KeyName:    "tls.key",
-		WebhookMux: http.NewServeMux(),
+		Host:          "127.0.0.1",
+		Port:          8083,
+		CertDir:       *certDir,
+		CertName:      "tls.crt",
+		KeyName:       "tls.key",
+		WebhookMux:    http.NewServeMux(),
+		TLSMinVersion: "1.2",
 	}
 
 	operation1Handler, err := catalogHTTP.NewHandlerBuilder().
