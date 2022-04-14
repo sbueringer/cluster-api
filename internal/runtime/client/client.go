@@ -31,6 +31,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/transport"
 
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
@@ -321,9 +322,10 @@ func httpCall(ctx context.Context, request, response runtime.Object, opts *httpC
 		if err != nil {
 			return errors.Wrap(err, "failed to create tls config")
 		}
-		client.Transport = &http.Transport{
+		// this also adds http2
+		client.Transport = utilnet.SetTransportDefaults(&http.Transport{
 			TLSClientConfig: tlsConfig,
-		}
+		})
 	}
 	resp, err := client.Do(httpRequest)
 	// TODO:  handle error in conjunction with FailurePolicy
