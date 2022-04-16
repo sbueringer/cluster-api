@@ -18,10 +18,11 @@ package controllers
 
 import (
 	"context"
-
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -182,6 +183,8 @@ func (r Reconciler) discoverExtension(ctx context.Context, extension *runtimev1.
 		return extension, errors.Wrap(err, "failed to discover extension")
 	}
 
+	discoveredExtension = defaultRuntimeExtensionDiscovery(discoveredExtension)
+
 	if err = validateRuntimeExtensionDiscovery(extension); err != nil {
 		conditions.MarkFalse(extension, runtimev1.RuntimeExtensionDiscovered, "DiscoveryFailed", clusterv1.ConditionSeverityError, "error in discovery: %v", err)
 		return extension, errors.Wrap(err, "failed to validate RuntimeExtension")
@@ -197,14 +200,59 @@ func (r Reconciler) discoverExtension(ctx context.Context, extension *runtimev1.
 // if any of these checks fails the response is invalid and an error is returned. Extensions with previously valid
 // RuntimeExtension registrations are not removed from the registry or the object's status.
 func validateRuntimeExtensionDiscovery(ext *runtimev1.Extension) error {
+	names := make(map[string]bool)
+	var errs []error
+	// TODO: Implement the same validation rules in the runtime SDK server side Discovery handler.
 	for _, runtimeExtension := range ext.Status.RuntimeExtensions {
-		// TODO: Extend the validation to cover more cases.
 
-		// simple dummy check to show how and where RuntimeExtension validation works.
-		// this should aggregate the errors on validation.
-		if len(runtimeExtension.Name) > 63 {
-			return errors.New("RuntimeExtension name must be less than 64 characters")
+		// Names should be unique
+		if _, ok := names[runtimeExtension.Name]; ok {
+			errs = append(errs, errors.Errorf("duplicate name %s found", runtimeExtension.Name))
 		}
+
+		names[runtimeExtension.Name] = true
+		// Name should match Kubernetes naming conventions - validated based on Kubernetes DNS1123 Subdomain rules.
+		if errStrings := validation.IsDNS1123Subdomain(runtimeExtension.Name); len(errStrings) > 0 {
+			errs = append(errs, errors.Errorf("Name %s is not valid: %s", runtimeExtension.Name, errStrings))
+		}
+
+		// Timeout should be a positive integer and should be under 600 seconds (10 minutes)
+		if *runtimeExtension.TimeoutSeconds < 0 && *runtimeExtension.TimeoutSeconds > 600 {
+			errs = append(errs, errors.Errorf("%s timeoutSeconds must be between 0 and 600", runtimeExtension.Name))
+		}
+
+		// FailurePolicy must be one of Ignore or Fail
+		// Fixme: I think This will fail json unmarshalling and isn't necessary.
+		if *runtimeExtension.FailurePolicy != runtimev1.FailurePolicyFail && *runtimeExtension.FailurePolicy != runtimev1.FailurePolicyIgnore {
+			errs = append(errs, errors.Errorf("%s failurePolicy must equal \"Ignore\" or \"Fail\"", runtimeExtension.Name))
+		}
+
+	}
+
+	if len(errs) > 0 {
+		return kerrors.NewAggregate(errs)
 	}
 	return nil
+}
+
+// defaultRuntimeExtensionDiscovery defaults FailPolicy and Timeout for all discovered runtimeExtensions.
+// TODO: This could alternately be done in discovery or handled in the client calls.
+// FIXME: We could use kubebuilder defaulting.
+func defaultRuntimeExtensionDiscovery(ext *runtimev1.Extension) *runtimev1.Extension {
+	for i, runtimeExtension := range ext.Status.RuntimeExtensions {
+		// TODO: Default Timeout and FailPolicy here.
+		if runtimeExtension.FailurePolicy == nil {
+			defaultFailPolicy := runtimev1.FailurePolicyFail
+			runtimeExtension.FailurePolicy = &defaultFailPolicy
+		}
+
+		// FIXME: How should we handle timeout is nil or zero?
+		// If TimeoutSeconds is not defined set to zero.
+		if runtimeExtension.TimeoutSeconds == nil {
+			runtimeExtension.TimeoutSeconds = pointer.Int32(0)
+		}
+		ext.Status.RuntimeExtensions[i] = runtimeExtension
+	}
+
+	return ext
 }
