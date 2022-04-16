@@ -85,18 +85,30 @@ func TestExtensionConfigValidate(t *testing.T) {
 		},
 	}
 
+	extensionWithServiceAndURL := extensionWithURL.DeepCopy()
+	extensionWithServiceAndURL.Spec.ClientConfig.Service = extensionWithService.Spec.ClientConfig.Service
+
 	// Valid updated Extension
 	updatedExtension := extensionWithURL.DeepCopy()
 	updatedExtension.Spec.ClientConfig.URL = pointer.StringPtr("https://a-in-extension-address.com")
-
-	badURLExtension := extensionWithURL.DeepCopy()
-	badURLExtension.Spec.ClientConfig.URL = pointer.String("https//extension-address.com")
 
 	extensionWithoutURLOrService := extensionWithURL.DeepCopy()
 	extensionWithoutURLOrService.Spec.ClientConfig.URL = nil
 
 	extensionWithInvalidServicePath := extensionWithService.DeepCopy()
 	extensionWithInvalidServicePath.Spec.ClientConfig.Service.Path = pointer.StringPtr("https://example.com")
+
+	extensionWithNoServiceName := extensionWithService.DeepCopy()
+	extensionWithNoServiceName.Spec.ClientConfig.Service.Name = ""
+
+	extensionWithBadServiceName := extensionWithService.DeepCopy()
+	extensionWithBadServiceName.Spec.ClientConfig.Service.Name = "NOT_ALLOWED"
+
+	extensionWithNoServiceNamespace := extensionWithService.DeepCopy()
+	extensionWithNoServiceNamespace.Spec.ClientConfig.Service.Namespace = ""
+
+	badURLExtension := extensionWithURL.DeepCopy()
+	badURLExtension.Spec.ClientConfig.URL = pointer.String("https//extension-address.com")
 
 	extensionWithInvalidServicePort := extensionWithService.DeepCopy()
 	extensionWithInvalidServicePort.Spec.ClientConfig.Service.Port = pointer.Int32(90000)
@@ -122,6 +134,24 @@ func TestExtensionConfigValidate(t *testing.T) {
 			expectErr:   true,
 		},
 		{
+			name:        "creation should fail if no name is defined",
+			in:          extensionWithNoServiceName,
+			featureGate: true,
+			expectErr:   true,
+		},
+		{
+			name:        "creation should fail if name violates Kubernetes naming rules",
+			in:          extensionWithBadServiceName,
+			featureGate: true,
+			expectErr:   true,
+		},
+		{
+			name:        "creation should fail if no namespace is defined",
+			in:          extensionWithNoServiceNamespace,
+			featureGate: true,
+			expectErr:   true,
+		},
+		{
 			name:        "update should fail if URL is invalid",
 			old:         extensionWithURL,
 			in:          badURLExtension,
@@ -135,7 +165,13 @@ func TestExtensionConfigValidate(t *testing.T) {
 			featureGate: true,
 			expectErr:   true,
 		},
-
+		{
+			name:        "update should fail if both URL and Service are defined",
+			old:         extensionWithService,
+			in:          extensionWithServiceAndURL,
+			featureGate: true,
+			expectErr:   true,
+		},
 		{
 			name:        "update should fail if Service Path is invalid",
 			old:         extensionWithService,

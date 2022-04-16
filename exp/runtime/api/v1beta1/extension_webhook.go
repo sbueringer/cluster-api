@@ -74,11 +74,11 @@ func (e *Extension) ValidateUpdate(old runtime.Object) error {
 	return e.validate(newExtension)
 }
 
-func (e *Extension) validate(old *Extension) error {
+func (e *Extension) validate(_ *Extension) error {
 	specPath := field.NewPath("spec")
 	var allErrs field.ErrorList
-	// NOTE: ExtensionConfig is behind the RuntimeSDK feature gate flag; the web hook
-	// must prevent creating and updating objects old case the feature flag is disabled.
+	// NOTE: ExtensionConfig is behind the RuntimeSDK feature gate flag; the webhook
+	// must prevent creating and updating objects in case the feature flag is disabled.
 	if !feature.Gates.Enabled(feature.RuntimeSDK) {
 		allErrs = append(allErrs, field.Forbidden(
 			specPath,
@@ -88,10 +88,6 @@ func (e *Extension) validate(old *Extension) error {
 
 	allErrs = append(allErrs, validateExtensionSpec(e)...)
 
-	// ValidateUpdate if old is not nil.
-	if old != nil {
-		allErrs = append(allErrs, validateExtensionSpec(old)...)
-	}
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(clusterv1.GroupVersion.WithKind("Extension").GroupKind(), e.Name, allErrs)
 	}
@@ -107,6 +103,12 @@ func validateExtensionSpec(e *Extension) field.ErrorList {
 		allErrs = append(allErrs, field.Required(
 			specPath.Child("clientConfig"),
 			"either URL or Service must be defined",
+		))
+	}
+	if e.Spec.ClientConfig.URL != nil && e.Spec.ClientConfig.Service != nil {
+		allErrs = append(allErrs, field.Forbidden(
+			specPath.Child("clientConfig"),
+			"only one of URL or Service can be defined",
 		))
 	}
 
