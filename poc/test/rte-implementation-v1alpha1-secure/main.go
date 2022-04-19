@@ -1,19 +1,14 @@
 package main
 
 import (
-	"context"
-	"crypto/tls"
-	"errors"
 	"flag"
 	"fmt"
-	"net"
 	"net/http"
-	"path/filepath"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
 	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
@@ -24,58 +19,24 @@ import (
 // go run rte/test/rte-implementation-v1alpha2/main.go
 
 var c = catalog.New()
-var certDir = flag.String("certDir", "", "path to directory containing tls.crt and tls.key")
-var enableTLS = flag.Bool("enableTLS", false, "enables TLS webserver")
+var certDir = flag.String("certDir", "/tmp/rte-implementation-secure/", "path to directory containing tls.crt and tls.key")
 
 func init() {
 	_ = v1alpha1.AddToCatalog(c)
 }
 
 func main() {
-	flag.Parse()
-
 	ctx := ctrl.SetupSignalHandler()
 
-	var listener net.Listener
-	var err error
-
-	if *enableTLS {
-		if *certDir == "" {
-			panic(errors.New("expected certDir to find path to tls.crt and tls.key"))
-		}
-
-		// see https://github.com/kubernetes-sigs/controller-runtime/blob/master/pkg/webhook/server.go#L210
-		certPath := filepath.Join(*certDir, "tls.crt")
-		keyPath := filepath.Join(*certDir, "tls.key")
-
-		certWatcher, err := certwatcher.New(certPath, keyPath)
-		if err != nil {
-			panic(err)
-		}
-
-		go func() {
-			if err := certWatcher.Start(ctx); err != nil {
-				fmt.Printf("error: certificate watcher error %v\n", err)
-			}
-		}()
-
-		cfg := &tls.Config{ //nolint:gosec
-			NextProtos:     []string{"h2"},
-			GetCertificate: certWatcher.GetCertificate,
-			MinVersion:     tls.VersionTLS10,
-		}
-		listener, err = tls.Listen("tcp", net.JoinHostPort("127.0.0.1", "8083"), cfg)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		listener, err = net.Listen("tcp", net.JoinHostPort("127.0.0.1", "8082"))
-		if err != nil {
-			panic(err)
-		}
+	srv := webhook.Server{
+		Host:          "127.0.0.1",
+		Port:          8083,
+		CertDir:       *certDir,
+		CertName:      "tls.crt",
+		KeyName:       "tls.key",
+		WebhookMux:    http.NewServeMux(),
+		TLSMinVersion: "1.2",
 	}
-
-	fmt.Println("Server started")
 
 	operation1Handler, err := catalogHTTP.NewHandlerBuilder().
 		WithCatalog(c).
@@ -87,21 +48,9 @@ func main() {
 		panic(err)
 	}
 
-	srv := &http.Server{
-		Handler: operation1Handler,
-	}
+	srv.WebhookMux.Handle("/", operation1Handler)
 
-	go func() {
-		<-ctx.Done()
-
-		// TODO: use a context with reasonable timeout
-		if err := srv.Shutdown(context.Background()); err != nil {
-			// Error from closing listeners, or context timeout
-			panic("error shutting down the HTTP server")
-		}
-	}()
-
-	if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+	if err := srv.StartStandalone(ctx, nil); err != nil {
 		panic(err)
 	}
 }
