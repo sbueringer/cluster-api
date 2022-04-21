@@ -45,6 +45,7 @@ import (
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1alpha1"
 	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
+	runtimemetrics "sigs.k8s.io/cluster-api/internal/runtime/metrics"
 	runtimeregistry "sigs.k8s.io/cluster-api/internal/runtime/registry"
 	"sigs.k8s.io/cluster-api/util"
 )
@@ -375,6 +376,11 @@ func httpCall(ctx context.Context, request, response runtime.Object, opts *httpC
 		return errors.Wrapf(err, "failed to compute URL of the extension handler %q", opts.name)
 	}
 
+	// Create request latency metric.
+	start := time.Now()
+	defer func() {
+		runtimemetrics.RequestLatency.Observe(opts.hookGVH.Hook, *extensionURL, time.Since(start))
+	}()
 	requireConversion := opts.registrationGVH.Version != opts.hookGVH.Version
 
 	requestLocal := request
@@ -448,6 +454,8 @@ func httpCall(ctx context.Context, request, response runtime.Object, opts *httpC
 	})
 
 	resp, err := client.Do(httpRequest)
+	// Create http request metric.
+	runtimemetrics.RequestsTotal.Observe(httpRequest, resp, opts.hookGVH.Hook, err)
 	if err != nil {
 		return errCallingExtensionHandler(
 			errors.Wrapf(err, "failed to call ExtensionHandler: %q", opts.name),
