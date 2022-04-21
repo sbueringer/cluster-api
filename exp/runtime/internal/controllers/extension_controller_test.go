@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -75,9 +76,7 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 			Namespace: ns.Name,
 		},
 		Spec: runtimev1.ExtensionSpec{
-			ClientConfig: runtimev1.ExtensionClientConfig{
-				URL: pointer.String("http://localhost:39999"),
-			},
+			ClientConfig:      runtimev1.ExtensionClientConfig{},
 			NamespaceSelector: nil,
 		},
 	}
@@ -92,13 +91,10 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 			Namespace: ns.Name,
 		},
 		Spec: runtimev1.ExtensionSpec{
-			ClientConfig: runtimev1.ExtensionClientConfig{
-				URL: pointer.String("http://localhost:39999"),
-			},
+			ClientConfig:      runtimev1.ExtensionClientConfig{},
 			NamespaceSelector: nil,
 		},
 	}
-
 	hookStore := map[string][]runtimev1.RuntimeExtension{
 		namespacedName(workingExtension1).String(): {
 			runtimev1.RuntimeExtension{
@@ -231,7 +227,7 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 				}
 			}
 		}
-		g.Expect(env.CleanupAndWait(ctx, workingExtension1, workingExtension2, brokenExtension)).To(Succeed())
+		g.Expect(env.CleanupAndWait(ctx, workingExtension1, workingExtension2)).To(Succeed())
 	})
 
 	t.Run("test discovery using real client", func(t *testing.T) {
@@ -241,7 +237,8 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 		g.Expect(hooksv2.AddToCatalog(cat)).To(Succeed())
 		g.Expect(hooksv3.AddToCatalog(cat)).To(Succeed())
 
-		http.HandleFunc("/hooks.runtime.cluster.x-k8s.io/v1alpha1/discovery", func(w http.ResponseWriter, r *http.Request) {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/hooks.runtime.cluster.x-k8s.io/v1alpha1/discovery", func(w http.ResponseWriter, r *http.Request) {
 			resp := runtimehooksv1.DiscoveryHookResponse{
 				TypeMeta: metav1.TypeMeta{},
 				Status:   "",
@@ -268,11 +265,12 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 				panic(err)
 			}
 		})
-		go func() {
-			if err := http.ListenAndServe(":39999", nil); err != nil {
-				panic(err)
-			}
-		}()
+
+		ts := httptest.NewServer(mux)
+		defer ts.Close()
+
+		extensionWithDiscovery1.Spec.ClientConfig.URL = &ts.URL
+		extensionWithDiscovery2.Spec.ClientConfig.URL = &ts.URL
 
 		r := &Reconciler{
 			Client:    env.GetClient(),
@@ -315,7 +313,33 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 				}
 			}
 		}
-		g.Expect(env.CleanupAndWait(ctx, workingExtension1, brokenExtension)).To(Succeed())
+		g.Expect(env.CleanupAndWait(ctx, extensionWithDiscovery1, extensionWithDiscovery2)).To(Succeed())
+	})
+
+	t.Run("test removal of extension", func(t *testing.T) {
+		var result runtimev1.Extension
+
+		r := &Reconciler{
+			Client:    env.GetClient(),
+			APIReader: env.GetAPIReader(),
+			RuntimeClient: &fakeClient{
+				extensionStore: hookStore,
+			},
+		}
+
+		// Create and attempt to discover a working, discoverable extension. Expect no error.
+		g.Expect(env.CreateAndWait(ctx, workingExtension1.DeepCopy())).To(Succeed())
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(workingExtension1)})
+		g.Expect(err).To(BeNil())
+		g.Expect(env.GetAPIReader().Get(ctx, namespacedName(workingExtension1), &result)).To(Succeed())
+
+		// Delete and attempt to discover a removal of the extension. Expect no error.
+		g.Expect(env.Delete(ctx, workingExtension1.DeepCopy())).To(Succeed())
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(workingExtension1)})
+		g.Expect(err).To(BeNil())
+
+		// Check again if the extension was removed
+		g.Expect(env.GetAPIReader().Get(ctx, namespacedName(workingExtension1), &result)).To(HaveOccurred())
 	})
 }
 

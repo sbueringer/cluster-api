@@ -76,11 +76,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Extension not found. Remove from registry.
-			err = r.RuntimeClient.Extension(extension).Unregister()
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{}, nil
+			return r.reconcileDelete(ctx, extension)
 		}
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
