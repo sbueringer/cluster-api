@@ -630,7 +630,7 @@ release-manifests: $(RELEASE_DIR) $(KUSTOMIZE) $(RUNTIME_OPENAPI_GEN) ## Build t
 	cp metadata.yaml $(RELEASE_DIR)/metadata.yaml
 
 	# Generate OpenAPI specification.
-	$(RUNTIME_OPENAPI_GEN) --version $(RELEASE_TAG)--output-file $(RELEASE_DIR)/runtime-sdk-openapi.yaml
+	$(RUNTIME_OPENAPI_GEN) --version $(RELEASE_TAG) --output-file $(RELEASE_DIR)/runtime-sdk-openapi.yaml
 
 .PHONY: release-manifests-dev
 release-manifests-dev: ## Build the development manifests and copies them in the release folder
