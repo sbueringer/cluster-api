@@ -15,8 +15,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 
-	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
-	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimev1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	catalogHTTP "sigs.k8s.io/cluster-api/internal/runtime/server"
 )
@@ -28,7 +27,7 @@ var certDir = flag.String("certDir", "", "path to directory containing tls.crt a
 var enableTLS = flag.Bool("enableTLS", false, "enables TLS webserver")
 
 func init() {
-	_ = v1alpha1.AddToCatalog(c)
+	_ = runtimev1alpha1.AddToCatalog(c)
 }
 
 func main() {
@@ -79,8 +78,8 @@ func main() {
 
 	operation1Handler, err := catalogHTTP.NewHandlerBuilder().
 		WithCatalog(c).
-		AddDiscovery(v1alpha1.Discovery, doDiscovery). // TODO: this is not strongly typed, but there are type checks when the service starts
-		AddExtension(v1alpha1.BeforeClusterUpgrade, "install-metrics-database", doInstallMetricsDatabase).
+		AddDiscovery(runtimev1alpha1.Discovery, doDiscovery). // TODO: this is not strongly typed, but there are type checks when the service starts
+		AddExtension(runtimev1alpha1.BeforeClusterUpgrade, "install-metrics-database", doInstallMetricsDatabase).
 		// TODO: test with more services
 		Build()
 	if err != nil {
@@ -108,32 +107,29 @@ func main() {
 
 // TODO: consider registering extensions with all required data and then auto-generating the discovery func based on that.
 // If we want folks to write it manually, make it nicer to do.
-func doDiscovery(request *v1alpha1.DiscoveryHookRequest, response *v1alpha1.DiscoveryHookResponse) error {
+func doDiscovery(request *runtimev1alpha1.DiscoveryHookRequest, response *runtimev1alpha1.DiscoveryHookResponse) error {
 	fmt.Println("Discovery/v1alpha1 called")
 
-	response.Status = v1alpha1.ResponseStatusSuccess
-	response.Extensions = append(response.Extensions, runtimev1.RuntimeExtension{
+	response.Status = runtimev1alpha1.ResponseStatusSuccess
+	response.Extensions = append(response.Extensions, runtimev1alpha1.RuntimeExtension{
 		Name: "install-metrics-database",
-		Hook: runtimev1.Hook{
-			APIVersion: v1alpha1.GroupVersion.String(),
+		Hook: runtimev1alpha1.Hook{
+			APIVersion: runtimev1alpha1.GroupVersion.String(),
 			Name:       "BeforeClusterUpgrade",
 		},
 		TimeoutSeconds: pointer.Int32(10),
-		FailurePolicy:  toPtr(runtimev1.FailurePolicyFail),
+		FailurePolicy:  toPtr(runtimev1alpha1.FailurePolicyFail),
 	})
 
 	return nil
 }
 
-func doInstallMetricsDatabase(request *v1alpha1.BeforeClusterUpgradeRequest, response *v1alpha1.BlockingResponse) error {
+func doInstallMetricsDatabase(request *runtimev1alpha1.BeforeClusterUpgradeRequest, response *runtimev1alpha1.BeforeClusterUpgradeResponse) error {
 	fmt.Println("BeforeClusterUpgrade/v1alpha1 called", "cluster", klog.KObj(&request.Cluster))
-
-	response.Status = v1alpha1.ResponseStatusSuccess
-	response.RetryAfterSeconds = 10
 
 	return nil
 }
 
-func toPtr(f runtimev1.FailurePolicy) *runtimev1.FailurePolicy {
+func toPtr(f runtimev1alpha1.FailurePolicy) *runtimev1alpha1.FailurePolicy {
 	return &f
 }
