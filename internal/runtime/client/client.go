@@ -251,8 +251,11 @@ type httpCallOptions struct {
 }
 
 func httpCall(ctx context.Context, request, response runtime.Object, opts *httpCallOptions) error {
+	if opts == nil || request == nil || response == nil {
+		return fmt.Errorf("opts, request and response cannot be nil")
+	}
 	if opts.catalog == nil {
-		return fmt.Errorf("options are invalid. Catalog cannot be nil")
+		return fmt.Errorf("opts.Catalog cannot be nil")
 	}
 
 	url, err := urlForExtension(opts.config, opts.gvh, opts.name)
