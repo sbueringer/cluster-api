@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1alpha1 contains types for catalog tests
-// Note: they have to be in a separate package because otherwise it wouldn't
-// be possible to register different versions of the same hook.
 package v1alpha1
 
 import (
@@ -39,6 +36,12 @@ var (
 	// AddToCatalog adds rpc services defined in this package and their request and
 	// response types to a catalog.
 	AddToCatalog = catalogBuilder.AddToCatalog
+
+	// localSchemeBuilder provide access to the SchemeBuilder used for managing rpc
+	// method's request and response types defined in this package.
+	// NOTE: this object is required to allow registration of automatically generated
+	// conversions func.
+	localSchemeBuilder = catalogBuilder
 )
 
 func FakeHook(*FakeRequest, *FakeResponse) {}

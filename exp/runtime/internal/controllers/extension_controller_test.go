@@ -334,7 +334,7 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 		g.Expect(env.GetAPIReader().Get(ctx, namespacedName(workingExtension1), &result)).To(Succeed())
 
 		// Delete and attempt to discover a removal of the extension. Expect no error.
-		g.Expect(env.Delete(ctx, workingExtension1.DeepCopy())).To(Succeed())
+		g.Expect(env.CleanupAndWait(ctx, workingExtension1.DeepCopy())).To(Succeed())
 		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName(workingExtension1)})
 		g.Expect(err).To(BeNil())
 

@@ -26,9 +26,9 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
-	hooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
-	hooksv1alpha3 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
+	fakev1alpha1 "sigs.k8s.io/cluster-api/internal/runtime/catalog/test/v1alpha1"
+	fakev1alpha2 "sigs.k8s.io/cluster-api/internal/runtime/catalog/test/v1alpha2"
 )
 
 func TestClient_httpCall(t *testing.T) {
@@ -37,12 +37,13 @@ func TestClient_httpCall(t *testing.T) {
 	ctx := context.TODO()
 
 	discoveryHookHandler := func(w http.ResponseWriter, r *http.Request) {
-		response := &hooksv1alpha1.DiscoveryHookResponse{
+		response := &fakev1alpha1.FakeResponse{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "DiscoveryHookResponse",
-				APIVersion: hooksv1alpha1.GroupVersion.Identifier(),
+				APIVersion: fakev1alpha1.GroupVersion.Identifier(),
 			},
-			Status: hooksv1alpha1.ResponseStatusSuccess,
+			Second: "",
+			First:  1,
 		}
 		respBody, err := json.Marshal(response)
 		if err != nil {
@@ -56,20 +57,20 @@ func TestClient_httpCall(t *testing.T) {
 		g.Expect(httpCall(ctx, nil, nil, nil)).To(HaveOccurred())
 	})
 	t.Run("pass nil catalog", func(t *testing.T) {
-		g.Expect(httpCall(ctx, &hooksv1alpha1.DiscoveryHookRequest{}, &hooksv1alpha1.DiscoveryHookResponse{}, &httpCallOptions{})).To(HaveOccurred())
+		g.Expect(httpCall(ctx, &fakev1alpha1.FakeRequest{}, &fakev1alpha1.FakeResponse{}, &httpCallOptions{})).To(HaveOccurred())
 	})
 	t.Run("pass empty catalog", func(t *testing.T) {
 		opts := &httpCallOptions{
 			catalog: catalog.New(),
 		}
-		g.Expect(httpCall(ctx, &hooksv1alpha1.DiscoveryHookRequest{}, &hooksv1alpha1.DiscoveryHookResponse{}, opts)).To(HaveOccurred())
+		g.Expect(httpCall(ctx, &fakev1alpha1.FakeRequest{}, &fakev1alpha1.FakeResponse{}, opts)).To(HaveOccurred())
 	})
 	t.Run("ok, no conversion, discovery hook", func(t *testing.T) {
 		// create catalog containing a DiscoveryHook
 		c := catalog.New()
-		hookFunc := func(req *hooksv1alpha1.DiscoveryHookRequest, resp *hooksv1alpha1.DiscoveryHookResponse) {}
+		hookFunc := func(req *fakev1alpha1.FakeRequest, resp *fakev1alpha1.FakeResponse) {}
 		c.AddHook(
-			hooksv1alpha1.GroupVersion,
+			fakev1alpha1.GroupVersion,
 			hookFunc,
 			&catalog.HookMeta{},
 		)
@@ -84,13 +85,13 @@ func TestClient_httpCall(t *testing.T) {
 			gvh:     gvh,
 		}
 		// use same gvh for req as for hook in catalog
-		req := &hooksv1alpha1.DiscoveryHookRequest{
+		req := &fakev1alpha1.FakeRequest{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "DiscoveryHookRequest",
-				APIVersion: hooksv1alpha1.GroupVersion.Identifier(),
+				APIVersion: fakev1alpha1.GroupVersion.Identifier(),
 			},
 		}
-		resp := &hooksv1alpha1.DiscoveryHookResponse{}
+		resp := &fakev1alpha1.FakeResponse{}
 
 		// create http server with hook
 		mux := http.NewServeMux()
@@ -106,11 +107,11 @@ func TestClient_httpCall(t *testing.T) {
 	t.Run("ok, conversion, discovery hook", func(t *testing.T) {
 		// create catalog containing a DiscoveryHook
 		c := catalog.New()
-		// register hooksv1alpha1 to enable conversion
-		g.Expect(hooksv1alpha1.AddToCatalog(c)).To(Succeed())
-		hookFunc := func(req *hooksv1alpha1.DiscoveryHookRequest, resp *hooksv1alpha1.DiscoveryHookResponse) {}
+		// register fakev1alpha2 to enable conversion
+		g.Expect(fakev1alpha2.AddToCatalog(c)).To(Succeed())
+		hookFunc := func(req *fakev1alpha2.FakeRequest, resp *fakev1alpha2.FakeResponse) {}
 		c.AddHook(
-			hooksv1alpha1.GroupVersion,
+			fakev1alpha2.GroupVersion,
 			hookFunc,
 			&catalog.HookMeta{},
 		)
@@ -125,13 +126,13 @@ func TestClient_httpCall(t *testing.T) {
 			gvh:     gvh,
 		}
 		// use same gvh for req as for hook in catalog
-		req := &hooksv1alpha3.DiscoveryHookRequest{
+		req := &fakev1alpha1.FakeRequest{
 			TypeMeta: metav1.TypeMeta{
-				Kind:       "DiscoveryHookRequest",
-				APIVersion: hooksv1alpha3.GroupVersion.Identifier(),
+				Kind:       "FakeRequest",
+				APIVersion: fakev1alpha1.GroupVersion.Identifier(),
 			},
 		}
-		resp := &hooksv1alpha3.DiscoveryHookResponse{}
+		resp := &fakev1alpha1.FakeResponse{}
 
 		// create http server with hook
 		mux := http.NewServeMux()
