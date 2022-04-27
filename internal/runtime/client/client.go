@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/transport"
 
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
-	hooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	"sigs.k8s.io/cluster-api/internal/runtime/registry"
 )
@@ -191,13 +191,13 @@ type extensionClient struct {
 }
 
 func (e *extensionClient) Discover(ctx context.Context) (*runtimev1.Extension, error) {
-	gvh, err := e.client.catalog.GroupVersionHook(hooksv1alpha1.Discovery)
+	gvh, err := e.client.catalog.GroupVersionHook(runtimehooksv1.Discovery)
 	if err != nil {
 		return nil, err
 	}
 
-	request := &hooksv1alpha1.DiscoveryHookRequest{}
-	response := &hooksv1alpha1.DiscoveryHookResponse{}
+	request := &runtimehooksv1.DiscoveryHookRequest{}
+	response := &runtimehooksv1.DiscoveryHookResponse{}
 
 	// Future work: The discovery runtime extension could be operating on a different hook version than
 	// the latest. We will have to loop through different versions of the discover hook here to actually

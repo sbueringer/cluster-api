@@ -8,7 +8,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
@@ -61,7 +61,7 @@ func main() {
 	}
 }
 
-func doOperation1(in *v1alpha1.DiscoveryHookRequest, out *v1alpha1.DiscoveryHookResponse) error {
+func doOperation1(in *runtimehooksv1.DiscoveryHookRequest, out *runtimehooksv1.DiscoveryHookResponse) error {
 	fmt.Println("Discovery/v1alpha2 called")
 	out.Message = fmt.Sprintf("Discovery implementation version v1alpha2")
 	return nil

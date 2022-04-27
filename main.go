@@ -57,7 +57,7 @@ import (
 	expcontrollers "sigs.k8s.io/cluster-api/exp/controllers"
 	expruntimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
 	runtimecontroller "sigs.k8s.io/cluster-api/exp/runtime/controllers"
-	hooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	hooksv1alpha2 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	hooksv1alpha3 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/feature"
@@ -118,7 +118,7 @@ func init() {
 
 	// +kubebuilder:scaffold:scheme
 
-	_ = hooksv1alpha1.AddToCatalog(catalog)
+	_ = runtimehooksv1.AddToCatalog(catalog)
 	_ = hooksv1alpha2.AddToCatalog(catalog)
 	_ = hooksv1alpha3.AddToCatalog(catalog)
 }
