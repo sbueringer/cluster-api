@@ -122,6 +122,9 @@ linters-settings:
         alias: infraexpv1alpha4
       - pkg: sigs.k8s.io/cluster-api/test/infrastructure/docker/exp/api/v1beta1
         alias: infraexpv1
+      # runtime SDK exp
+      - pkg: sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1
+        alias: runtimehooksv1
   nolintlint:
     allow-unused: false
     allow-leading-space: false
