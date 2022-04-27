@@ -217,11 +217,11 @@ issues:
   - linters:
     - revive
     text: exported (method|function|type|const) (.+) should have comment or be unexported
-    path: .*(api|types)\/.*\/conversion.*\.go$
+    path: .*(api|types|test)\/.*\/conversion.*\.go$
   - linters:
     - revive
     text: "var-naming: don't use underscores in Go names;"
-    path: .*(api|types)\/.*\/conversion.*\.go$
+    path: .*(api|types|test)\/.*\/conversion.*\.go$
   - linters:
     - revive
     text: "receiver-naming: receiver name"
