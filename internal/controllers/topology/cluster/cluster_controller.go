@@ -35,7 +35,7 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/api/v1beta1/index"
 	"sigs.k8s.io/cluster-api/controllers/external"
-	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/controllers/topology/cluster/patches"
 	"sigs.k8s.io/cluster-api/internal/controllers/topology/cluster/scope"
@@ -138,12 +138,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 	// TODO: just poc code
 
 	if feature.Gates.Enabled(feature.RuntimeSDK) {
-		request := &v1alpha1.BeforeClusterUpgradeRequest{
+		request := &runtimehooksv1.BeforeClusterUpgradeRequest{
 			Cluster: *cluster,
 		}
-		response := &v1alpha1.BeforeClusterUpgradeResponse{}
+		response := &runtimehooksv1.BeforeClusterUpgradeResponse{}
 
-		err := r.RuntimeClient.Hook(v1alpha1.BeforeClusterUpgrade).CallAll(ctx, request, response)
+		err := r.RuntimeClient.Hook(runtimehooksv1.BeforeClusterUpgrade).CallAll(ctx, request, response)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

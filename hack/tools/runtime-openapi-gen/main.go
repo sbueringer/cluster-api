@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
@@ -43,7 +43,7 @@ func main() {
 	}
 
 	c := catalog.New()
-	_ = v1alpha1.AddToCatalog(c)
+	_ = runtimehooksv1.AddToCatalog(c)
 	_ = v1alpha2.AddToCatalog(c)
 	_ = v1alpha3.AddToCatalog(c)
 

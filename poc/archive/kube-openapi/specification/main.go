@@ -13,7 +13,7 @@ import (
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
-	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 )
 
 // OpenAPI v3 intro https://oai.github.io/Documentation/specification.html
@@ -36,7 +36,7 @@ func main() {
 
 	// Create a minimal builder config, then call the builder with the definition names.
 	config := CreateOpenAPIBuilderConfig()
-	config.GetDefinitions = v1alpha1.GetOpenAPIDefinitions
+	config.GetDefinitions = runtimehooksv1.GetOpenAPIDefinitions
 	config.GetOperationIDAndTags = getOperationIDAndTags
 	// Build the Paths using a simple WebService for the final spec
 	swagger, serr := builderv3.BuildOpenAPISpec(CreateWebServices(), config)

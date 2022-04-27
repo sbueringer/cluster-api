@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
-	"sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	catalogHTTP "sigs.k8s.io/cluster-api/internal/runtime/server"
 )
@@ -22,7 +22,7 @@ var c = catalog.New()
 var certDir = flag.String("certDir", "/tmp/rte-implementation-secure/", "path to directory containing tls.crt and tls.key")
 
 func init() {
-	_ = v1alpha1.AddToCatalog(c)
+	_ = runtimehooksv1.AddToCatalog(c)
 }
 
 func main() {
@@ -40,8 +40,8 @@ func main() {
 
 	operation1Handler, err := catalogHTTP.NewHandlerBuilder().
 		WithCatalog(c).
-		AddDiscovery(v1alpha1.Discovery, doDiscovery). // TODO: this is not strongly typed, but there are type checks when the service starts
-		AddExtension(v1alpha1.BeforeClusterUpgrade, "install-metrics-database", doInstallMetricsDatabase).
+		AddDiscovery(runtimehooksv1.Discovery, doDiscovery). // TODO: this is not strongly typed, but there are type checks when the service starts
+		AddExtension(runtimehooksv1.BeforeClusterUpgrade, "install-metrics-database", doInstallMetricsDatabase).
 		// TODO: test with more services
 		Build()
 	if err != nil {
@@ -57,14 +57,14 @@ func main() {
 
 // TODO: consider registering extensions with all required data and then auto-generating the discovery func based on that.
 // If we want folks to write it manually, make it nicer to do.
-func doDiscovery(request *v1alpha1.DiscoveryHookRequest, response *v1alpha1.DiscoveryHookResponse) error {
+func doDiscovery(request *runtimehooksv1.DiscoveryHookRequest, response *runtimehooksv1.DiscoveryHookResponse) error {
 	fmt.Println("Discovery/v1alpha1 called")
 
-	response.Status = v1alpha1.ResponseStatusSuccess
+	response.Status = runtimehooksv1.ResponseStatusSuccess
 	response.Extensions = append(response.Extensions, runtimev1.RuntimeExtension{
 		Name: "install-metrics-database",
 		Hook: runtimev1.Hook{
-			APIVersion: v1alpha1.GroupVersion.String(),
+			APIVersion: runtimehooksv1.GroupVersion.String(),
 			Name:       "BeforeClusterUpgrade",
 		},
 		TimeoutSeconds: pointer.Int32(10),
@@ -74,10 +74,10 @@ func doDiscovery(request *v1alpha1.DiscoveryHookRequest, response *v1alpha1.Disc
 	return nil
 }
 
-func doInstallMetricsDatabase(request *v1alpha1.BeforeClusterUpgradeRequest, response *v1alpha1.BlockingResponse) error {
+func doInstallMetricsDatabase(request *runtimehooksv1.BeforeClusterUpgradeRequest, response *runtimehooksv1.BlockingResponse) error {
 	fmt.Println("BeforeClusterUpgrade/v1alpha1 called", "cluster", klog.KObj(&request.Cluster))
 
-	response.Status = v1alpha1.ResponseStatusSuccess
+	response.Status = runtimehooksv1.ResponseStatusSuccess
 	response.RetryAfterSeconds = 10
 
 	return nil

@@ -17,7 +17,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1beta1"
-	hooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	hooksv2 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	hooksv3 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/feature"
@@ -237,19 +237,19 @@ func TestExtensionReconciler_Reconcile(t *testing.T) {
 	t.Run("test discovery using real client", func(t *testing.T) {
 		var results runtimev1.ExtensionList
 		cat := catalog.New()
-		g.Expect(hooksv1.AddToCatalog(cat)).To(Succeed())
+		g.Expect(runtimehooksv1.AddToCatalog(cat)).To(Succeed())
 		g.Expect(hooksv2.AddToCatalog(cat)).To(Succeed())
 		g.Expect(hooksv3.AddToCatalog(cat)).To(Succeed())
 
 		http.HandleFunc("/hooks.runtime.cluster.x-k8s.io/v1alpha1/discovery", func(w http.ResponseWriter, r *http.Request) {
-			resp := hooksv1.DiscoveryHookResponse{
+			resp := runtimehooksv1.DiscoveryHookResponse{
 				TypeMeta: metav1.TypeMeta{},
 				Status:   "",
 				Message:  "what a message",
-				Extensions: []hooksv1.RuntimeExtension{
+				Extensions: []runtimehooksv1.RuntimeExtension{
 					{
 						Name: "first",
-						Hook: hooksv1.Hook{
+						Hook: runtimehooksv1.Hook{
 							Name:       "first",
 							APIVersion: "v1alpha1",
 						},

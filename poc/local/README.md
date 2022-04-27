@@ -42,6 +42,8 @@ for f in $(kubectl get secret my-local-extension-cert -o json | jq '.data | keys
   kubectl get secret my-local-extension-cert -o json | jq '.data["'$f'"]' -r | base64 -d > "/tmp/rte-implementation-secure/$f"
 done
 
+export CA_BUNDLE="$(cat /tmp/rte-implementation-secure/ca.crt | base64)"
+envsubst < poc/local/secure-extension.yaml | k apply -f -
 # replace caBundle in `secure-extension.yaml` with base64 encoded content of /tmp/rte-implementation-secure/ca.crt
 
 # start webserver now (IDE?) rte-implementation-v1alpha1-secure
