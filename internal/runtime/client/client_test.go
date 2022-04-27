@@ -43,35 +43,39 @@ func TestClient_httpCall(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			"all nil, err",
-			nil, nil,
-			nil,
-			true,
+			name:     "all nil, err",
+			request:  nil,
+			response: nil,
+			opts:     nil,
+			wantErr:  true,
 		},
 		{
-			"nil catalog, err",
-			&fakev1alpha1.FakeRequest{}, &fakev1alpha1.FakeResponse{},
-			nil,
-			true,
+			name:     "nil catalog, err",
+			request:  &fakev1alpha1.FakeRequest{},
+			response: &fakev1alpha1.FakeResponse{},
+			opts: &httpCallOptions{
+				catalog: nil,
+			},
+			wantErr: true,
 		},
 		{
-			"empty catalog, err",
-			&fakev1alpha1.FakeRequest{}, &fakev1alpha1.FakeResponse{},
-			&httpCallOptions{
+			name:    "empty catalog, err",
+			request: &fakev1alpha1.FakeRequest{}, &fakev1alpha1.FakeResponse{},
+			opts: &httpCallOptions{
 				catalog: catalog.New(),
 			},
-			true,
+			wantErr: true,
 		},
 		{
-			"ok, no conversion",
-			&fakev1alpha1.FakeRequest{
+			name: "ok, no conversion",
+			request: &fakev1alpha1.FakeRequest{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "FakeRequest",
 					APIVersion: fakev1alpha1.GroupVersion.Identifier(),
 				},
 			},
-			&fakev1alpha1.FakeResponse{},
-			func() *httpCallOptions {
+			response: &fakev1alpha1.FakeResponse{},
+			opts: func() *httpCallOptions {
 				c := catalog.New()
 				c.AddHook(
 					fakev1alpha1.GroupVersion,
@@ -88,18 +92,18 @@ func TestClient_httpCall(t *testing.T) {
 					gvh:     gvh,
 				}
 			}(),
-			false,
+			wantErr: false,
 		},
 		{
-			"ok, conversion",
-			&fakev1alpha2.FakeRequest{
+			name: "ok, conversion",
+			request: &fakev1alpha2.FakeRequest{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "FakeRequest",
 					APIVersion: fakev1alpha2.GroupVersion.Identifier(),
 				},
 			},
-			&fakev1alpha2.FakeResponse{},
-			func() *httpCallOptions {
+			response: &fakev1alpha2.FakeResponse{},
+			opts: func() *httpCallOptions {
 				c := catalog.New()
 				// register fakev1alpha1 to enable conversion
 				g.Expect(fakev1alpha1.AddToCatalog(c)).To(Succeed())
@@ -118,7 +122,7 @@ func TestClient_httpCall(t *testing.T) {
 					gvh:     gvh,
 				}
 			}(),
-			false,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tableTests {

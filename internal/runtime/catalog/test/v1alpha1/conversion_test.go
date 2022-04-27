@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -28,19 +29,31 @@ import (
 )
 
 func TestConversion(t *testing.T) {
+	g := NewWithT(t)
+
 	var c = catalog.New()
 	_ = AddToCatalog(c)
 	_ = v1alpha2.AddToCatalog(c)
 
-	c1 := &v1alpha2.FakeRequest{Cluster: clusterv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-		Name: "test",
-	}}}
-	c2 := &FakeRequest{}
+	t.Run("down-convert FakeRequest v1alpha2 to v1alpha1", func(t *testing.T) {
+		oldRequest := &v1alpha2.FakeRequest{Cluster: clusterv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		}}}
+		newRequest := &FakeRequest{}
 
-	if err := c.Convert(c1, c2, context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if c2.Cluster.GetName() != "test" {
-		t.Fatal("expected name to be `test`")
-	}
+		g.Expect(c.Convert(oldRequest, newRequest, context.Background())).To(Succeed())
+		g.Expect(newRequest.Cluster.GetName()).To(Equal(oldRequest.Cluster.Name))
+	})
+
+	t.Run("up-convert FakeResponse v1alpha1 to v1alpha2", func(t *testing.T) {
+		oldResponse := &FakeResponse{
+			First:  1,
+			Second: "foo",
+		}
+		newResponse := &v1alpha2.FakeResponse{}
+		g.Expect(c.Convert(oldResponse, newResponse, context.Background())).To(Succeed())
+
+		g.Expect(newResponse.First).To(Equal(oldResponse.First))
+		g.Expect(newResponse.Second).To(Equal(oldResponse.Second))
+	})
 }
