@@ -229,7 +229,7 @@ issues:
   - linters:
     - stylecheck
     text: "ST1003: should not use underscores in Go names;"
-    path: .*(api|types)\/.*\/conversion.*\.go$
+    path: .*(api|types|test)\/.*\/conversion.*\.go$
   - linters:
     - stylecheck
     text: "ST1016: methods on the same type should have the same receiver name"
