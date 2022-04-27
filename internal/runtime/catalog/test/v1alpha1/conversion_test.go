@@ -36,24 +36,24 @@ func TestConversion(t *testing.T) {
 	_ = v1alpha2.AddToCatalog(c)
 
 	t.Run("down-convert FakeRequest v1alpha2 to v1alpha1", func(t *testing.T) {
-		oldRequest := &v1alpha2.FakeRequest{Cluster: clusterv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+		request := &v1alpha2.FakeRequest{Cluster: clusterv1.Cluster{ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 		}}}
-		newRequest := &FakeRequest{}
+		requestLocal := &FakeRequest{}
 
-		g.Expect(c.Convert(oldRequest, newRequest, context.Background())).To(Succeed())
-		g.Expect(newRequest.Cluster.GetName()).To(Equal(oldRequest.Cluster.Name))
+		g.Expect(c.Convert(request, requestLocal, context.Background())).To(Succeed())
+		g.Expect(requestLocal.Cluster.GetName()).To(Equal(request.Cluster.Name))
 	})
 
 	t.Run("up-convert FakeResponse v1alpha1 to v1alpha2", func(t *testing.T) {
-		oldResponse := &FakeResponse{
+		responseLocal := &FakeResponse{
 			First:  1,
 			Second: "foo",
 		}
-		newResponse := &v1alpha2.FakeResponse{}
-		g.Expect(c.Convert(oldResponse, newResponse, context.Background())).To(Succeed())
+		response := &v1alpha2.FakeResponse{}
+		g.Expect(c.Convert(responseLocal, response, context.Background())).To(Succeed())
 
-		g.Expect(newResponse.First).To(Equal(oldResponse.First))
-		g.Expect(newResponse.Second).To(Equal(oldResponse.Second))
+		g.Expect(response.First).To(Equal(responseLocal.First))
+		g.Expect(response.Second).To(Equal(responseLocal.Second))
 	})
 }
