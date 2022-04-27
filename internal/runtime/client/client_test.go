@@ -73,15 +73,14 @@ func TestClient_httpCall(t *testing.T) {
 			&fakev1alpha1.FakeResponse{},
 			func() *httpCallOptions {
 				c := catalog.New()
-				hookFunc := func(req *fakev1alpha1.FakeRequest, resp *fakev1alpha1.FakeResponse) {}
 				c.AddHook(
 					fakev1alpha1.GroupVersion,
-					hookFunc,
+					fakev1alpha1.FakeHook,
 					&catalog.HookMeta{},
 				)
 
-				// get same gvh for hook by using the hookfunc and catalog
-				gvh, err := c.GroupVersionHook(hookFunc)
+				// get same gvh for hook by using the FakeHook and catalog
+				gvh, err := c.GroupVersionHook(fakev1alpha1.FakeHook)
 				g.Expect(err).To(Succeed())
 
 				return &httpCallOptions{
@@ -104,15 +103,14 @@ func TestClient_httpCall(t *testing.T) {
 				c := catalog.New()
 				// register fakev1alpha1 to enable conversion
 				g.Expect(fakev1alpha1.AddToCatalog(c)).To(Succeed())
-				hookFunc := func(req *fakev1alpha1.FakeRequest, resp *fakev1alpha1.FakeResponse) {}
 				c.AddHook(
 					fakev1alpha1.GroupVersion,
-					hookFunc,
+					fakev1alpha1.FakeHook,
 					&catalog.HookMeta{},
 				)
 
-				// get same gvh for hook by using the hookfunc and catalog
-				gvh, err := c.GroupVersionHook(hookFunc)
+				// get same gvh for hook by using the FakeHook and catalog
+				gvh, err := c.GroupVersionHook(fakev1alpha1.FakeHook)
 				g.Expect(err).To(Succeed())
 
 				return &httpCallOptions{

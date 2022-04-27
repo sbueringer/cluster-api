@@ -20,24 +20,27 @@ import (
 	"context"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	"sigs.k8s.io/cluster-api/internal/runtime/catalog/test/v1alpha2"
 )
 
 func TestConversion(t *testing.T) {
-	// NOTE: this is only a very simple conversion test
-	// We need something more once we merge multiple versions of a type
-	// and actually use conversion.
-
 	var c = catalog.New()
 	_ = AddToCatalog(c)
 	_ = v1alpha2.AddToCatalog(c)
 
-	c1 := &v1alpha2.FakeRequest{}
+	c1 := &v1alpha2.FakeRequest{Cluster: clusterv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+		Name: "test",
+	}}}
 	c2 := &FakeRequest{}
 
-	err := c.Convert(c1, c2, context.Background())
-	if err != nil {
+	if err := c.Convert(c1, c2, context.Background()); err != nil {
 		t.Fatal(err)
+	}
+	if c2.Cluster.GetName() != "test" {
+		t.Fatal("expected name to be `test`")
 	}
 }
