@@ -361,3 +361,8 @@ should monitor for changes. When a dependency is modified, Tilt rebuilds the pro
 machine**, copies the binary to the running container, and executes a restart script. This is significantly faster
 than rebuilding the container image for each change. It also helps keep the size of each development image as small as
 possible (the container images do not need the entire go toolchain, source code, module dependencies, etc.).
+
+## Syntax Highlighting for Tiltfile in Intellij
+
+Syntax highlighting for the Tiltfile in Intellij can be configured with a TextMate Bundle. For instructions, please see:
+[Tiltfile TextMate Bundle](https://github.com/tilt-dev/tiltfile.tmbundle).
