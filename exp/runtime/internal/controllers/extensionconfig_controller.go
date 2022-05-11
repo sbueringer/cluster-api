@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1alpha1"
@@ -54,6 +56,28 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	if err != nil {
 		return errors.Wrap(err, "failed setting up with a controller manager")
 	}
+
+	err = mgr.Add(&WarmupRunnable{
+		RuntimeClient: r.RuntimeClient,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed setting up with a controller manager")
+	}
+	return nil
+}
+
+var _ manager.LeaderElectionRunnable = &WarmupRunnable{}
+
+type WarmupRunnable struct {
+	RuntimeClient runtimeclient.Client
+}
+
+func (r *WarmupRunnable) NeedLeaderElection() bool {
+	return true
+}
+
+func (r *WarmupRunnable) Start(ctx context.Context) error {
+	fmt.Println("r.RuntimeClient.WarmUp()")
 	return nil
 }
 
