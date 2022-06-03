@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/external"
 	"sigs.k8s.io/cluster-api/internal/controllers/topology/cluster/patches"
 	"sigs.k8s.io/cluster-api/internal/controllers/topology/cluster/scope"
+	"sigs.k8s.io/cluster-api/internal/controllers/topology/cluster/structuredmerge"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -50,6 +51,8 @@ import (
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machinehealthchecks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;create;delete
+
+type patchHelperFactoryFunc func(original, modified client.Object, opts ...structuredmerge.HelperOption) (structuredmerge.PatchHelper, error)
 
 // Reconciler reconciles a managed topology for a Cluster object.
 type Reconciler struct {
@@ -70,6 +73,8 @@ type Reconciler struct {
 
 	// patchEngine is used to apply patches during computeDesiredState.
 	patchEngine patches.Engine
+
+	patchHelperFactory patchHelperFactoryFunc
 }
 
 func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -102,13 +107,19 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	}
 	r.patchEngine = patches.NewEngine()
 	r.recorder = mgr.GetEventRecorderFor("topology/cluster")
+	if r.patchHelperFactory == nil {
+		r.patchHelperFactory = serverSideApplyPatchHelperFactory(r.Client)
+	}
 	return nil
 }
+
+// Add two factory functions.
 
 // SetupForDryRun prepares the Reconciler for a dry run execution.
 func (r *Reconciler) SetupForDryRun(recorder record.EventRecorder) {
 	r.patchEngine = patches.NewEngine()
 	r.recorder = recorder
+	r.patchHelperFactory = dryRunPatchHelperFactory(r.Client)
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
@@ -284,4 +295,18 @@ func (r *Reconciler) machineDeploymentToCluster(o client.Object) []ctrl.Request 
 			Name:      md.Spec.ClusterName,
 		},
 	}}
+}
+
+// serverSideApplyPatchHelperFactory makes use of managed fields provided by server side apply and is used by the controllers.
+func serverSideApplyPatchHelperFactory(c client.Client) patchHelperFactoryFunc {
+	return func(original, modified client.Object, opts ...structuredmerge.HelperOption) (structuredmerge.PatchHelper, error) {
+		return structuredmerge.NewServerSidePatchHelper(original, modified, c, opts...)
+	}
+}
+
+// dryRunPatchHelperFactory makes use of a two way patch and is used in situations where we cannot rely on managed fields.
+func dryRunPatchHelperFactory(c client.Client) patchHelperFactoryFunc {
+	return func(original, modified client.Object, opts ...structuredmerge.HelperOption) (structuredmerge.PatchHelper, error) {
+		return structuredmerge.NewTwoWaysPatchHelper(original, modified, c, opts...)
+	}
 }
