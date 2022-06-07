@@ -761,7 +761,9 @@ func Test_dryRunPatch(t *testing.T) {
 					// NOTE: We are simulating a real object with something in spec and labels, so both
 					// the top level object and metadata are considered as granular maps.
 					"f:metadata": map[string]interface{}{
-						"f:foo": map[string]interface{}{},
+						"f:labels": map[string]interface{}{
+							"f:foo": map[string]interface{}{},
+						},
 					},
 					"f:spec": map[string]interface{}{
 						"f:another": map[string]interface{}{},
@@ -774,15 +776,18 @@ func Test_dryRunPatch(t *testing.T) {
 						"labels": map[string]interface{}{
 							"foo": "bar",
 						},
-						"spec": map[string]interface{}{
-							"another": "value",
-						},
+					},
+					"spec": map[string]interface{}{
+						"another": "value",
 					},
 				},
 				modified: map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name":      "foo",
 						"namespace": "bar",
+						"labels": map[string]interface{}{
+							"foo": "bar",
+						},
 					},
 					"spec": map[string]interface{}{
 						"another": "value",

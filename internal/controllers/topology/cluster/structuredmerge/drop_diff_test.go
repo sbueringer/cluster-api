@@ -27,12 +27,12 @@ import (
 func Test_dropChangesForNotAllowedPaths(t *testing.T) {
 	tests := []struct {
 		name         string
-		ctx          *dropChangeContext
+		ctx          *dropChangeInput
 		wantModified map[string]interface{}
 	}{
 		{
 			name: "Sets not allowed paths to original value if defined",
-			ctx: &dropChangeContext{
+			ctx: &dropChangeInput{
 				path: contract.Path{},
 				original: map[string]interface{}{
 					"metadata": map[string]interface{}{
@@ -87,7 +87,7 @@ func Test_dropChangesForNotAllowedPaths(t *testing.T) {
 		},
 		{
 			name: "Drops not allowed paths if they do not exist in original",
-			ctx: &dropChangeContext{
+			ctx: &dropChangeInput{
 				path:     contract.Path{},
 				original: map[string]interface{}{
 					// Original doesn't have values for not allowed paths.
@@ -135,7 +135,7 @@ func Test_dropChangesForNotAllowedPaths(t *testing.T) {
 		},
 		{
 			name: "Cleanup empty maps",
-			ctx: &dropChangeContext{
+			ctx: &dropChangeInput{
 				path:     contract.Path{},
 				original: map[string]interface{}{
 					// Original doesn't have values for not allowed paths.
@@ -158,7 +158,7 @@ func Test_dropChangesForNotAllowedPaths(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			dropChanges(tt.ctx)
+			dropDiff(tt.ctx)
 
 			g.Expect(tt.ctx.modified).To(Equal(tt.wantModified))
 		})
@@ -168,12 +168,12 @@ func Test_dropChangesForNotAllowedPaths(t *testing.T) {
 func Test_dropChangesForIgnoredPaths(t *testing.T) {
 	tests := []struct {
 		name         string
-		ctx          *dropChangeContext
+		ctx          *dropChangeInput
 		wantModified map[string]interface{}
 	}{
 		{
 			name: "Sets ignored paths to original value if defined",
-			ctx: &dropChangeContext{
+			ctx: &dropChangeInput{
 				path: contract.Path{},
 				original: map[string]interface{}{
 					"spec": map[string]interface{}{
@@ -211,7 +211,7 @@ func Test_dropChangesForIgnoredPaths(t *testing.T) {
 		},
 		{
 			name: "Drops ignore paths if they do not exist in original",
-			ctx: &dropChangeContext{
+			ctx: &dropChangeInput{
 				path:     contract.Path{},
 				original: map[string]interface{}{
 					// Original doesn't have values for ignore paths.
@@ -240,7 +240,7 @@ func Test_dropChangesForIgnoredPaths(t *testing.T) {
 		},
 		{
 			name: "Cleanup empty maps",
-			ctx: &dropChangeContext{
+			ctx: &dropChangeInput{
 				path:     contract.Path{},
 				original: map[string]interface{}{
 					// Original doesn't have values for not allowed paths.
@@ -265,7 +265,7 @@ func Test_dropChangesForIgnoredPaths(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			dropChanges(tt.ctx)
+			dropDiff(tt.ctx)
 
 			g.Expect(tt.ctx.modified).To(Equal(tt.wantModified))
 		})

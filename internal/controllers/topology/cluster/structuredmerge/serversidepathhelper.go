@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/cluster-api/internal/contract"
 )
 
-const topologyManagerName = "topology"
+const topologyManagerName = "capi-topology"
 
 type serverSidePatchHelper struct {
 	client         client.Client
@@ -169,7 +169,11 @@ func cleanupLegacyManagedFields(obj *unstructured.Unstructured, c client.Client)
 		managedFields = append(managedFields, originalManagedFields[i])
 	}
 
-	// Add a seeding managedFieldEntry for SSA executed by the management controller, to prevent SSA to create ""
+	// Add a seeding managedFieldEntry for SSA executed by the management controller, to prevent SSA to create/infer
+	// a default managedFieldEntry when the first SSA is applied.
+	// More specifically, if an existing object doesn't have managedFields when applying the first SSA the API server
+	// creates an entry with operation=Update (kind of guessing where the object comes from), but this entry ends up
+	// acting as a co-ownership and we want to prevent this.
 	// NOTE: fieldV1Map cannot be empty, so we add metadata.name which will be cleaned up at the first SSA patch.
 	fieldV1Map := map[string]interface{}{
 		"f:metadata": map[string]interface{}{
@@ -184,7 +188,7 @@ func cleanupLegacyManagedFields(obj *unstructured.Unstructured, c client.Client)
 	managedFields = append(managedFields, metav1.ManagedFieldsEntry{
 		Manager:    topologyManagerName,
 		Operation:  metav1.ManagedFieldsOperationApply,
-		APIVersion: "infrastructure.cluster.x-k8s.io/v1beta1",
+		APIVersion: obj.GetAPIVersion(),
 		Time:       &now,
 		FieldsType: "FieldsV1",
 		FieldsV1:   &metav1.FieldsV1{Raw: fieldV1},

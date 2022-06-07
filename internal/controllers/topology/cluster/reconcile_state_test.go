@@ -744,17 +744,12 @@ func TestReconcileControlPlane(t *testing.T) {
 				if tt.original != nil {
 					if tt.original.InfrastructureMachineTemplate != nil && tt.original.InfrastructureMachineTemplate.GetName() != gotInfrastructureMachineRef.Name {
 						gotRotation = true
+						// if template has been rotated, fixup infrastructureRef in the wantControlPlaneObjectSpec before comparison.
+						g.Expect(contract.ControlPlane().MachineTemplate().InfrastructureRef().Set(tt.want.Object, refToUnstructured(gotInfrastructureMachineRef))).To(Succeed())
 					}
 				}
 			}
 			g.Expect(gotRotation).To(Equal(tt.wantRotation))
-
-			// if template has been rotated, fixup infrastructureRef in the wantControlPlaneObjectSpec before comparison.
-			if gotRotation {
-				gotInfrastructureMachineRef, err := contract.ControlPlane().MachineTemplate().InfrastructureRef().Get(gotControlPlaneObject)
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(contract.ControlPlane().MachineTemplate().InfrastructureRef().Set(tt.want.Object, refToUnstructured(gotInfrastructureMachineRef))).To(Succeed())
-			}
 
 			// Get the spec from the ControlPlaneObject we are expecting
 			wantControlPlaneObjectSpec, ok, err := unstructured.NestedMap(tt.want.Object.UnstructuredContent(), "spec")

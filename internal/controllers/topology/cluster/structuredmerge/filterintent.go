@@ -28,7 +28,7 @@ func filterObject(obj *unstructured.Unstructured, helperOptions *HelperOptions) 
 	if len(helperOptions.allowedPaths) > 0 {
 		filterIntent(&filterIntentContext{
 			path:         contract.Path{},
-			modified:     obj.Object,
+			value:        obj.Object,
 			shouldFilter: isNotAllowedPath(helperOptions.allowedPaths),
 		})
 	}
@@ -38,7 +38,7 @@ func filterObject(obj *unstructured.Unstructured, helperOptions *HelperOptions) 
 	if len(helperOptions.ignorePaths) > 0 {
 		filterIntent(&filterIntentContext{
 			path:         contract.Path{},
-			modified:     obj.Object,
+			value:        obj.Object,
 			shouldFilter: isIgnorePath(helperOptions.ignorePaths),
 		})
 	}
@@ -49,22 +49,27 @@ func filterObject(obj *unstructured.Unstructured, helperOptions *HelperOptions) 
 // NOTE: This func is called recursively only for fields of type Map, but this is ok given the current use cases
 // this func has to address. More specifically, we are using this func for filtering out not allowed paths and for ignore paths;
 // all of them are defined in reconcile_state.go and are targeting well-known fields inside nested maps.
+// Allowed paths / ignore paths which point to an array are not supported by the current implementation.
 func filterIntent(ctx *filterIntentContext) bool {
-	modified, _ := ctx.modified.(map[string]interface{})
+	value, ok := ctx.value.(map[string]interface{})
+	if !ok {
+		return false
+	}
+
 	gotDeletions := false
-	for field := range modified {
+	for field := range value {
 		fieldCtx := &filterIntentContext{
 			// Compose the path for the nested field.
 			path: ctx.path.Append(field),
 			// Gets the original and the modified value for the field.
-			modified: modified[field],
+			value: value[field],
 			// Carry over global values from the context.
 			shouldFilter: ctx.shouldFilter,
 		}
 
 		// If the field should be filtered out, delete it from the modified object.
 		if fieldCtx.shouldFilter(fieldCtx.path) {
-			delete(modified, field)
+			delete(value, field)
 			gotDeletions = true
 			continue
 		}
@@ -72,8 +77,8 @@ func filterIntent(ctx *filterIntentContext) bool {
 		// Process nested fields and get in return if filterIntent removed fields.
 		if filterIntent(fieldCtx) {
 			// Ensure we are not leaving empty maps around.
-			if v, ok := fieldCtx.modified.(map[string]interface{}); ok && len(v) == 0 {
-				delete(modified, field)
+			if v, ok := fieldCtx.value.(map[string]interface{}); ok && len(v) == 0 {
+				delete(value, field)
 			}
 		}
 	}
@@ -86,8 +91,8 @@ type filterIntentContext struct {
 	// the path of the field being processed.
 	path contract.Path
 
-	// the original and the modified value for the current path.
-	modified interface{}
+	// the value for the current path.
+	value interface{}
 
 	// shouldFilter handle the func that determine if the current path should be dropped or not.
 	shouldFilter func(path contract.Path) bool
@@ -97,6 +102,9 @@ type filterIntentContext struct {
 func isAllowedPath(allowedPaths []contract.Path) func(path contract.Path) bool {
 	return func(path contract.Path) bool {
 		for _, p := range allowedPaths {
+			// NOTE: we allow everything Equal or one IsParentOf one of the allowed paths.
+			// e.g. if allowed path is metadata.labels, we allow both metadata and metadata.labels;
+			// this is required because allowed path is called recursively.
 			if path.Overlaps(p) {
 				return true
 			}

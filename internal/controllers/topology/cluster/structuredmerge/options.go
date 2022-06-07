@@ -38,6 +38,7 @@ type HelperOptions struct {
 	// IgnorePaths instruct the Helper to ignore given paths when computing a patch.
 	// NOTE: ignorePaths are used to filter out fields nested inside allowedPaths, e.g.
 	// spec.ControlPlaneEndpoint.
+	// NOTE: ignore paths which point to an array are not supported by the current implementation.
 	ignorePaths []contract.Path
 }
 

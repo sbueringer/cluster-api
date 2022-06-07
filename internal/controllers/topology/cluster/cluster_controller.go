@@ -52,8 +52,6 @@ import (
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;create;delete
 
-type patchHelperFactoryFunc func(original, modified client.Object, opts ...structuredmerge.HelperOption) (structuredmerge.PatchHelper, error)
-
 // Reconciler reconciles a managed topology for a Cluster object.
 type Reconciler struct {
 	Client client.Client
@@ -74,7 +72,7 @@ type Reconciler struct {
 	// patchEngine is used to apply patches during computeDesiredState.
 	patchEngine patches.Engine
 
-	patchHelperFactory patchHelperFactoryFunc
+	patchHelperFactory structuredmerge.PatchHelperFactoryFunc
 }
 
 func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -112,8 +110,6 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	}
 	return nil
 }
-
-// Add two factory functions.
 
 // SetupForDryRun prepares the Reconciler for a dry run execution.
 func (r *Reconciler) SetupForDryRun(recorder record.EventRecorder) {
@@ -297,15 +293,15 @@ func (r *Reconciler) machineDeploymentToCluster(o client.Object) []ctrl.Request 
 	}}
 }
 
-// serverSideApplyPatchHelperFactory makes use of managed fields provided by server side apply and is used by the controllers.
-func serverSideApplyPatchHelperFactory(c client.Client) patchHelperFactoryFunc {
+// serverSideApplyPatchHelperFactory makes use of managed fields provided by server side apply and is used by the controller.
+func serverSideApplyPatchHelperFactory(c client.Client) structuredmerge.PatchHelperFactoryFunc {
 	return func(original, modified client.Object, opts ...structuredmerge.HelperOption) (structuredmerge.PatchHelper, error) {
 		return structuredmerge.NewServerSidePatchHelper(original, modified, c, opts...)
 	}
 }
 
-// dryRunPatchHelperFactory makes use of a two way patch and is used in situations where we cannot rely on managed fields.
-func dryRunPatchHelperFactory(c client.Client) patchHelperFactoryFunc {
+// dryRunPatchHelperFactory makes use of a two-ways patch and is used in situations where we cannot rely on managed fields.
+func dryRunPatchHelperFactory(c client.Client) structuredmerge.PatchHelperFactoryFunc {
 	return func(original, modified client.Object, opts ...structuredmerge.HelperOption) (structuredmerge.PatchHelper, error) {
 		return structuredmerge.NewTwoWaysPatchHelper(original, modified, c, opts...)
 	}

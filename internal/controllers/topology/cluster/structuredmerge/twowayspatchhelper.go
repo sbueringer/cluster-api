@@ -165,7 +165,7 @@ func applyOptions(in *applyOptionsInput) ([]byte, error) {
 	// drop changes for exclude paths (fields to not consider, e.g. status);
 	// Note: for everything not allowed it sets modified equal to original, so the generated patch doesn't include this change
 	if len(in.options.allowedPaths) > 0 {
-		dropChanges(&dropChangeContext{
+		dropDiff(&dropChangeInput{
 			path:                 contract.Path{},
 			original:             originalMap,
 			modified:             modifiedMap,
@@ -177,7 +177,7 @@ func applyOptions(in *applyOptionsInput) ([]byte, error) {
 	//   spec.controlPlaneEndpoint in the InfrastructureCluster object);
 	// Note: for everything ignored it sets  modified equal to original, so the generated patch doesn't include this change
 	if len(in.options.ignorePaths) > 0 {
-		dropChanges(&dropChangeContext{
+		dropDiff(&dropChangeInput{
 			path:                 contract.Path{},
 			original:             originalMap,
 			modified:             modifiedMap,

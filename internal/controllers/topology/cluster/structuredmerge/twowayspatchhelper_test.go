@@ -141,14 +141,14 @@ func TestNewHelper(t *testing.T) {
 				Object: map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"labels": map[string]interface{}{
-							"foo": "foo",
+							"foo": "foo-modified",
 						},
 					},
 				},
 			},
-			wantHasChanges:     false,
+			wantHasChanges:     true,
 			wantHasSpecChanges: false,
-			wantPatch:          []byte("{}"),
+			wantPatch:          []byte("{\"metadata\":{\"labels\":{\"foo\":\"foo-modified\"}}}"),
 		},
 		{
 			name: "Field (spec.template.spec.foo) both in original and in modified, no-op when equal",

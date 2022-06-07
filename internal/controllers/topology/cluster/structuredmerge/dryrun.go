@@ -41,8 +41,11 @@ func getTopologyManagedFields(original client.Object) map[string]interface{} {
 		if m.Operation == metav1.ManagedFieldsOperationApply &&
 			m.Manager == topologyManagerName &&
 			m.APIVersion == original.GetObjectKind().GroupVersionKind().GroupVersion().String() {
-			// NOTE: ignoring this error because API server ensures this is a valid yaml.
-			_ = json.Unmarshal(m.FieldsV1.Raw, &r)
+			// NOTE: API server ensures this is a valid json.
+			err := json.Unmarshal(m.FieldsV1.Raw, &r)
+			if err != nil {
+				continue
+			}
 			break
 		}
 	}
@@ -104,7 +107,8 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 					modified: fieldValue,
 					original: fieldOriginalValue,
 				})
-				hasChanges, hasSpecChanges = hasChanges || fieldHasChanges, hasSpecChanges || fieldHasSpecChanges
+				hasChanges = hasChanges || fieldHasChanges
+				hasSpecChanges = hasSpecChanges || fieldHasSpecChanges
 			}
 
 			// Process all the fields the corresponding managed field to identify fields previously managed being
@@ -116,7 +120,7 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 				field := strings.TrimPrefix(fieldV1, "f:")
 				if !keys.Has(field) {
 					fieldPath := ctx.path.Append(field)
-					return splitChange(fieldPath)
+					return pathToResult(fieldPath)
 				}
 			}
 			return
@@ -135,7 +139,7 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 			// something is changed without checking all the items.
 			// NOTE: this assumes the root of the object isn't a list, which is true for all the K8s objects.
 			if len(modifiedList) != len(ctx.fieldsV1) || len(modifiedList) != len(originalList) {
-				return splitChange(ctx.path)
+				return pathToResult(ctx.path)
 			}
 
 			// Otherwise, check the item in the list one by one.
@@ -161,7 +165,8 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 						modified: modifiedItem,
 						original: originalItem,
 					})
-					hasChanges, hasSpecChanges = hasChanges || itemHasChanges, hasSpecChanges || itemHasSpecChanges
+					hasChanges = hasChanges || itemHasChanges
+					hasSpecChanges = hasSpecChanges || itemHasSpecChanges
 
 					// If there are already changes detected, it is possible to skip processing other items.
 					if hasChanges {
@@ -181,7 +186,7 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 					// NOTE: ignoring this error because API server ensures the keys in listMap are scalars value.
 					vString, _ := v.(string)
 					if !s.Has(vString) {
-						return splitChange(ctx.path)
+						return pathToResult(ctx.path)
 					}
 				}
 				return
@@ -202,12 +207,12 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 		notManagedBefore = false
 	}
 
-	// Check if the field if the field value is changed.
+	// Check if the field value is changed.
 	// NOTE: it is required to use reflect.DeepEqual because in case of atomic map or lists the value is not a scalar value.
 	valueChanged := !reflect.DeepEqual(ctx.modified, ctx.original)
 
 	if notManagedBefore || valueChanged {
-		return splitChange(ctx.path)
+		return pathToResult(ctx.path)
 	}
 	return false, false
 }
@@ -215,7 +220,7 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 type hasChangesContext struct {
 	// the path of the field being processed.
 	path contract.Path
-	// the original and the modified value for the current path.
+	// fieldsV1 for the current path.
 	fieldsV1 map[string]interface{}
 
 	// the original and the modified value for the current path.
@@ -223,8 +228,11 @@ type hasChangesContext struct {
 	original interface{}
 }
 
-// splitChange determine if a change in a path impact the spec.
-func splitChange(p contract.Path) (hasChanges, hasSpecChanges bool) {
+// pathToResult determine if a change in a path impact the spec.
+// We assume there is always a change when this call is called; additionally
+// we determine the change impacts spec when the path is the root of the object
+// or the path starts with spec.
+func pathToResult(p contract.Path) (hasChanges, hasSpecChanges bool) {
 	return true, len(p) == 0 || (len(p) > 0 && p[0] == "spec")
 }
 
@@ -243,8 +251,11 @@ func getItemKeys(keys map[string]string, values map[string]interface{}) map[stri
 	keyValues := map[string]string{}
 	for k := range keys {
 		if v, ok := values[k]; ok {
-			// NOTE: ignoring this error because API server ensures the keys in listMap are scalars value.
-			vString, _ := v.(string)
+			// NOTE: API server ensures the keys in listMap are scalars value.
+			vString, ok := v.(string)
+			if !ok {
+				continue
+			}
 			keyValues[k] = vString
 		}
 	}
@@ -254,8 +265,11 @@ func getItemKeys(keys map[string]string, values map[string]interface{}) map[stri
 // getItemWithKeys return the item in the list with the given keys or nil if any.
 func getItemWithKeys(l []interface{}, keys map[string]string) map[string]interface{} {
 	for _, i := range l {
-		// NOTE: ignoring this error because API server ensures the item in a listMap is a map.
-		iMap, _ := i.(map[string]interface{})
+		// NOTE: API server ensures the item in a listMap is a map.
+		iMap, ok := i.(map[string]interface{})
+		if !ok {
+			continue
+		}
 		iKeys := getItemKeys(keys, iMap)
 		if reflect.DeepEqual(iKeys, keys) {
 			return iMap

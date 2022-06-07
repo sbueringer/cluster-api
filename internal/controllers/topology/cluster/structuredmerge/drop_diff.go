@@ -18,16 +18,17 @@ package structuredmerge
 
 import "sigs.k8s.io/cluster-api/internal/contract"
 
-// dropChanges allow to change the modified object so the generated patch will not contain changes
+// dropDiff allow to change the modified object so the generated patch will not contain changes
 // that match the shouldDropChange criteria.
 // NOTE: This func is called recursively only for fields of type Map, but this is ok given the current use cases
 // this func has to address. More specifically, we are using only for not allowed paths and for ignore paths;
 // all of them are defined in reconcile_state.go and are targeting well-known fields inside nested maps.
-func dropChanges(ctx *dropChangeContext) {
+// Allowed paths / ignore paths which point to an array are not supported by the current implementation.
+func dropDiff(ctx *dropChangeInput) {
 	original, _ := ctx.original.(map[string]interface{})
 	modified, _ := ctx.modified.(map[string]interface{})
 	for field := range modified {
-		fieldCtx := &dropChangeContext{
+		fieldCtx := &dropChangeInput{
 			// Compose the path for the nested field.
 			path: ctx.path.Append(field),
 			// Gets the original and the modified value for the field.
@@ -49,7 +50,7 @@ func dropChanges(ctx *dropChangeContext) {
 		}
 
 		// Process nested fields.
-		dropChanges(fieldCtx)
+		dropDiff(fieldCtx)
 
 		// Ensure we are not leaving empty maps around.
 		if v, ok := fieldCtx.modified.(map[string]interface{}); ok && len(v) == 0 {
@@ -58,8 +59,8 @@ func dropChanges(ctx *dropChangeContext) {
 	}
 }
 
-// dropChangeContext holds info required while computing dropChange.
-type dropChangeContext struct {
+// dropChangeInput holds info required while computing dropChange.
+type dropChangeInput struct {
 	// the path of the field being processed.
 	path contract.Path
 

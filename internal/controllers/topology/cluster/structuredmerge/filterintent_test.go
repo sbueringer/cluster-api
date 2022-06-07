@@ -26,15 +26,15 @@ import (
 
 func Test_filterNotAllowedPaths(t *testing.T) {
 	tests := []struct {
-		name         string
-		ctx          *filterIntentContext
-		wantModified map[string]interface{}
+		name      string
+		ctx       *filterIntentContext
+		wantValue map[string]interface{}
 	}{
 		{
 			name: "Filters out not allowed paths",
 			ctx: &filterIntentContext{
 				path: contract.Path{},
-				modified: map[string]interface{}{
+				value: map[string]interface{}{
 					"apiVersion": "foo.bar/v1",
 					"kind":       "Foo",
 					"metadata": map[string]interface{}{
@@ -67,7 +67,7 @@ func Test_filterNotAllowedPaths(t *testing.T) {
 					},
 				),
 			},
-			wantModified: map[string]interface{}{
+			wantValue: map[string]interface{}{
 				"apiVersion": "foo.bar/v1",
 				"kind":       "Foo",
 				"metadata": map[string]interface{}{
@@ -91,7 +91,7 @@ func Test_filterNotAllowedPaths(t *testing.T) {
 			name: "Cleanup empty maps",
 			ctx: &filterIntentContext{
 				path: contract.Path{},
-				modified: map[string]interface{}{
+				value: map[string]interface{}{
 					"spec": map[string]interface{}{
 						"foo": "123",
 					},
@@ -100,7 +100,7 @@ func Test_filterNotAllowedPaths(t *testing.T) {
 					[]contract.Path{}, // NOTE: we are filtering out everything not in this list (everything)
 				),
 			},
-			wantModified: map[string]interface{}{
+			wantValue: map[string]interface{}{
 				// we are filtering out spec.foo and then spec given that it is an empty map
 			},
 		},
@@ -111,22 +111,22 @@ func Test_filterNotAllowedPaths(t *testing.T) {
 
 			filterIntent(tt.ctx)
 
-			g.Expect(tt.ctx.modified).To(Equal(tt.wantModified))
+			g.Expect(tt.ctx.value).To(Equal(tt.wantValue))
 		})
 	}
 }
 
 func Test_filterIgnoredPaths(t *testing.T) {
 	tests := []struct {
-		name         string
-		ctx          *filterIntentContext
-		wantModified map[string]interface{}
+		name      string
+		ctx       *filterIntentContext
+		wantValue map[string]interface{}
 	}{
 		{
 			name: "Filters out ignore paths",
 			ctx: &filterIntentContext{
 				path: contract.Path{},
-				modified: map[string]interface{}{
+				value: map[string]interface{}{
 					"spec": map[string]interface{}{
 						"foo": "bar",
 						"controlPlaneEndpoint": map[string]interface{}{
@@ -141,7 +141,7 @@ func Test_filterIgnoredPaths(t *testing.T) {
 					},
 				),
 			},
-			wantModified: map[string]interface{}{
+			wantValue: map[string]interface{}{
 				"spec": map[string]interface{}{
 					"foo": "bar",
 					// spec.controlPlaneEndpoint filtered out
@@ -152,7 +152,7 @@ func Test_filterIgnoredPaths(t *testing.T) {
 			name: "Cleanup empty maps",
 			ctx: &filterIntentContext{
 				path: contract.Path{},
-				modified: map[string]interface{}{
+				value: map[string]interface{}{
 					"spec": map[string]interface{}{
 						"foo": "123",
 					},
@@ -163,7 +163,7 @@ func Test_filterIgnoredPaths(t *testing.T) {
 					},
 				),
 			},
-			wantModified: map[string]interface{}{
+			wantValue: map[string]interface{}{
 				// we are filtering out spec.foo and then spec given that it is an empty map
 			},
 		},
@@ -174,7 +174,7 @@ func Test_filterIgnoredPaths(t *testing.T) {
 
 			filterIntent(tt.ctx)
 
-			g.Expect(tt.ctx.modified).To(Equal(tt.wantModified))
+			g.Expect(tt.ctx.value).To(Equal(tt.wantValue))
 		})
 	}
 }

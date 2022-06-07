@@ -17,7 +17,6 @@ limitations under the License.
 package structuredmerge
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -27,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/internal/test/envtest"
@@ -49,12 +47,9 @@ func TestMain(m *testing.M) {
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultEventuallyTimeout(30 * time.Second)
 	os.Exit(envtest.Run(ctx, envtest.RunInput{
-		M:                   m,
-		ManagerUncachedObjs: []client.Object{},
-		SetupEnv:            func(e *envtest.Environment) { env = e },
+		M:        m,
+		SetupEnv: func(e *envtest.Environment) { env = e },
 		// We are testing the patch helper against a real API Server, no need of additional indexes/reconcilers.
-		SetupIndexes:     func(ctx context.Context, mgr ctrl.Manager) {},
-		SetupReconcilers: func(ctx context.Context, mgr ctrl.Manager) {},
-		MinK8sVersion:    "v1.22.0", // ClusterClass uses server side apply that went GA in 1.22; we do not support previous version because of bug/inconsistent behaviours in the older release.
+		MinK8sVersion: "v1.22.0", // ClusterClass uses server side apply that went GA in 1.22; we do not support previous version because of bug/inconsistent behaviours in the older release.
 	}))
 }
