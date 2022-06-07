@@ -55,5 +55,6 @@ func TestMain(m *testing.M) {
 		// We are testing the patch helper against a real API Server, no need of additional indexes/reconcilers.
 		SetupIndexes:     func(ctx context.Context, mgr ctrl.Manager) {},
 		SetupReconcilers: func(ctx context.Context, mgr ctrl.Manager) {},
+		MinK8sVersion:    "v1.22.0", // ClusterClass uses server side apply that went GA in 1.22; we do not support previous version because of bug/inconsistent behaviours in the older release.
 	}))
 }

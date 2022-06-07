@@ -96,5 +96,6 @@ func TestMain(m *testing.M) {
 		SetupEnv:            func(e *envtest.Environment) { env = e },
 		SetupIndexes:        setupIndexes,
 		SetupReconcilers:    setupReconcilers,
+		MinK8sVersion:       "v1.22.0", // ClusterClass uses server side apply that went GA in 1.22; we do not support previous version because of bug/inconsistent behaviours in the older release.
 	}))
 }
