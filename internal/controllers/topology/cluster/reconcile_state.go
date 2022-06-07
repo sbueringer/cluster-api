@@ -101,7 +101,7 @@ func (r *Reconciler) reconcileClusterShim(ctx context.Context, s *scope.Scope) e
 			return errors.Wrap(err, "failed to create the cluster shim object")
 		}
 
-		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(shim), shim); err != nil {
+		if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(shim), shim); err != nil {
 			return errors.Wrap(err, "get shim after creation")
 		}
 
