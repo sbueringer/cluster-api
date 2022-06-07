@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -152,7 +153,7 @@ func TestServerSideApply(t *testing.T) {
 		g.Expect(p0.HasSpecChanges()).To(BeTrue())
 	})
 
-	t.Run("Server side apply patch helper detect changes impacting only metadata", func(t *testing.T) {
+	t.Run("Server side apply patch helper detect changes impacting only metadata.labels", func(t *testing.T) {
 		g := NewWithT(t)
 
 		// Get the current object (assumes tests to be run in sequence).
@@ -162,6 +163,46 @@ func TestServerSideApply(t *testing.T) {
 		// Create a patch helper for a modified object with changes only in metadata.
 		modified := obj.DeepCopy()
 		modified.SetLabels(map[string]string{"foo": "changed"})
+
+		p0, err := NewServerSidePatchHelper(original, modified, env.GetClient(), IgnorePaths{{"spec", "foo"}})
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(p0.HasChanges()).To(BeTrue())
+		g.Expect(p0.HasSpecChanges()).To(BeFalse())
+	})
+
+	t.Run("Server side apply patch helper detect changes impacting only metadata.annotations", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// Get the current object (assumes tests to be run in sequence).
+		original := obj.DeepCopy()
+		g.Expect(env.GetAPIReader().Get(ctx, client.ObjectKeyFromObject(original), original)).To(Succeed())
+
+		// Create a patch helper for a modified object with changes only in metadata.
+		modified := obj.DeepCopy()
+		modified.SetAnnotations(map[string]string{"foo": "changed"})
+
+		p0, err := NewServerSidePatchHelper(original, modified, env.GetClient(), IgnorePaths{{"spec", "foo"}})
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(p0.HasChanges()).To(BeTrue())
+		g.Expect(p0.HasSpecChanges()).To(BeFalse())
+	})
+
+	t.Run("Server side apply patch helper detect changes impacting only metadata.ownerReferences", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// Get the current object (assumes tests to be run in sequence).
+		original := obj.DeepCopy()
+		g.Expect(env.GetAPIReader().Get(ctx, client.ObjectKeyFromObject(original), original)).To(Succeed())
+
+		// Create a patch helper for a modified object with changes only in metadata.
+		modified := obj.DeepCopy()
+		modified.SetOwnerReferences([]metav1.OwnerReference{
+			{
+				APIVersion: "foo/v1alpha1",
+				Kind:       "foo",
+				Name:       "foo",
+			},
+		})
 
 		p0, err := NewServerSidePatchHelper(original, modified, env.GetClient(), IgnorePaths{{"spec", "foo"}})
 		g.Expect(err).ToNot(HaveOccurred())
