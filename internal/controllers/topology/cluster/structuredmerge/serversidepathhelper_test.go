@@ -383,3 +383,60 @@ func TestServerSideApply(t *testing.T) {
 		g.Expect(p0.HasSpecChanges()).To(BeFalse())
 	})
 }
+
+func TestServerSideApply_CleanupLegacyManagedFields(t *testing.T) {
+	g := NewWithT(t)
+
+	// Write the config file to access the test env for debugging.
+	// g.Expect(os.WriteFile("test.conf", kubeconfig.FromEnvTestConfig(env.Config, &clusterv1.Cluster{
+	//	ObjectMeta: metav1.ObjectMeta{Name: "test"},
+	// }), 0777)).To(Succeed())
+
+	// Create a namespace for running the test
+	ns, err := env.CreateNamespace(ctx, "ssa")
+	g.Expect(err).ToNot(HaveOccurred())
+
+	// Build the test object to work with.
+	obj := builder.TestInfrastructureCluster(ns.Name, "obj1").WithSpecFields(map[string]interface{}{
+		"spec.foo": "",
+	}).Build()
+	obj.SetAnnotations(map[string]string{clusterv1.ClusterTopologyManagedFieldsAnnotation: "foo"})
+
+	t.Run("Server side apply cleanups legacy managed fields", func(t *testing.T) {
+		g := NewWithT(t)
+
+		// Create the object simulating reconcile with legacy managed fields
+		g.Expect(env.CreateAndWait(ctx, obj.DeepCopy(), client.FieldOwner("manager")))
+
+		// Gets the object and create SSA patch helper triggering cleanup.
+		original := builder.TestInfrastructureCluster("", "").Build()
+		g.Expect(env.GetAPIReader().Get(ctx, client.ObjectKeyFromObject(obj), original)).To(Succeed())
+
+		modified := obj.DeepCopy()
+		_, err := NewServerSidePatchHelper(original, modified, env.GetClient())
+		g.Expect(err).ToNot(HaveOccurred())
+
+		// Get created object after cleanup
+		got := builder.TestInfrastructureCluster("", "").Build()
+		g.Expect(env.GetAPIReader().Get(ctx, client.ObjectKeyFromObject(obj), got)).To(Succeed())
+
+		// Check annotation has been removed
+		g.Expect(got.GetAnnotations()).ToNot(HaveKey(clusterv1.ClusterTopologyManagedFieldsAnnotation))
+
+		// Check managed fields has been fixed
+		gotManagedFields := got.GetManagedFields()
+		gotLegacyManager, gotSSAManager := false, false
+		for i := range gotManagedFields {
+			if gotManagedFields[i].Manager == "manager" &&
+				gotManagedFields[i].Operation == metav1.ManagedFieldsOperationUpdate {
+				gotLegacyManager = true
+			}
+			if gotManagedFields[i].Manager == topologyManagerName &&
+				gotManagedFields[i].Operation == metav1.ManagedFieldsOperationApply {
+				gotSSAManager = true
+			}
+		}
+		g.Expect(gotLegacyManager).To(BeFalse())
+		g.Expect(gotSSAManager).To(BeTrue())
+	})
+}
