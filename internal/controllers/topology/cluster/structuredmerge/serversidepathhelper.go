@@ -31,7 +31,8 @@ import (
 	"sigs.k8s.io/cluster-api/internal/contract"
 )
 
-const topologyManagerName = "capi-topology"
+// TopologyManagerName is the manager name in managed fields for the topology controller.
+const TopologyManagerName = "capi-topology"
 
 type serverSidePatchHelper struct {
 	client         client.Client
@@ -139,7 +140,7 @@ func (h *serverSidePatchHelper) Patch(ctx context.Context) error {
 	log.V(5).Info("Patching object", "Intent", h.modified)
 
 	options := []client.PatchOption{
-		client.FieldOwner(topologyManagerName),
+		client.FieldOwner(TopologyManagerName),
 		// NOTE: we are using force ownership so in case of conflicts the topology controller
 		// overwrite values and become sole manager.
 		client.ForceOwnership,
@@ -186,7 +187,7 @@ func cleanupLegacyManagedFields(obj *unstructured.Unstructured, c client.Client)
 	}
 	now := metav1.Now()
 	managedFields = append(managedFields, metav1.ManagedFieldsEntry{
-		Manager:    topologyManagerName,
+		Manager:    TopologyManagerName,
 		Operation:  metav1.ManagedFieldsOperationApply,
 		APIVersion: obj.GetAPIVersion(),
 		Time:       &now,

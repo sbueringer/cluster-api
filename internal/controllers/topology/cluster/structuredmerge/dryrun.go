@@ -39,7 +39,7 @@ func getTopologyManagedFields(original client.Object) map[string]interface{} {
 
 	for _, m := range original.GetManagedFields() {
 		if m.Operation == metav1.ManagedFieldsOperationApply &&
-			m.Manager == topologyManagerName &&
+			m.Manager == TopologyManagerName &&
 			m.APIVersion == original.GetObjectKind().GroupVersionKind().GroupVersion().String() {
 			// NOTE: API server ensures this is a valid json.
 			err := json.Unmarshal(m.FieldsV1.Raw, &r)

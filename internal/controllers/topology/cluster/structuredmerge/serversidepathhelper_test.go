@@ -431,7 +431,7 @@ func TestServerSideApply_CleanupLegacyManagedFields(t *testing.T) {
 				gotManagedFields[i].Operation == metav1.ManagedFieldsOperationUpdate {
 				gotLegacyManager = true
 			}
-			if gotManagedFields[i].Manager == topologyManagerName &&
+			if gotManagedFields[i].Manager == TopologyManagerName &&
 				gotManagedFields[i].Operation == metav1.ManagedFieldsOperationApply {
 				gotSSAManager = true
 			}
