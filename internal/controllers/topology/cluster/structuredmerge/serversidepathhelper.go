@@ -104,7 +104,7 @@ func NewServerSidePatchHelper(original, modified client.Object, c client.Client,
 	case nil:
 		hasChanges, hasSpecChanges = true, true
 	default:
-		hasChanges, hasSpecChanges = dryRunPatch(&hasChangesContext{
+		hasChanges, hasSpecChanges = dryRunPatch(&dryRunInput{
 			path:     contract.Path{},
 			fieldsV1: getTopologyManagedFields(original),
 			original: originalUnstructured.Object,

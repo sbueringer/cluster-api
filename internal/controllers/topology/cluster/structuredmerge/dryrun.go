@@ -58,7 +58,7 @@ func getTopologyManagedFields(original client.Object) map[string]interface{} {
 // - something previously managed is missing from intent (a field has been deleted from modified)
 // - the value for a field previously managed is changing in the intent (a field has been changed in modified)
 // - the intent contains something not previously managed (a field has been added to modified).
-func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
+func dryRunPatch(ctx *dryRunInput) (hasChanges, hasSpecChanges bool) {
 	// If the func is processing a modified element of type map
 	if modifiedMap, ok := ctx.modified.(map[string]interface{}); ok {
 		// NOTE: ignoring the error in case the element wasn't in original.
@@ -101,7 +101,7 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 				fieldOriginalValue := originalMap[field]
 
 				// Check for changes in the field value.
-				fieldHasChanges, fieldHasSpecChanges := dryRunPatch(&hasChangesContext{
+				fieldHasChanges, fieldHasSpecChanges := dryRunPatch(&dryRunInput{
 					path:     fieldPath,
 					fieldsV1: fieldV1,
 					modified: fieldValue,
@@ -159,7 +159,7 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 					fieldV1Map, _ := itemFieldsV1.(map[string]interface{})
 
 					// Check for changes in the item value.
-					itemHasChanges, itemHasSpecChanges := dryRunPatch(&hasChangesContext{
+					itemHasChanges, itemHasSpecChanges := dryRunPatch(&dryRunInput{
 						path:     ctx.path,
 						fieldsV1: fieldV1Map,
 						modified: modifiedItem,
@@ -217,7 +217,7 @@ func dryRunPatch(ctx *hasChangesContext) (hasChanges, hasSpecChanges bool) {
 	return false, false
 }
 
-type hasChangesContext struct {
+type dryRunInput struct {
 	// the path of the field being processed.
 	path contract.Path
 	// fieldsV1 for the current path.

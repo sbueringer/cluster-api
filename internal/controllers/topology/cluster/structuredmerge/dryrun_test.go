@@ -27,13 +27,13 @@ import (
 func Test_dryRunPatch(t *testing.T) {
 	tests := []struct {
 		name               string
-		ctx                *hasChangesContext
+		ctx                *dryRunInput
 		wantHasChanges     bool
 		wantHasSpecChanges bool
 	}{
 		{
 			name: "DryRun detects no changes on managed fields",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:metadata": map[string]interface{}{
@@ -71,7 +71,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "apiVersion, kind, metadata.name and metadata.namespace fields in modified are not detected as changes",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					// apiVersion, kind, metadata.name and metadata.namespace are not tracked in managedField.
@@ -120,7 +120,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "apiVersion, kind, metadata.name and metadata.namespace fields in modified are not detected as changes (edge case)",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path:     contract.Path{},
 				fieldsV1: map[string]interface{}{
 					// apiVersion, kind, metadata.name and metadata.namespace are not tracked in managedField.
@@ -152,7 +152,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "DryRun detects metadata only change on managed fields",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:metadata": map[string]interface{}{
@@ -190,7 +190,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "DryRun detects identifies spec change on managed fields",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:metadata": map[string]interface{}{
@@ -228,7 +228,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "identifies changes when modified has a value not previously managed",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -252,7 +252,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "identifies changes when modified drops a value previously managed",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -275,7 +275,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "No changes in an atomic map",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -302,7 +302,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "identifies changes in an atomic map",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -329,7 +329,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "No changes on managed atomic list",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -360,7 +360,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identifies changes on managed atomic list",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -391,7 +391,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "No changes on managed listMap",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -429,7 +429,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified value added on a empty managed listMap",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -458,7 +458,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified value added on a managed listMap",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -496,7 +496,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified value removed on a managed listMap",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -527,7 +527,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified changes on a managed listMap",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -565,7 +565,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified changes on a managed listMap (same number of items, different keys)",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -603,7 +603,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "no changes on a managed listSet",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -635,7 +635,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified value added on a empty managed listSet",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -660,7 +660,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified value added on a managed listSet",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -690,7 +690,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified value removed on a managed listSet",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -722,7 +722,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified changes on a managed listSet",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -754,7 +754,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Identified nested field got added",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					// apiVersion, kind, metadata.name and metadata.namespace are not tracked in managedField.
@@ -802,7 +802,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Nested type gets changed",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{
@@ -839,7 +839,7 @@ func Test_dryRunPatch(t *testing.T) {
 		},
 		{
 			name: "Nested field is getting removed",
-			ctx: &hasChangesContext{
+			ctx: &dryRunInput{
 				path: contract.Path{},
 				fieldsV1: map[string]interface{}{
 					"f:spec": map[string]interface{}{

@@ -26,7 +26,7 @@ import (
 func filterObject(obj *unstructured.Unstructured, helperOptions *HelperOptions) {
 	// filter out changes not in the allowed paths (fields to not consider, e.g. status);
 	if len(helperOptions.allowedPaths) > 0 {
-		filterIntent(&filterIntentContext{
+		filterIntent(&filterIntentInput{
 			path:         contract.Path{},
 			value:        obj.Object,
 			shouldFilter: isNotAllowedPath(helperOptions.allowedPaths),
@@ -36,7 +36,7 @@ func filterObject(obj *unstructured.Unstructured, helperOptions *HelperOptions) 
 	// filter out changes for ignore paths (well known fields owned by other controllers, e.g.
 	//   spec.controlPlaneEndpoint in the InfrastructureCluster object);
 	if len(helperOptions.ignorePaths) > 0 {
-		filterIntent(&filterIntentContext{
+		filterIntent(&filterIntentInput{
 			path:         contract.Path{},
 			value:        obj.Object,
 			shouldFilter: isIgnorePath(helperOptions.ignorePaths),
@@ -50,7 +50,7 @@ func filterObject(obj *unstructured.Unstructured, helperOptions *HelperOptions) 
 // this func has to address. More specifically, we are using this func for filtering out not allowed paths and for ignore paths;
 // all of them are defined in reconcile_state.go and are targeting well-known fields inside nested maps.
 // Allowed paths / ignore paths which point to an array are not supported by the current implementation.
-func filterIntent(ctx *filterIntentContext) bool {
+func filterIntent(ctx *filterIntentInput) bool {
 	value, ok := ctx.value.(map[string]interface{})
 	if !ok {
 		return false
@@ -58,7 +58,7 @@ func filterIntent(ctx *filterIntentContext) bool {
 
 	gotDeletions := false
 	for field := range value {
-		fieldCtx := &filterIntentContext{
+		fieldCtx := &filterIntentInput{
 			// Compose the path for the nested field.
 			path: ctx.path.Append(field),
 			// Gets the original and the modified value for the field.
@@ -85,9 +85,9 @@ func filterIntent(ctx *filterIntentContext) bool {
 	return gotDeletions
 }
 
-// filterIntentContext holds info required while filtering the intent for server side apply.
+// filterIntentInput holds info required while filtering the intent for server side apply.
 // NOTE: in server side apply an intent is a partial object that only includes the fields and values for which the user has an opinion.
-type filterIntentContext struct {
+type filterIntentInput struct {
 	// the path of the field being processed.
 	path contract.Path
 

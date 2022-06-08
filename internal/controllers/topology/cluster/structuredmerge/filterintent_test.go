@@ -27,12 +27,12 @@ import (
 func Test_filterNotAllowedPaths(t *testing.T) {
 	tests := []struct {
 		name      string
-		ctx       *filterIntentContext
+		ctx       *filterIntentInput
 		wantValue map[string]interface{}
 	}{
 		{
 			name: "Filters out not allowed paths",
-			ctx: &filterIntentContext{
+			ctx: &filterIntentInput{
 				path: contract.Path{},
 				value: map[string]interface{}{
 					"apiVersion": "foo.bar/v1",
@@ -89,7 +89,7 @@ func Test_filterNotAllowedPaths(t *testing.T) {
 		},
 		{
 			name: "Cleanup empty maps",
-			ctx: &filterIntentContext{
+			ctx: &filterIntentInput{
 				path: contract.Path{},
 				value: map[string]interface{}{
 					"spec": map[string]interface{}{
@@ -119,12 +119,12 @@ func Test_filterNotAllowedPaths(t *testing.T) {
 func Test_filterIgnoredPaths(t *testing.T) {
 	tests := []struct {
 		name      string
-		ctx       *filterIntentContext
+		ctx       *filterIntentInput
 		wantValue map[string]interface{}
 	}{
 		{
 			name: "Filters out ignore paths",
-			ctx: &filterIntentContext{
+			ctx: &filterIntentInput{
 				path: contract.Path{},
 				value: map[string]interface{}{
 					"spec": map[string]interface{}{
@@ -150,7 +150,7 @@ func Test_filterIgnoredPaths(t *testing.T) {
 		},
 		{
 			name: "Cleanup empty maps",
-			ctx: &filterIntentContext{
+			ctx: &filterIntentInput{
 				path: contract.Path{},
 				value: map[string]interface{}{
 					"spec": map[string]interface{}{
