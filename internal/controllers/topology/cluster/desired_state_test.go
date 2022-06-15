@@ -1632,22 +1632,10 @@ func Test_computeMachineHealthCheck(t *testing.T) {
 	selector := &metav1.LabelSelector{MatchLabels: map[string]string{
 		"foo": "bar",
 	}}
-	healthCheckTarget := builder.MachineDeployment("ns1", "md1").Build()
+	currentHealthCheckTarget := builder.MachineDeployment("ns1", "md1").Build()
+	currentHealthCheckTarget.UID = "md1-uid"
+	desiredHealthCheckTarget := builder.MachineDeployment("ns1", "md1").Build()
 	clusterName := "cluster1"
-	current := &clusterv1.MachineHealthCheck{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       clusterv1.GroupVersion.WithKind("MachineHealthCheck").Kind,
-			APIVersion: clusterv1.GroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "md1",
-			Namespace: "ns1",
-			// The only thing we care about in current is the owner reference to the target object
-			OwnerReferences: []metav1.OwnerReference{
-				*ownerReferenceTo(healthCheckTarget),
-			},
-		},
-	}
 	want := &clusterv1.MachineHealthCheck{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       clusterv1.GroupVersion.WithKind("MachineHealthCheck").Kind,
@@ -1659,7 +1647,7 @@ func Test_computeMachineHealthCheck(t *testing.T) {
 			// Label is added by defaulting values using MachineHealthCheck.Default()
 			Labels: map[string]string{"cluster.x-k8s.io/cluster-name": "cluster1"},
 			OwnerReferences: []metav1.OwnerReference{
-				*ownerReferenceTo(healthCheckTarget),
+				*ownerReferenceTo(desiredHealthCheckTarget),
 			},
 		},
 		Spec: clusterv1.MachineHealthCheckSpec{
@@ -1685,12 +1673,24 @@ func Test_computeMachineHealthCheck(t *testing.T) {
 				Duration: time.Duration(1)},
 		},
 	}
+	wantWithUID := want.DeepCopyObject().(*clusterv1.MachineHealthCheck)
+	wantWithUID.SetOwnerReferences([]metav1.OwnerReference{
+		*ownerReferenceTo(currentHealthCheckTarget),
+	})
 
 	t.Run("set all fields correctly", func(t *testing.T) {
 		g := NewWithT(t)
 
-		got := computeMachineHealthCheck(healthCheckTarget, selector, clusterName, mhcSpec, current)
+		got := computeMachineHealthCheck(nil, desiredHealthCheckTarget, selector, clusterName, mhcSpec)
 
 		g.Expect(got).To(Equal(want), cmp.Diff(got, want))
+	})
+
+	t.Run("set all fields correctly including health check target uid", func(t *testing.T) {
+		g := NewWithT(t)
+
+		got := computeMachineHealthCheck(currentHealthCheckTarget, desiredHealthCheckTarget, selector, clusterName, mhcSpec)
+
+		g.Expect(got).To(Equal(wantWithUID), cmp.Diff(got, wantWithUID))
 	})
 }

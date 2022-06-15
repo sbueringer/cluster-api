@@ -19,6 +19,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -71,11 +72,11 @@ func (r *Reconciler) computeDesiredState(ctx context.Context, s *scope.Scope) (*
 	// The MachineHealthCheck will have the same name as the ControlPlane Object and a selector for the ControlPlane InfrastructureMachines.
 	if s.Blueprint.HasControlPlaneMachineHealthCheck() {
 		desiredState.ControlPlane.MachineHealthCheck = computeMachineHealthCheck(
+			s.Current.ControlPlane.Object,
 			desiredState.ControlPlane.Object,
 			selectorForControlPlaneMHC(),
 			s.Current.Cluster.Name,
-			s.Blueprint.ControlPlane.MachineHealthCheck,
-			s.Current.ControlPlane.MachineHealthCheck)
+			s.Blueprint.ControlPlane.MachineHealthCheck)
 	}
 
 	// Compute the desired state for the Cluster object adding a reference to the
@@ -548,17 +549,17 @@ func computeMachineDeployment(_ context.Context, s *scope.Scope, desiredControlP
 
 	// If the ClusterClass defines a MachineHealthCheck for the MachineDeployment add it to the desired state.
 	if machineDeploymentBlueprint.MachineHealthCheck != nil {
-		var currentMachineHealthCheck *clusterv1.MachineHealthCheck
-		if currentMachineDeployment != nil {
-			currentMachineHealthCheck = currentMachineDeployment.MachineHealthCheck
-		}
 		// Note: The MHC is going to use a selector that provides a minimal set of labels which are common to all MachineSets belonging to the MachineDeployment.
+		var currentMachineDeploymentObj *clusterv1.MachineDeployment
+		if currentMachineDeployment != nil {
+			currentMachineDeploymentObj = currentMachineDeployment.Object
+		}
 		desiredMachineDeployment.MachineHealthCheck = computeMachineHealthCheck(
+			currentMachineDeploymentObj,
 			desiredMachineDeploymentObj,
 			selectorForMachineDeploymentMHC(desiredMachineDeploymentObj),
 			s.Current.Cluster.Name,
-			machineDeploymentBlueprint.MachineHealthCheck,
-			currentMachineHealthCheck)
+			machineDeploymentBlueprint.MachineHealthCheck)
 	}
 	return desiredMachineDeployment, nil
 }
@@ -797,7 +798,7 @@ func ownerReferenceTo(obj client.Object) *metav1.OwnerReference {
 	}
 }
 
-func computeMachineHealthCheck(healthCheckTarget client.Object, selector *metav1.LabelSelector, clusterName string, check *clusterv1.MachineHealthCheckClass, current *clusterv1.MachineHealthCheck) *clusterv1.MachineHealthCheck {
+func computeMachineHealthCheck(currentHealthCheckTarget, desiredHealthCheckTarget client.Object, selector *metav1.LabelSelector, clusterName string, check *clusterv1.MachineHealthCheckClass) *clusterv1.MachineHealthCheck {
 	// Create a MachineHealthCheck with the spec given in the ClusterClass.
 	mhc := &clusterv1.MachineHealthCheck{
 		TypeMeta: metav1.TypeMeta{
@@ -805,8 +806,8 @@ func computeMachineHealthCheck(healthCheckTarget client.Object, selector *metav1
 			APIVersion: clusterv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      healthCheckTarget.GetName(),
-			Namespace: healthCheckTarget.GetNamespace(),
+			Name:      desiredHealthCheckTarget.GetName(),
+			Namespace: desiredHealthCheckTarget.GetNamespace(),
 		},
 		Spec: clusterv1.MachineHealthCheckSpec{
 			ClusterName:         clusterName,
@@ -823,15 +824,30 @@ func computeMachineHealthCheck(healthCheckTarget client.Object, selector *metav1
 	// state of the object won't be different from the current state due to webhook Defaulting.
 	mhc.Default()
 
-	// Carry over ownerReference to the target object.
-	// NOTE: this prevents to the ownerRef to be deleted by server side apply.
-	if current != nil {
-		if ref := getOwnerReferenceFrom(current, healthCheckTarget); ref != nil {
-			mhc.SetOwnerReferences([]metav1.OwnerReference{*ref})
-		}
+	if !isNil(currentHealthCheckTarget) {
+		// If the currentHealthCheckTarget exists we use it to pick up the UID (UID is not set on desired).
+		mhc.SetOwnerReferences([]metav1.OwnerReference{
+			*ownerReferenceTo(currentHealthCheckTarget),
+		})
+	} else {
+		// Otherwise we have to use desiredHealthCheckTarget. UID is then resolved during reconcile state.
+		mhc.SetOwnerReferences([]metav1.OwnerReference{
+			*ownerReferenceTo(desiredHealthCheckTarget),
+		})
 	}
 
 	return mhc
+}
+
+func isNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Array, reflect.Chan, reflect.Slice:
+		return reflect.ValueOf(i).IsValid() && reflect.ValueOf(i).IsNil()
+	}
+	return false
 }
 
 func selectorForControlPlaneMHC() *metav1.LabelSelector {
