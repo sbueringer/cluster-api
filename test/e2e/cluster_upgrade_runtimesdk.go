@@ -124,7 +124,7 @@ func clusterUpgradeWithRuntimeSDKSpec(ctx context.Context, inputGetter func() cl
 		// Set the SERVICE_NAMESPACE, which is used in the cert-manager Certificate CR.
 		// We have to dynamically set the namespace here, because it depends on the test run and thus
 		// cannot be set when rendering the test extension YAML with kustomize.
-		testExtensionDeployment := strings.ReplaceAll(string(testExtensionDeploymentTemplate), "${SERVICE_NAMESPACE}", namespace.Name)
+		testExtensionDeployment := strings.ReplaceAll(string(testExtensionDeploymentTemplate), "${TEST_NAMESPACE}", namespace.Name)
 		Expect(testExtensionDeployment).ToNot(BeEmpty(), "Test Extension deployment manifest file should not be empty")
 
 		Expect(input.BootstrapClusterProxy.Apply(ctx, []byte(testExtensionDeployment), "--namespace", namespace.Name)).To(Succeed())

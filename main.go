@@ -56,7 +56,8 @@ import (
 	expcontrollers "sigs.k8s.io/cluster-api/exp/controllers"
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1alpha1"
 	runtimecontrollers "sigs.k8s.io/cluster-api/exp/runtime/controllers"
-	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	"sigs.k8s.io/cluster-api/feature"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	runtimeclient "sigs.k8s.io/cluster-api/internal/runtime/client"
@@ -117,6 +118,7 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 
 	// Register the RuntimeHook types into the catalog.
+	_ = runtimehooksv1alpha1.AddToCatalog(catalog)
 	_ = runtimehooksv1.AddToCatalog(catalog)
 }
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +25,7 @@ import (
 var (
 	// GroupVersion is group version identifying RuntimeHooks defined in this package
 	// and their request and response types.
-	GroupVersion = schema.GroupVersion{Group: "hooks.runtime.cluster.x-k8s.io", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: "hooks.runtime.cluster.x-k8s.io", Version: "v1alpha2"}
 
 	// catalogBuilder is used to add RuntimeHooks and their request and response types
 	// to a Catalog.
@@ -34,12 +34,6 @@ var (
 	// AddToCatalog adds RuntimeHooks defined in this package and their request and
 	// response types to a catalog.
 	AddToCatalog = catalogBuilder.AddToCatalog
-
-	// localSchemeBuilder provide access to the SchemeBuilder used for managing rpc
-	// method's request and response types defined in this package.
-	// NOTE: this object is required to allow registration of automatically generated
-	// conversions func.
-	localSchemeBuilder = catalogBuilder
 )
 
 func init() {

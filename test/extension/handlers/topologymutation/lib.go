@@ -25,18 +25,19 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	patchvariables "sigs.k8s.io/cluster-api/internal/controllers/topology/cluster/patches/variables"
 )
 
 // walkTemplates walks through all templates of a GeneratePatchesRequest and calls the mutateFunc.
-func walkTemplates(decoder runtime.Decoder, req *runtimehooksv1.GeneratePatchesRequest, resp *runtimehooksv1.GeneratePatchesResponse, mutateFunc func(obj runtime.Object, variables map[string]apiextensionsv1.JSON) error) {
-	globalVariables := patchvariables.ToMap(req.Variables)
+func walkTemplates(decoder runtime.Decoder, req *runtimehooksv1alpha1.GeneratePatchesRequest, resp *runtimehooksv1alpha1.GeneratePatchesResponse, mutateFunc func(obj runtime.Object, variables map[string]apiextensionsv1.JSON) error) {
+	globalVariables := patchvariables.ToMap(convert(req.Variables))
 
 	for _, requestItem := range req.Items {
-		templateVariables, err := patchvariables.MergeVariableMaps(globalVariables, patchvariables.ToMap(requestItem.Variables))
+		templateVariables, err := patchvariables.MergeVariableMaps(globalVariables, patchvariables.ToMap(convert(requestItem.Variables)))
 		if err != nil {
-			resp.Status = runtimehooksv1.ResponseStatusFailure
+			resp.Status = runtimehooksv1alpha1.ResponseStatusFailure
 			resp.Message = err.Error()
 			return
 		}
@@ -50,28 +51,39 @@ func walkTemplates(decoder runtime.Decoder, req *runtimehooksv1.GeneratePatchesR
 		original := obj.DeepCopyObject()
 
 		if err := mutateFunc(obj, templateVariables); err != nil {
-			resp.Status = runtimehooksv1.ResponseStatusFailure
+			resp.Status = runtimehooksv1alpha1.ResponseStatusFailure
 			resp.Message = err.Error()
 			return
 		}
 
 		patch, err := createPatch(original, obj)
 		if err != nil {
-			resp.Status = runtimehooksv1.ResponseStatusFailure
+			resp.Status = runtimehooksv1alpha1.ResponseStatusFailure
 			resp.Message = err.Error()
 			return
 		}
 
-		resp.Items = append(resp.Items, runtimehooksv1.GeneratePatchesResponseItem{
+		resp.Items = append(resp.Items, runtimehooksv1alpha1.GeneratePatchesResponseItem{
 			UID:       requestItem.UID,
-			PatchType: runtimehooksv1.JSONPatchType,
+			PatchType: runtimehooksv1alpha1.JSONPatchType,
 			Patch:     patch,
 		})
 
 		fmt.Printf("Generated patch (uid: %q): %q\n", requestItem.UID, string(patch))
 	}
 
-	resp.Status = runtimehooksv1.ResponseStatusSuccess
+	resp.Status = runtimehooksv1alpha1.ResponseStatusSuccess
+}
+
+func convert(variables []runtimehooksv1alpha1.Variable) []runtimehooksv1.Variable {
+	result := []runtimehooksv1.Variable{}
+	for _, v := range variables {
+		result = append(result, runtimehooksv1.Variable{
+			Name:  v.Name,
+			Value: v.Value,
+		})
+	}
+	return result
 }
 
 // createPatch creates a JSON patch from the original and the modified object.

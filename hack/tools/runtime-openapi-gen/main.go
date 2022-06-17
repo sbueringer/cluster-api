@@ -26,7 +26,8 @@ import (
 	"sigs.k8s.io/yaml"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
 )
 
@@ -51,6 +52,7 @@ func main() {
 	}
 
 	c := runtimecatalog.New()
+	_ = runtimehooksv1alpha1.AddToCatalog(c)
 	_ = runtimehooksv1.AddToCatalog(c)
 
 	c.AddOpenAPIDefinitions(clusterv1.GetOpenAPIDefinitions)

@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	patchvariables "sigs.k8s.io/cluster-api/internal/controllers/topology/cluster/patches/variables"
 	infrav1 "sigs.k8s.io/cluster-api/test/infrastructure/docker/api/v1beta1"
 )
@@ -46,7 +46,7 @@ type Handler struct {
 }
 
 // GeneratePatches returns a function that generates patches for the given request.
-func (h *Handler) GeneratePatches(ctx context.Context, req *runtimehooksv1.GeneratePatchesRequest, resp *runtimehooksv1.GeneratePatchesResponse) {
+func (h *Handler) GeneratePatches(ctx context.Context, req *runtimehooksv1alpha1.GeneratePatchesRequest, resp *runtimehooksv1alpha1.GeneratePatchesResponse) {
 	log := ctrl.LoggerFrom(ctx)
 	log.Info("GeneratePatches called")
 
@@ -80,9 +80,9 @@ func patchDockerClusterTemplate(dockerClusterTemplate *infrav1.DockerClusterTemp
 }
 
 // ValidateTopology returns a function that validates the given request.
-func (h *Handler) ValidateTopology(ctx context.Context, _ *runtimehooksv1.ValidateTopologyRequest, resp *runtimehooksv1.ValidateTopologyResponse) {
+func (h *Handler) ValidateTopology(ctx context.Context, _ *runtimehooksv1alpha1.ValidateTopologyRequest, resp *runtimehooksv1alpha1.ValidateTopologyResponse) {
 	log := ctrl.LoggerFrom(ctx)
 	log.Info("ValidateTopology called")
 
-	resp.Status = runtimehooksv1.ResponseStatusSuccess
+	resp.Status = runtimehooksv1alpha1.ResponseStatusSuccess
 }

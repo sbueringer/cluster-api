@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -42,7 +43,8 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1alpha1"
-	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	runtimeregistry "sigs.k8s.io/cluster-api/internal/runtime/registry"
 	"sigs.k8s.io/cluster-api/util"
@@ -118,20 +120,38 @@ func (c *client) Discover(ctx context.Context, extensionConfig *runtimev1.Extens
 	hookGVH, err := c.catalog.GroupVersionHook(runtimehooksv1.Discovery)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compute GVH of hook")
-	}
 
+	}
 	request := &runtimehooksv1.DiscoveryRequest{}
 	response := &runtimehooksv1.DiscoveryResponse{}
-	opts := &httpCallOptions{
-		catalog:         c.catalog,
-		config:          extensionConfig.Spec.ClientConfig,
-		registrationGVH: hookGVH,
-		hookGVH:         hookGVH,
-		timeout:         defaultDiscoveryTimeout,
+	var errs []error
+	var discoverySucceeded bool
+	for _, discoveryHookFunc := range []interface{}{runtimehooksv1.Discovery, runtimehooksv1alpha1.Discovery} {
+		registrationGVH, err := c.catalog.GroupVersionHook(discoveryHookFunc)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to compute GVH of hook")
+		}
+
+		opts := &httpCallOptions{
+			catalog:         c.catalog,
+			config:          extensionConfig.Spec.ClientConfig,
+			registrationGVH: registrationGVH,
+			hookGVH:         hookGVH,
+			timeout:         defaultDiscoveryTimeout,
+		}
+		if err := httpCall(ctx, request, response, opts); err != nil {
+			errs = append(errs, errors.Wrap(err, "failed to call the Discovery endpoint"))
+			continue
+		}
+
+		discoverySucceeded = true
+		break
 	}
-	if err := httpCall(ctx, request, response, opts); err != nil {
-		return nil, errors.Wrap(err, "failed to call the Discovery endpoint")
+
+	if !discoverySucceeded {
+		return nil, kerrors.NewAggregate(errs)
 	}
+
 	// Check to see if the response is a failure and handle the failure accordingly.
 	if response.GetStatus() == runtimehooksv1.ResponseStatusFailure {
 		return nil, errors.Errorf("discovery failed with %v", response.GetMessage())
@@ -452,14 +472,21 @@ func httpCall(ctx context.Context, request, response runtime.Object, opts *httpC
 			errors.Wrapf(err, "failed to call ExtensionHandler: %q", opts.name),
 		)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		respBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return errCallingExtensionHandler(
+				errors.Errorf("failed to call ExtensionHandler: failed to read response body (status code: %d)", resp.StatusCode),
+			)
+		}
+
 		return errCallingExtensionHandler(
-			errors.Errorf("non 200 response code, %q, not accepted", resp.StatusCode),
+			errors.Errorf("failed to call ExtensionHandler: response: %q (status code: %d)", string(respBody), resp.StatusCode),
 		)
 	}
 
-	defer resp.Body.Close()
 	if err := json.NewDecoder(resp.Body).Decode(responseLocal); err != nil {
 		return errCallingExtensionHandler(
 			errors.Wrap(err, "failed to decode message"),

@@ -22,7 +22,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
 )
 
