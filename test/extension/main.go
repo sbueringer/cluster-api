@@ -29,7 +29,7 @@ import (
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	"sigs.k8s.io/cluster-api/test/extension/handlers/topologymutation"
 	"sigs.k8s.io/cluster-api/test/extension/server"
@@ -54,7 +54,7 @@ func init() {
 	_ = infrav1.AddToScheme(scheme)
 
 	// Register the RuntimeHook types into the catalog.
-	_ = runtimehooksv1.AddToCatalog(catalog)
+	_ = runtimehooksv1alpha1.AddToCatalog(catalog)
 }
 
 // InitFlags initializes the flags.
@@ -108,22 +108,22 @@ func main() {
 	topologyMutationHandler := topologymutation.NewHandler(scheme)
 
 	if err := webhookServer.AddExtensionHandler(server.ExtensionHandler{
-		Hook:           runtimehooksv1.GeneratePatches,
+		Hook:           runtimehooksv1alpha1.GeneratePatches,
 		Name:           "generate-patches",
 		HandlerFunc:    topologyMutationHandler.GeneratePatches,
 		TimeoutSeconds: pointer.Int32(5),
-		FailurePolicy:  toPtr(runtimehooksv1.FailurePolicyFail),
+		FailurePolicy:  toPtr(runtimehooksv1alpha1.FailurePolicyFail),
 	}); err != nil {
 		setupLog.Error(err, "error adding handler")
 		os.Exit(1)
 	}
 
 	if err := webhookServer.AddExtensionHandler(server.ExtensionHandler{
-		Hook:           runtimehooksv1.ValidateTopology,
+		Hook:           runtimehooksv1alpha1.ValidateTopology,
 		Name:           "validate-topology",
 		HandlerFunc:    topologyMutationHandler.ValidateTopology,
 		TimeoutSeconds: pointer.Int32(5),
-		FailurePolicy:  toPtr(runtimehooksv1.FailurePolicyFail),
+		FailurePolicy:  toPtr(runtimehooksv1alpha1.FailurePolicyFail),
 	}); err != nil {
 		setupLog.Error(err, "error adding handler")
 		os.Exit(1)
@@ -136,6 +136,6 @@ func main() {
 	}
 }
 
-func toPtr(f runtimehooksv1.FailurePolicy) *runtimehooksv1.FailurePolicy {
+func toPtr(f runtimehooksv1alpha1.FailurePolicy) *runtimehooksv1alpha1.FailurePolicy {
 	return &f
 }

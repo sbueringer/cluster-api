@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1alpha1 contains the v1alpha1 RuntimeHooks.
-// +k8s:conversion-gen=sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2
+// Package v1alpha2 contains the v1alpha1 RuntimeHooks.
 // +kubebuilder:object:generate=true
 // +k8s:openapi-gen=true
-package v1alpha1
+package v1alpha2

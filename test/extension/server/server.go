@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
+	runtimehooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
 )
 
@@ -121,7 +121,7 @@ type ExtensionHandler struct {
 	TimeoutSeconds *int32
 
 	// FailurePolicy is the failure policy of the extension handler
-	FailurePolicy *runtimehooksv1.FailurePolicy
+	FailurePolicy *runtimehooksv1alpha1.FailurePolicy
 }
 
 // AddExtensionHandler adds an extension handler to the server.
@@ -210,7 +210,7 @@ func (s *Server) validateHandler(handler ExtensionHandler) error {
 func (s *Server) Start(ctx context.Context) error {
 	// Add discovery handler.
 	err := s.AddExtensionHandler(ExtensionHandler{
-		Hook:        runtimehooksv1.Discovery,
+		Hook:        runtimehooksv1alpha1.Discovery,
 		HandlerFunc: discoveryHandler(s.handlers),
 	})
 	if err != nil {
@@ -229,12 +229,12 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // discoveryHandler generates a discovery handler based on a list of handlers.
-func discoveryHandler(handlers map[string]ExtensionHandler) func(context.Context, *runtimehooksv1.DiscoveryRequest, *runtimehooksv1.DiscoveryResponse) {
-	cachedHandlers := []runtimehooksv1.ExtensionHandler{}
+func discoveryHandler(handlers map[string]ExtensionHandler) func(context.Context, *runtimehooksv1alpha1.DiscoveryRequest, *runtimehooksv1alpha1.DiscoveryResponse) {
+	cachedHandlers := []runtimehooksv1alpha1.ExtensionHandler{}
 	for _, handler := range handlers {
-		cachedHandlers = append(cachedHandlers, runtimehooksv1.ExtensionHandler{
+		cachedHandlers = append(cachedHandlers, runtimehooksv1alpha1.ExtensionHandler{
 			Name: handler.Name,
-			RequestHook: runtimehooksv1.GroupVersionHook{
+			RequestHook: runtimehooksv1alpha1.GroupVersionHook{
 				APIVersion: handler.gvh.GroupVersion().String(),
 				Hook:       handler.gvh.Hook,
 			},
@@ -243,8 +243,8 @@ func discoveryHandler(handlers map[string]ExtensionHandler) func(context.Context
 		})
 	}
 
-	return func(_ context.Context, _ *runtimehooksv1.DiscoveryRequest, response *runtimehooksv1.DiscoveryResponse) {
-		response.SetStatus(runtimehooksv1.ResponseStatusSuccess)
+	return func(_ context.Context, _ *runtimehooksv1alpha1.DiscoveryRequest, response *runtimehooksv1alpha1.DiscoveryResponse) {
+		response.SetStatus(runtimehooksv1alpha1.ResponseStatusSuccess)
 		response.Handlers = cachedHandlers
 	}
 }
@@ -265,19 +265,19 @@ func (s *Server) wrapHandler(handler ExtensionHandler) func(w http.ResponseWrite
 	}
 }
 
-func (s *Server) callHandler(handler ExtensionHandler, r *http.Request) runtimehooksv1.ResponseObject {
+func (s *Server) callHandler(handler ExtensionHandler, r *http.Request) runtimehooksv1alpha1.ResponseObject {
 	request := handler.requestObject.DeepCopyObject()
-	response := handler.responseObject.DeepCopyObject().(runtimehooksv1.ResponseObject)
+	response := handler.responseObject.DeepCopyObject().(runtimehooksv1alpha1.ResponseObject)
 
 	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		response.SetStatus(runtimehooksv1.ResponseStatusFailure)
+		response.SetStatus(runtimehooksv1alpha1.ResponseStatusFailure)
 		response.SetMessage(fmt.Sprintf("error reading request: %v", err))
 		return response
 	}
 
 	if err := json.Unmarshal(requestBody, request); err != nil {
-		response.SetStatus(runtimehooksv1.ResponseStatusFailure)
+		response.SetStatus(runtimehooksv1alpha1.ResponseStatusFailure)
 		response.SetMessage(fmt.Sprintf("error unmarshalling request: %v", err))
 		return response
 	}

@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	clusterv1alpha4 "sigs.k8s.io/cluster-api/api/v1alpha4"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
 )
 
@@ -29,7 +29,7 @@ type BeforeClusterCreateRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// The cluster object the lifecycle hook corresponds to.
-	Cluster clusterv1alpha4.Cluster `json:"cluster"`
+	Cluster clusterv1.Cluster `json:"cluster"`
 }
 
 var _ RetryResponseObject = &BeforeClusterCreateResponse{}
@@ -52,7 +52,7 @@ type AfterControlPlaneInitializedRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// The cluster object the lifecycle hook corresponds to.
-	Cluster clusterv1alpha4.Cluster `json:"cluster"`
+	Cluster clusterv1.Cluster `json:"cluster"`
 }
 
 var _ ResponseObject = &AfterControlPlaneInitializedResponse{}
@@ -76,7 +76,7 @@ type BeforeClusterUpgradeRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// The cluster object the lifecycle hook corresponds to.
-	Cluster clusterv1alpha4.Cluster `json:"cluster"`
+	Cluster clusterv1.Cluster `json:"cluster"`
 
 	// The current Kubernetes version of the cluster.
 	FromKubernetesVersion string `json:"fromKubernetesVersion"`
@@ -106,7 +106,7 @@ type AfterControlPlaneUpgradeRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// The cluster object the lifecycle hook corresponds to.
-	Cluster clusterv1alpha4.Cluster `json:"cluster"`
+	Cluster clusterv1.Cluster `json:"cluster"`
 
 	// The Kubernetes version after upgrade.
 	KubernetesVersion string `json:"kubernetesVersion"`
@@ -133,7 +133,7 @@ type AfterClusterUpgradeRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// The cluster object the lifecycle hook corresponds to.
-	Cluster clusterv1alpha4.Cluster `json:"cluster"`
+	Cluster clusterv1.Cluster `json:"cluster"`
 
 	// The Kubernetes version after upgrade.
 	KubernetesVersion string `json:"kubernetesVersion"`
@@ -160,7 +160,7 @@ type BeforeClusterDeleteRequest struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// The cluster object the lifecycle hook corresponds to.
-	Cluster clusterv1alpha4.Cluster `json:"cluster"`
+	Cluster clusterv1.Cluster `json:"cluster"`
 }
 
 var _ RetryResponseObject = &BeforeClusterDeleteResponse{}
