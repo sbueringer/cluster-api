@@ -43,6 +43,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1alpha1"
+	runtimehooksv1alpha1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha1"
 	runtimehooksv1 "sigs.k8s.io/cluster-api/exp/runtime/hooks/api/v1alpha2"
 	runtimecatalog "sigs.k8s.io/cluster-api/internal/runtime/catalog"
 	runtimeregistry "sigs.k8s.io/cluster-api/internal/runtime/registry"
@@ -119,20 +120,38 @@ func (c *client) Discover(ctx context.Context, extensionConfig *runtimev1.Extens
 	hookGVH, err := c.catalog.GroupVersionHook(runtimehooksv1.Discovery)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compute GVH of hook")
-	}
 
+	}
 	request := &runtimehooksv1.DiscoveryRequest{}
 	response := &runtimehooksv1.DiscoveryResponse{}
-	opts := &httpCallOptions{
-		catalog:         c.catalog,
-		config:          extensionConfig.Spec.ClientConfig,
-		registrationGVH: hookGVH,
-		hookGVH:         hookGVH,
-		timeout:         defaultDiscoveryTimeout,
+	var errs []error
+	var discoverySucceeded bool
+	for _, discoveryHookFunc := range []interface{}{runtimehooksv1.Discovery, runtimehooksv1alpha1.Discovery} {
+		registrationGVH, err := c.catalog.GroupVersionHook(discoveryHookFunc)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to compute GVH of hook")
+		}
+
+		opts := &httpCallOptions{
+			catalog:         c.catalog,
+			config:          extensionConfig.Spec.ClientConfig,
+			registrationGVH: registrationGVH,
+			hookGVH:         hookGVH,
+			timeout:         defaultDiscoveryTimeout,
+		}
+		if err := httpCall(ctx, request, response, opts); err != nil {
+			errs = append(errs, errors.Wrap(err, "failed to call the Discovery endpoint"))
+			continue
+		}
+
+		discoverySucceeded = true
+		break
 	}
-	if err := httpCall(ctx, request, response, opts); err != nil {
-		return nil, errors.Wrap(err, "failed to call the Discovery endpoint")
+
+	if !discoverySucceeded {
+		return nil, kerrors.NewAggregate(errs)
 	}
+
 	// Check to see if the response is a failure and handle the failure accordingly.
 	if response.GetStatus() == runtimehooksv1.ResponseStatusFailure {
 		return nil, errors.Errorf("discovery failed with %v", response.GetMessage())
