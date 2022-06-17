@@ -6,6 +6,7 @@ resources:
 
 bases:
 - ../certmanager
+- ../rbac
 
 patchesStrategicMerge:
 # Provide customizable hook for make targets.

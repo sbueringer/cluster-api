@@ -20,11 +20,7 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	"strconv"
 
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,7 +36,7 @@ type Handler struct {
 // DoBeforeClusterCreate implements the BeforeClusterCreate hook.
 func (h *Handler) DoBeforeClusterCreate(ctx context.Context, request *runtimehooksv1.BeforeClusterCreateRequest, response *runtimehooksv1.BeforeClusterCreateResponse) {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("BeforeClusterCreate is called")
+	log.Info("BeforeClusterCreate is called", "cluster", fmt.Sprintf("%#v", request.Cluster), "clusterType", fmt.Sprintf("%T", request.Cluster))
 	cluster := request.Cluster
 	err := h.updateResponseFromConfigMap(cluster.Name, cluster.Namespace, runtimehooksv1.BeforeClusterCreate, response)
 	if err != nil {
@@ -54,7 +50,7 @@ func (h *Handler) DoBeforeClusterCreate(ctx context.Context, request *runtimehoo
 // DoBeforeClusterUpgrade implements the BeforeClusterUpgrade hook.
 func (h *Handler) DoBeforeClusterUpgrade(ctx context.Context, request *runtimehooksv1.BeforeClusterUpgradeRequest, response *runtimehooksv1.BeforeClusterUpgradeResponse) {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("BeforeClusterUpgrade is called")
+	log.Info("BeforeClusterUpgrade is called", "cluster", fmt.Sprintf("%#v", request.Cluster), "clusterType", fmt.Sprintf("%T", request.Cluster))
 	cluster := request.Cluster
 	err := h.updateResponseFromConfigMap(cluster.Name, cluster.Namespace, runtimehooksv1.BeforeClusterUpgrade, response)
 	if err != nil {
@@ -68,7 +64,7 @@ func (h *Handler) DoBeforeClusterUpgrade(ctx context.Context, request *runtimeho
 // DoAfterControlPlaneInitialized implements the AfterControlPlaneInitialized hook.
 func (h *Handler) DoAfterControlPlaneInitialized(ctx context.Context, request *runtimehooksv1.AfterControlPlaneInitializedRequest, response *runtimehooksv1.AfterControlPlaneInitializedResponse) {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("AfterControlPlaneInitialized is called")
+	log.Info("AfterControlPlaneInitialized is called", "cluster", fmt.Sprintf("%#v", request.Cluster), "clusterType", fmt.Sprintf("%T", request.Cluster))
 	cluster := request.Cluster
 	err := h.updateResponseFromConfigMap(cluster.Name, cluster.Namespace, runtimehooksv1.AfterControlPlaneInitialized, response)
 	if err != nil {
@@ -81,7 +77,7 @@ func (h *Handler) DoAfterControlPlaneInitialized(ctx context.Context, request *r
 // DoAfterControlPlaneUpgrade implements the AfterControlPlaneUpgrade hook.
 func (h *Handler) DoAfterControlPlaneUpgrade(ctx context.Context, request *runtimehooksv1.AfterControlPlaneUpgradeRequest, response *runtimehooksv1.AfterControlPlaneUpgradeResponse) {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("AfterControlPlaneUpgrade is called")
+	log.Info("AfterControlPlaneUpgrade is called", "cluster", fmt.Sprintf("%#v", request.Cluster), "clusterType", fmt.Sprintf("%T", request.Cluster))
 	cluster := request.Cluster
 	err := h.updateResponseFromConfigMap(cluster.Name, cluster.Namespace, runtimehooksv1.AfterControlPlaneUpgrade, response)
 	if err != nil {
@@ -95,7 +91,7 @@ func (h *Handler) DoAfterControlPlaneUpgrade(ctx context.Context, request *runti
 // DoAfterClusterUpgrade implements the AfterClusterUpgrade hook.
 func (h *Handler) DoAfterClusterUpgrade(ctx context.Context, request *runtimehooksv1.AfterClusterUpgradeRequest, response *runtimehooksv1.AfterClusterUpgradeResponse) {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("AfterClusterUpgrade is called")
+	log.Info("AfterClusterUpgrade is called", "cluster", fmt.Sprintf("%#v", request.Cluster), "clusterType", fmt.Sprintf("%T", request.Cluster))
 	cluster := request.Cluster
 	err := h.updateResponseFromConfigMap(cluster.Name, cluster.Namespace, runtimehooksv1.AfterClusterUpgrade, response)
 	if err != nil {
@@ -108,7 +104,7 @@ func (h *Handler) DoAfterClusterUpgrade(ctx context.Context, request *runtimehoo
 // DoBeforeClusterDelete implements the BeforeClusterDelete hook.
 func (h *Handler) DoBeforeClusterDelete(ctx context.Context, request *runtimehooksv1.BeforeClusterDeleteRequest, response *runtimehooksv1.BeforeClusterDeleteResponse) {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("BeforeClusterDelete is called")
+	log.Info("BeforeClusterDelete is called", "cluster", fmt.Sprintf("%#v", request.Cluster), "clusterType", fmt.Sprintf("%T", request.Cluster))
 	cluster := request.Cluster
 	err := h.updateResponseFromConfigMap(cluster.Name, cluster.Namespace, runtimehooksv1.BeforeClusterDelete, response)
 	if err != nil {
@@ -120,23 +116,26 @@ func (h *Handler) DoBeforeClusterDelete(ctx context.Context, request *runtimehoo
 }
 
 func (h *Handler) updateResponseFromConfigMap(name, namespace string, hook runtimecatalog.Hook, response runtimehooksv1.ResponseObject) error {
-	hookName := runtimecatalog.HookName(hook)
-	configMap := &corev1.ConfigMap{}
-	configMapName := name + "-hookresponses"
-	if err := h.Client.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: configMapName}, configMap); err != nil {
-		return errors.Wrapf(err, "failed to read the ConfigMap %s/%s", namespace, configMapName)
-	}
-	m := map[string]string{}
-	if err := yaml.Unmarshal([]byte(configMap.Data[hookName]), m); err != nil {
-		return errors.Wrapf(err, "failed to read %q response information from ConfigMap", hook)
-	}
-	response.SetMessage(m["Status"])
-	if retryResponse, ok := response.(runtimehooksv1.RetryResponseObject); ok {
-		retryAfterSeconds, err := strconv.Atoi(m["RetryAfterSeconds"]) //nolint:gosec
-		if err != nil {
-			return err
-		}
-		retryResponse.SetRetryAfterSeconds(int32(retryAfterSeconds))
-	}
+	response.SetStatus(runtimehooksv1.ResponseStatusSuccess)
 	return nil
+
+	//hookName := runtimecatalog.HookName(hook)
+	//configMap := &corev1.ConfigMap{}
+	//configMapName := name + "-hookresponses"
+	//if err := h.Client.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: configMapName}, configMap); err != nil {
+	//	return errors.Wrapf(err, "failed to read the ConfigMap %s/%s", namespace, configMapName)
+	//}
+	//m := map[string]string{}
+	//if err := yaml.Unmarshal([]byte(configMap.Data[hookName]), m); err != nil {
+	//	return errors.Wrapf(err, "failed to read %q response information from ConfigMap", hook)
+	//}
+	//response.SetMessage(m["Status"])
+	//if retryResponse, ok := response.(runtimehooksv1.RetryResponseObject); ok {
+	//	retryAfterSeconds, err := strconv.Atoi(m["RetryAfterSeconds"]) //nolint:gosec
+	//	if err != nil {
+	//		return err
+	//	}
+	//	retryResponse.SetRetryAfterSeconds(int32(retryAfterSeconds))
+	//}
+	//return nil
 }
