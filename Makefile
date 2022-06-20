@@ -255,7 +255,7 @@ generate-manifests-kubeadm-control-plane: $(CONTROLLER_GEN) ## Generate manifest
 
 .PHONY: generate-manifests-capd
 generate-manifests-capd: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for capd provider
-	cd $(CAPD_DIR); $(CONTROLLER_GEN) \
+	cd $(CAPD_DIR); /home/sbuerin/code/src/sigs.k8s.io/controller-tools/controller-gen \
 		paths=./api/... \
 		paths=./$(EXP_DIR)/api/... \
 		paths=./$(EXP_DIR)/internal/controllers/... \
