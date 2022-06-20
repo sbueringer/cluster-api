@@ -207,7 +207,7 @@ generate-manifests: $(addprefix generate-manifests-,$(ALL_GENERATE_MODULES)) ## 
 
 .PHONY: generate-manifests-core
 generate-manifests-core: $(CONTROLLER_GEN) $(KUSTOMIZE) ## Generate manifests e.g. CRD, RBAC etc. for core
-	$(CONTROLLER_GEN) \
+	/home/sbuerin/code/src/sigs.k8s.io/controller-tools/controller-gen \
 		paths=./api/... \
 		paths=./internal/controllers/... \
 		paths=./internal/webhooks/... \
@@ -230,7 +230,7 @@ generate-manifests-core: $(CONTROLLER_GEN) $(KUSTOMIZE) ## Generate manifests e.
 
 .PHONY: generate-manifests-kubeadm-bootstrap
 generate-manifests-kubeadm-bootstrap: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for kubeadm bootstrap
-	$(CONTROLLER_GEN) \
+	/home/sbuerin/code/src/sigs.k8s.io/controller-tools/controller-gen \
 		paths=./bootstrap/kubeadm/api/... \
 		paths=./bootstrap/kubeadm/internal/controllers/... \
 		crd:crdVersions=v1 \
@@ -242,7 +242,7 @@ generate-manifests-kubeadm-bootstrap: $(CONTROLLER_GEN) ## Generate manifests e.
 
 .PHONY: generate-manifests-kubeadm-control-plane
 generate-manifests-kubeadm-control-plane: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for kubeadm control plane
-	$(CONTROLLER_GEN) \
+	/home/sbuerin/code/src/sigs.k8s.io/controller-tools/controller-gen \
 		paths=./controlplane/kubeadm/api/... \
 		paths=./controlplane/kubeadm/internal/controllers/... \
 		paths=./controlplane/kubeadm/internal/webhooks/... \
