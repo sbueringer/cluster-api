@@ -83,7 +83,7 @@ SETUP_ENVTEST_BIN := setup-envtest
 SETUP_ENVTEST := $(abspath $(TOOLS_BIN_DIR)/$(SETUP_ENVTEST_BIN)-$(SETUP_ENVTEST_VER))
 SETUP_ENVTEST_PKG := sigs.k8s.io/controller-runtime/tools/setup-envtest
 
-CONTROLLER_GEN_VER := v0.8.0
+CONTROLLER_GEN_VER := 11b6dd2ad1f3048cd78d6f8f67e5e0d5c3a60c83
 CONTROLLER_GEN_BIN := controller-gen
 CONTROLLER_GEN := $(abspath $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER))
 CONTROLLER_GEN_PKG := sigs.k8s.io/controller-tools/cmd/controller-gen
@@ -207,7 +207,7 @@ generate-manifests: $(addprefix generate-manifests-,$(ALL_GENERATE_MODULES)) ## 
 
 .PHONY: generate-manifests-core
 generate-manifests-core: $(CONTROLLER_GEN) $(KUSTOMIZE) ## Generate manifests e.g. CRD, RBAC etc. for core
-	/home/sbuerin/code/src/sigs.k8s.io/controller-tools/controller-gen \
+	$(CONTROLLER_GEN) \
 		paths=./api/... \
 		paths=./internal/controllers/... \
 		paths=./internal/webhooks/... \
@@ -230,7 +230,7 @@ generate-manifests-core: $(CONTROLLER_GEN) $(KUSTOMIZE) ## Generate manifests e.
 
 .PHONY: generate-manifests-kubeadm-bootstrap
 generate-manifests-kubeadm-bootstrap: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for kubeadm bootstrap
-	/home/sbuerin/code/src/sigs.k8s.io/controller-tools/controller-gen \
+	$(CONTROLLER_GEN) \
 		paths=./bootstrap/kubeadm/api/... \
 		paths=./bootstrap/kubeadm/internal/controllers/... \
 		crd:crdVersions=v1 \
@@ -242,7 +242,7 @@ generate-manifests-kubeadm-bootstrap: $(CONTROLLER_GEN) ## Generate manifests e.
 
 .PHONY: generate-manifests-kubeadm-control-plane
 generate-manifests-kubeadm-control-plane: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for kubeadm control plane
-	/home/sbuerin/code/src/sigs.k8s.io/controller-tools/controller-gen \
+	$(CONTROLLER_GEN) \
 		paths=./controlplane/kubeadm/api/... \
 		paths=./controlplane/kubeadm/internal/controllers/... \
 		paths=./controlplane/kubeadm/internal/webhooks/... \
@@ -255,7 +255,7 @@ generate-manifests-kubeadm-control-plane: $(CONTROLLER_GEN) ## Generate manifest
 
 .PHONY: generate-manifests-capd
 generate-manifests-capd: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for capd provider
-	cd $(CAPD_DIR); /home/sbuerin/code/src/sigs.k8s.io/controller-tools/controller-gen \
+	cd $(CAPD_DIR); $(CONTROLLER_GEN) \
 		paths=./api/... \
 		paths=./$(EXP_DIR)/api/... \
 		paths=./$(EXP_DIR)/internal/controllers/... \
