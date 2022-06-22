@@ -125,28 +125,33 @@ func (w *Workload) UpdateCoreDNS(ctx context.Context, kcp *controlplanev1.Kubead
 		return err
 	}
 
-	// Return early if the from/to image is the same.
-	if info.FromImage == info.ToImage {
-		return nil
+	// Only update the KubeadmConfigMap and CoreDNSCoreFile if the image changed.
+	if info.FromImage != info.ToImage {
+		// Validate the image tag.
+		if err := validateCoreDNSImageTag(info.FromImageTag, info.ToImageTag); err != nil {
+			return errors.Wrapf(err, "failed to validate CoreDNS")
+		}
+
+		// Perform the upgrade.
+		if err := w.updateCoreDNSImageInfoInKubeadmConfigMap(ctx, &clusterConfig.DNS, version); err != nil {
+			return err
+		}
+		if err := w.updateCoreDNSCorefile(ctx, info); err != nil {
+			return err
+		}
 	}
 
-	// Validate the image tag.
-	if err := validateCoreDNSImageTag(info.FromImageTag, info.ToImageTag); err != nil {
-		return errors.Wrapf(err, "failed to validate CoreDNS")
-	}
-
-	// Perform the upgrade.
-	if err := w.updateCoreDNSImageInfoInKubeadmConfigMap(ctx, &clusterConfig.DNS, version); err != nil {
-		return err
-	}
-	if err := w.updateCoreDNSCorefile(ctx, info); err != nil {
-		return err
-	}
+	// Update the cluster role independent of image change. Kubernetes may get updated
+	// to v1.22 which requires updating the cluster role without image changes.
 	if err := w.updateCoreDNSClusterRole(ctx, version, info); err != nil {
 		return err
 	}
-	if err := w.updateCoreDNSDeployment(ctx, info); err != nil {
-		return errors.Wrap(err, "unable to update coredns deployment")
+
+	// Only update the deployment if the image changed.
+	if info.FromImage != info.ToImage {
+		if err := w.updateCoreDNSDeployment(ctx, info); err != nil {
+			return errors.Wrap(err, "unable to update coredns deployment")
+		}
 	}
 	return nil
 }
@@ -270,6 +275,12 @@ func (w *Workload) updateCoreDNSClusterRole(ctx context.Context, kubernetesVersi
 		return err
 	}
 	if targetCoreDNSVersion.LT(semver.Version{Major: 1, Minor: 8, Patch: 1}) {
+		return nil
+	}
+
+	// Do nothing for Kubernetes > 1.22 and coreDNS Version > 1.8.1.
+	if kubernetesVersion.GTE(semver.Version{Major: 1, Minor: 23, Patch: 0}) &&
+		targetCoreDNSVersion.GTE(semver.Version{Major: 1, Minor: 8, Patch: 1}) {
 		return nil
 	}
 
