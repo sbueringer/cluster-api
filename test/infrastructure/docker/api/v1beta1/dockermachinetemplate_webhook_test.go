@@ -54,7 +54,7 @@ func TestDockerMachineTemplateInvalid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.newTemplate.ValidateUpdate(tt.oldTemplate)
+			err := tt.newTemplate.ValidateUpdate(false, tt.oldTemplate)
 			if (err != nil) != tt.wantError {
 				t.Errorf("unexpected result - wanted %+v, got %+v", tt.wantError, err)
 			}

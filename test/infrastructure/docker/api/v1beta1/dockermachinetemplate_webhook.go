@@ -24,12 +24,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"sigs.k8s.io/cluster-api/util/webhooks"
 )
 
 const dockerMachineTemplateImmutableMsg = "DockerMachineTemplate spec.template.spec field is immutable. Please create a new resource instead."
 
 func (m *DockerMachineTemplate) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	// Register the topology aware validator webhook.
+	mgr.GetWebhookServer().Register(
+		"/validate-infrastructure-cluster-x-k8s-io-v1beta1-dockermachinetemplate",
+		webhooks.TopologyAwareValidatingWebhookFor(m),
+	)
+	// Register the defaulter webhook.
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(m).
 		Complete()
@@ -37,7 +44,7 @@ func (m *DockerMachineTemplate) SetupWebhookWithManager(mgr ctrl.Manager) error 
 
 // +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1beta1-dockermachinetemplate,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=dockermachinetemplates,versions=v1beta1,name=validation.dockermachinetemplate.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
 
-var _ webhook.Validator = &DockerMachineTemplate{}
+var _ webhooks.TopologyAwareValidator = &DockerMachineTemplate{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
 func (m *DockerMachineTemplate) ValidateCreate() error {
@@ -45,13 +52,13 @@ func (m *DockerMachineTemplate) ValidateCreate() error {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (m *DockerMachineTemplate) ValidateUpdate(oldRaw runtime.Object) error {
+func (m *DockerMachineTemplate) ValidateUpdate(skipImmutabilityChecks bool, oldRaw runtime.Object) error {
 	var allErrs field.ErrorList
 	old, ok := oldRaw.(*DockerMachineTemplate)
 	if !ok {
 		return apierrors.NewBadRequest(fmt.Sprintf("expected a DockerMachineTemplate but got a %T", oldRaw))
 	}
-	if !reflect.DeepEqual(m.Spec.Template.Spec, old.Spec.Template.Spec) {
+	if !skipImmutabilityChecks && !reflect.DeepEqual(m.Spec.Template.Spec, old.Spec.Template.Spec) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "template", "spec"), m, dockerMachineTemplateImmutableMsg))
 	}
 	if len(allErrs) == 0 {
