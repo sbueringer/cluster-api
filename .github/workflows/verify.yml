@@ -7,11 +7,15 @@ jobs:
     runs-on: ubuntu-latest
     name: verify PR contents
     steps:
+    - name: test
+      run: echo "$GITHUB_CONTEXT"
+      env:
+        GITHUB_CONTEXT: ${{ toJSON(github) }}
     - name: Verifier action
       id: verifier
       uses: kubernetes-sigs/kubebuilder-release-tools@v0.2.0
       # Don't run this step on PRs created by the cherry-pick bot,
       # as the PR description is too short, but otherwise the PRs are fine.
-      if: ${{ github.event.pull_request_target.head.repo.owner.login != 'chrischdi' }}
+      if: ${{ github.event.pull_request.head.repo.owner.login != 'chrischdi' }}
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
