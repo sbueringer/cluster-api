@@ -1,10 +1,11 @@
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, edited, synchronize, reopened]
     # Don't run this check on PRs created by the cherry-pick bot,
     # as the PR description is too short, but otherwise the PRs are fine.
     branches-ignore:
-      - k8s-infra-cherrypick-robot/**
+      - 'k8s-infra-cherrypick-robot/**'
+      - 'sbueringer/**'
 
 jobs:
   verify:
