@@ -31,6 +31,7 @@ import (
 
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
 	logf "sigs.k8s.io/cluster-api/cmd/clusterctl/log"
+	"sigs.k8s.io/cluster-api/feature"
 )
 
 type stackTracer interface {
@@ -117,6 +118,7 @@ func init() {
 	RootCmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
 		"Path to clusterctl configuration (default is `$HOME/.cluster-api/clusterctl.yaml`) or to a remote location (i.e. https://example.com/clusterctl.yaml)")
+	feature.MutableGates.AddFlag(RootCmd.PersistentFlags())
 
 	cobra.OnInitialize(initConfig, registerCompletionFuncForCommonFlags)
 }

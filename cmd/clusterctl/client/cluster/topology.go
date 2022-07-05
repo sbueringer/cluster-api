@@ -201,6 +201,7 @@ func (t *topologyClient) Plan(in *TopologyPlanInput) (*TopologyPlanOutput, error
 		Client:                    dryRunClient,
 		APIReader:                 dryRunClient,
 		UnstructuredCachingClient: dryRunClient,
+		RuntimeClient:             newClusterctlRuntimeClient(dryRunClient),
 	}
 	reconciler.SetupForDryRun(&noOpRecorder{})
 	request := reconcile.Request{NamespacedName: *targetCluster}
