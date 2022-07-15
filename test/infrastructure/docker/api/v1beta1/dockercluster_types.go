@@ -48,6 +48,11 @@ type DockerClusterSpec struct {
 	// +optional
 	LoadBalancer DockerLoadBalancer `json:"loadBalancer,omitempty"`
 
+	// SecondaryCidrBlock is the additional CIDR range to use for pod IPs.
+	// Must be within the 100.64.0.0/10 or 198.19.0.0/16 range.
+	// +optional
+	SecondaryCidrBlock *string `json:"secondaryCidrBlock,omitempty"`
+
 	Subnets1 DockerClusterSubnets1 `json:"subnets1,omitempty"`
 	Subnets2 DockerClusterSubnets2 `json:"subnets2,omitempty"`
 	Subnets3 DockerClusterSubnets3 `json:"subnets3,omitempty"`
@@ -67,6 +72,9 @@ type DockerClusterSubnets1Spec struct {
 	// ID defines a unique identifier to reference this resource.
 	ID string `json:"id,omitempty"`
 
+	// CidrBlock is the CIDR block to be used when the provider creates a managed VPC.
+	CidrBlock string `json:"cidrBlock,omitempty"`
+
 	TopologyField      string `json:"topologyField,omitempty"`
 	DockerClusterField string `json:"dockerClusterField,omitempty"`
 }
@@ -74,7 +82,7 @@ type DockerClusterSubnets1Spec struct {
 // DockerClusterSubnets2 .
 // +listType=map
 // +listMapKey=uuid
-type DockerClusterSubnets2 []DockerClusterSubnets1Spec
+type DockerClusterSubnets2 []DockerClusterSubnets2Spec
 
 // DockerClusterSubnets2Spec .
 type DockerClusterSubnets2Spec struct {
@@ -84,6 +92,9 @@ type DockerClusterSubnets2Spec struct {
 	// ID defines a unique identifier to reference this resource.
 	ID string `json:"id,omitempty"`
 
+	// CidrBlock is the CIDR block to be used when the provider creates a managed VPC.
+	CidrBlock string `json:"cidrBlock,omitempty"`
+
 	TopologyField      string `json:"topologyField,omitempty"`
 	DockerClusterField string `json:"dockerClusterField,omitempty"`
 }
@@ -91,7 +102,7 @@ type DockerClusterSubnets2Spec struct {
 // DockerClusterSubnets3 .
 // +listType=map
 // +listMapKey=uuid
-type DockerClusterSubnets3 []DockerClusterSubnets1Spec
+type DockerClusterSubnets3 []DockerClusterSubnets3Spec
 
 // DockerClusterSubnets3Spec .
 type DockerClusterSubnets3Spec struct {
@@ -100,6 +111,9 @@ type DockerClusterSubnets3Spec struct {
 
 	// ID defines a unique identifier to reference this resource.
 	ID string `json:"id,omitempty"`
+
+	// CidrBlock is the CIDR block to be used when the provider creates a managed VPC.
+	CidrBlock string `json:"cidrBlock,omitempty"`
 
 	TopologyField      string `json:"topologyField,omitempty"`
 	DockerClusterField string `json:"dockerClusterField,omitempty"`
@@ -113,8 +127,45 @@ type DockerClusterSubnets4Spec struct {
 	// ID defines a unique identifier to reference this resource.
 	ID string `json:"id,omitempty"`
 
+	// CidrBlock is the CIDR block to be used when the provider creates a managed VPC.
+	CidrBlock string `json:"cidrBlock,omitempty"`
+
 	TopologyField      string `json:"topologyField,omitempty"`
 	DockerClusterField string `json:"dockerClusterField,omitempty"`
+}
+
+func (s DockerClusterSubnets1) FindEqual(spec *DockerClusterSubnets1Spec) *DockerClusterSubnets1Spec {
+	for _, x := range s {
+		if (spec.ID != "" && x.ID == spec.ID) || (spec.CidrBlock == x.CidrBlock) {
+			return &x
+		}
+	}
+	return nil
+}
+func (s DockerClusterSubnets2) FindEqual(spec *DockerClusterSubnets2Spec) *DockerClusterSubnets2Spec {
+	for _, x := range s {
+		if (spec.ID != "" && x.ID == spec.ID) || (spec.CidrBlock == x.CidrBlock) {
+			return &x
+		}
+	}
+	return nil
+}
+func (s DockerClusterSubnets3) FindEqual(spec *DockerClusterSubnets3Spec) *DockerClusterSubnets3Spec {
+	for _, x := range s {
+		if (spec.ID != "" && x.ID == spec.ID) || (spec.CidrBlock == x.CidrBlock) {
+			return &x
+		}
+	}
+	return nil
+}
+func (s DockerClusterSubnets4) FindEqual(spec *DockerClusterSubnets4Spec) *DockerClusterSubnets4Spec {
+	// FIXME: Note added spec.CidrBlock != "" here to avoid finding "equal" subnet with empty CIDRs.
+	for _, x := range s {
+		if (spec.ID != "" && x.ID == spec.ID) || (spec.CidrBlock != "" && spec.CidrBlock == x.CidrBlock) {
+			return &x
+		}
+	}
+	return nil
 }
 
 // DockerLoadBalancer allows defining configurations for the cluster load balancer.

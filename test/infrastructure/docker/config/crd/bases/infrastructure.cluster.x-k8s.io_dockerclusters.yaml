@@ -390,11 +390,19 @@ spec:
                       image. if not set, "v20210715-a6da3463" will be used instead.
                     type: string
                 type: object
+              secondaryCidrBlock:
+                description: SecondaryCidrBlock is the additional CIDR range to use
+                  for pod IPs. Must be within the 100.64.0.0/10 or 198.19.0.0/16 range.
+                type: string
               subnets1:
                 description: DockerClusterSubnets1 .
                 items:
                   description: DockerClusterSubnets1Spec .
                   properties:
+                    cidrBlock:
+                      description: CidrBlock is the CIDR block to be used when the
+                        provider creates a managed VPC.
+                      type: string
                     dockerClusterField:
                       type: string
                     id:
@@ -414,8 +422,12 @@ spec:
               subnets2:
                 description: DockerClusterSubnets2 .
                 items:
-                  description: DockerClusterSubnets1Spec .
+                  description: DockerClusterSubnets2Spec .
                   properties:
+                    cidrBlock:
+                      description: CidrBlock is the CIDR block to be used when the
+                        provider creates a managed VPC.
+                      type: string
                     dockerClusterField:
                       type: string
                     id:
@@ -435,8 +447,12 @@ spec:
               subnets3:
                 description: DockerClusterSubnets3 .
                 items:
-                  description: DockerClusterSubnets1Spec .
+                  description: DockerClusterSubnets3Spec .
                   properties:
+                    cidrBlock:
+                      description: CidrBlock is the CIDR block to be used when the
+                        provider creates a managed VPC.
+                      type: string
                     dockerClusterField:
                       type: string
                     id:
@@ -458,6 +474,10 @@ spec:
                 items:
                   description: DockerClusterSubnets4Spec .
                   properties:
+                    cidrBlock:
+                      description: CidrBlock is the CIDR block to be used when the
+                        provider creates a managed VPC.
+                      type: string
                     dockerClusterField:
                       type: string
                     id:

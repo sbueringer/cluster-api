@@ -112,6 +112,11 @@ func (in *DockerClusterSpec) DeepCopyInto(out *DockerClusterSpec) {
 		}
 	}
 	out.LoadBalancer = in.LoadBalancer
+	if in.SecondaryCidrBlock != nil {
+		in, out := &in.SecondaryCidrBlock, &out.SecondaryCidrBlock
+		*out = new(string)
+		**out = **in
+	}
 	if in.Subnets1 != nil {
 		in, out := &in.Subnets1, &out.Subnets1
 		*out = make(DockerClusterSubnets1, len(*in))
@@ -406,6 +411,11 @@ func (in *DockerClusterTemplateNewSpec) DeepCopyInto(out *DockerClusterTemplateN
 		}
 	}
 	out.LoadBalancer = in.LoadBalancer
+	if in.SecondaryCidrBlock != nil {
+		in, out := &in.SecondaryCidrBlock, &out.SecondaryCidrBlock
+		*out = new(string)
+		**out = **in
+	}
 	if in.Subnets1 != nil {
 		in, out := &in.Subnets1, &out.Subnets1
 		*out = make(DockerClusterTemplateSubnets1, len(*in))

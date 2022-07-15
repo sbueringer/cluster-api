@@ -96,8 +96,33 @@ func (r *DockerClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	for i, _ := range dockerCluster.Spec.Subnets3 {
 		dockerCluster.Spec.Subnets3[i].DockerClusterField = "value"
 	}
+
+	if dockerCluster.Spec.SecondaryCidrBlock != nil {
+		found := false
+		for _, subnet := range dockerCluster.Spec.Subnets4 {
+			if subnet.CidrBlock == *dockerCluster.Spec.SecondaryCidrBlock {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			dockerCluster.Spec.Subnets4 = append(dockerCluster.Spec.Subnets4, infrav1.DockerClusterSubnets4Spec{
+				CidrBlock: *dockerCluster.Spec.SecondaryCidrBlock,
+			})
+		}
+	}
 	for i, _ := range dockerCluster.Spec.Subnets4 {
 		dockerCluster.Spec.Subnets4[i].DockerClusterField = "value"
+		if dockerCluster.Spec.Subnets4[i].CidrBlock != "" {
+			dockerCluster.Spec.Subnets4[i].DockerClusterField += " cidrBlock: " + dockerCluster.Spec.Subnets4[i].CidrBlock
+		}
+		if dockerCluster.Spec.Subnets4[i].ID != "" {
+			dockerCluster.Spec.Subnets4[i].DockerClusterField += " ID: " + dockerCluster.Spec.Subnets4[i].ID
+		}
+		if dockerCluster.Spec.Subnets4[i].TopologyField != "" {
+			dockerCluster.Spec.Subnets4[i].DockerClusterField += " topologyField: " + dockerCluster.Spec.Subnets4[i].TopologyField
+		}
 	}
 
 	// Always attempt to Patch the DockerCluster object and status after each reconciliation.
