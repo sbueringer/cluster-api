@@ -167,8 +167,7 @@ spec:
                         type: object
                     type: object
                   spec:
-                    description: DockerClusterTemplateNewSpec defines the desired
-                      state of DockerCluster.
+                    description: DockerClusterSpec defines the desired state of DockerCluster.
                     properties:
                       controlPlaneEndpoint:
                         description: ControlPlaneEndpoint represents the endpoint
@@ -231,80 +230,10 @@ spec:
                           to use for pod IPs. Must be within the 100.64.0.0/10 or
                           198.19.0.0/16 range.
                         type: string
-                      subnets1:
-                        description: DockerClusterTemplateSubnets1 .
+                      subnets:
+                        description: Subnets is a slice of Subnet.
                         items:
-                          description: DockerClusterTemplateSubnets1Spec .
-                          properties:
-                            cidrBlock:
-                              description: CidrBlock is the CIDR block to be used
-                                when the provider creates a managed VPC.
-                              type: string
-                            dockerClusterField:
-                              type: string
-                            id:
-                              description: ID defines a unique identifier to reference
-                                this resource.
-                              type: string
-                            topologyField:
-                              type: string
-                            uuid:
-                              default: dummy
-                              type: string
-                          type: object
-                        type: array
-                        x-kubernetes-list-map-keys:
-                        - uuid
-                        x-kubernetes-list-type: map
-                      subnets2:
-                        description: DockerClusterTemplateSubnets2 .
-                        items:
-                          description: DockerClusterTemplateSubnets2Spec .
-                          properties:
-                            cidrBlock:
-                              description: CidrBlock is the CIDR block to be used
-                                when the provider creates a managed VPC.
-                              type: string
-                            dockerClusterField:
-                              type: string
-                            id:
-                              description: ID defines a unique identifier to reference
-                                this resource.
-                              type: string
-                            topologyField:
-                              type: string
-                          type: object
-                        type: array
-                      subnets3:
-                        description: DockerClusterTemplateSubnets3 .
-                        items:
-                          description: DockerClusterTemplateSubnets3Spec .
-                          properties:
-                            cidrBlock:
-                              description: CidrBlock is the CIDR block to be used
-                                when the provider creates a managed VPC.
-                              type: string
-                            dockerClusterField:
-                              type: string
-                            id:
-                              description: ID defines a unique identifier to reference
-                                this resource.
-                              type: string
-                            topologyField:
-                              type: string
-                            uuid:
-                              type: string
-                          required:
-                          - uuid
-                          type: object
-                        type: array
-                        x-kubernetes-list-map-keys:
-                        - uuid
-                        x-kubernetes-list-type: map
-                      subnets4:
-                        description: DockerClusterTemplateSubnets4 .
-                        items:
-                          description: DockerClusterTemplateSubnets4Spec .
+                          description: SubnetSpec configures a Docker Subnet.
                           properties:
                             cidrBlock:
                               description: CidrBlock is the CIDR block to be used

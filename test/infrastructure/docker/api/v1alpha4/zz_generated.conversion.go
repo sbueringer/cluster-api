@@ -73,11 +73,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.DockerClusterSpec)(nil), (*DockerClusterSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_DockerClusterSpec_To_v1alpha4_DockerClusterSpec(a.(*v1beta1.DockerClusterSpec), b.(*DockerClusterSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*DockerClusterStatus)(nil), (*v1beta1.DockerClusterStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha4_DockerClusterStatus_To_v1beta1_DockerClusterStatus(a.(*DockerClusterStatus), b.(*v1beta1.DockerClusterStatus), scope)
 	}); err != nil {
@@ -225,6 +220,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.Mount)(nil), (*Mount)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_Mount_To_v1alpha4_Mount(a.(*v1beta1.Mount), b.(*Mount), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.DockerClusterSpec)(nil), (*DockerClusterSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DockerClusterSpec_To_v1alpha4_DockerClusterSpec(a.(*v1beta1.DockerClusterSpec), b.(*DockerClusterSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -385,9 +385,8 @@ func autoConvert_v1beta1_DockerClusterSpec_To_v1alpha4_DockerClusterSpec(in *v1b
 	if err := Convert_v1beta1_DockerLoadBalancer_To_v1alpha4_DockerLoadBalancer(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
-	// WARNING: in.Subnets1 requires manual conversion: does not exist in peer-type
-	// WARNING: in.Subnets2 requires manual conversion: does not exist in peer-type
-	// WARNING: in.Subnets3 requires manual conversion: does not exist in peer-type
+	// WARNING: in.SecondaryCidrBlock requires manual conversion: does not exist in peer-type
+	// WARNING: in.Subnets requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -528,7 +527,7 @@ func Convert_v1beta1_DockerClusterTemplateList_To_v1alpha4_DockerClusterTemplate
 }
 
 func autoConvert_v1alpha4_DockerClusterTemplateResource_To_v1beta1_DockerClusterTemplateResource(in *DockerClusterTemplateResource, out *v1beta1.DockerClusterTemplateResource, s conversion.Scope) error {
-	if err := Convert_v1alpha4_DockerClusterSpec_To_v1beta1_DockerClusterTemplateNewSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1alpha4_DockerClusterSpec_To_v1beta1_DockerClusterSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil
@@ -541,7 +540,7 @@ func Convert_v1alpha4_DockerClusterTemplateResource_To_v1beta1_DockerClusterTemp
 
 func autoConvert_v1beta1_DockerClusterTemplateResource_To_v1alpha4_DockerClusterTemplateResource(in *v1beta1.DockerClusterTemplateResource, out *DockerClusterTemplateResource, s conversion.Scope) error {
 	// WARNING: in.ObjectMeta requires manual conversion: does not exist in peer-type
-	if err := Convert_v1beta1_DockerClusterTemplateNewSpec_To_v1alpha4_DockerClusterSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1beta1_DockerClusterSpec_To_v1alpha4_DockerClusterSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil

@@ -320,9 +320,8 @@ func autoConvert_v1beta1_DockerClusterSpec_To_v1alpha3_DockerClusterSpec(in *v1b
 		out.FailureDomains = nil
 	}
 	// WARNING: in.LoadBalancer requires manual conversion: does not exist in peer-type
-	// WARNING: in.Subnets1 requires manual conversion: does not exist in peer-type
-	// WARNING: in.Subnets2 requires manual conversion: does not exist in peer-type
-	// WARNING: in.Subnets3 requires manual conversion: does not exist in peer-type
+	// WARNING: in.SecondaryCidrBlock requires manual conversion: does not exist in peer-type
+	// WARNING: in.Subnets requires manual conversion: does not exist in peer-type
 	return nil
 }
 

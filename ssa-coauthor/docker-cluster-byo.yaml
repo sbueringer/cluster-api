@@ -1,0 +1,37 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: my-cluster-byo
+  namespace: default
+  labels:
+    cni: "my-cluster-crs-0"
+spec:
+  topology:
+    class: "quick-start"
+    version: "v1.22.2"
+    controlPlane:
+      replicas: 1
+    variables:
+    - name: "secondaryCidrBlock"
+      value: "100.64.0.0/10"
+    - name: "subnets"
+      value:
+      # Use case: bring your own infra (ids are set)
+        - topologyField: value1
+          id: "uuid-1"
+        - topologyField: value2
+          id: "uuid-2"
+
+# Reconciles to DockerCluster:
+#  subnets:
+#  - cidrBlock: 41.207.184.14/24
+#    dockerClusterField: value
+#    id: uuid-1
+#    topologyField: value1
+#  - cidrBlock: 83.110.218.55/24
+#    dockerClusterField: value
+#    id: uuid-2
+#    topologyField: value2
+#  - cidrBlock: 100.64.0.0/10
+#    dockerClusterField: value
+#    id: 764b0ea1-efd7-46c1-baab-4e07c31c62c6

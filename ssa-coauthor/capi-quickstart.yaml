@@ -29,17 +29,11 @@ metadata:
   name: capi-quickstart
   namespace: default
 spec:
-  subnets1: []
-  #- topologyField: value
-  subnets2: []
-  #- topologyField: value
-  subnets3:
+  subnets:
   - topologyField: value1
     cidrBlock: "1.2.3.4/24"
   - topologyField: value2
     cidrBlock: "1.2.3.5/24"
-  #subnets4:
-  #- topologyField: value
 ---
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: KubeadmControlPlane

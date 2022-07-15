@@ -19,9 +19,12 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -87,43 +90,7 @@ func (r *DockerClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	for i, _ := range dockerCluster.Spec.Subnets1 {
-		dockerCluster.Spec.Subnets1[i].DockerClusterField = "value"
-	}
-	for i, _ := range dockerCluster.Spec.Subnets2 {
-		dockerCluster.Spec.Subnets2[i].DockerClusterField = "value"
-	}
-	for i, _ := range dockerCluster.Spec.Subnets3 {
-		dockerCluster.Spec.Subnets3[i].DockerClusterField = "value"
-	}
-
-	if dockerCluster.Spec.SecondaryCidrBlock != nil {
-		found := false
-		for _, subnet := range dockerCluster.Spec.Subnets4 {
-			if subnet.CidrBlock == *dockerCluster.Spec.SecondaryCidrBlock {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			dockerCluster.Spec.Subnets4 = append(dockerCluster.Spec.Subnets4, infrav1.DockerClusterSubnets4Spec{
-				CidrBlock: *dockerCluster.Spec.SecondaryCidrBlock,
-			})
-		}
-	}
-	for i, _ := range dockerCluster.Spec.Subnets4 {
-		dockerCluster.Spec.Subnets4[i].DockerClusterField = "value"
-		if dockerCluster.Spec.Subnets4[i].CidrBlock != "" {
-			dockerCluster.Spec.Subnets4[i].DockerClusterField += " cidrBlock: " + dockerCluster.Spec.Subnets4[i].CidrBlock
-		}
-		if dockerCluster.Spec.Subnets4[i].ID != "" {
-			dockerCluster.Spec.Subnets4[i].DockerClusterField += " ID: " + dockerCluster.Spec.Subnets4[i].ID
-		}
-		if dockerCluster.Spec.Subnets4[i].TopologyField != "" {
-			dockerCluster.Spec.Subnets4[i].DockerClusterField += " topologyField: " + dockerCluster.Spec.Subnets4[i].TopologyField
-		}
-	}
+	reconcileSubnets(dockerCluster)
 
 	// Always attempt to Patch the DockerCluster object and status after each reconciliation.
 	defer func() {
@@ -153,6 +120,56 @@ func (r *DockerClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Handle non-deleted clusters
 	return r.reconcileNormal(ctx, dockerCluster, externalLoadBalancer)
+}
+
+func reconcileSubnets(dockerCluster *infrav1.DockerCluster) {
+	// Default subnets if no subnets are provided
+	if len(dockerCluster.Spec.Subnets) == 0 {
+		dockerCluster.Spec.Subnets = defaultSubnets()
+	}
+
+	// Add a subnet for SecondaryCidrBlock if SecondaryCidrBlock is set
+	// and the subnet doesn't exist yet.
+	if dockerCluster.Spec.SecondaryCidrBlock != nil {
+		secondarySub := infrav1.SubnetSpec{
+			CidrBlock: *dockerCluster.Spec.SecondaryCidrBlock,
+		}
+
+		existingSubnet := dockerCluster.Spec.Subnets.FindEqual(&secondarySub)
+		if existingSubnet == nil {
+			dockerCluster.Spec.Subnets = append(dockerCluster.Spec.Subnets, secondarySub)
+		}
+	}
+
+	// Fill in additional fields from infra.
+	for i := range dockerCluster.Spec.Subnets {
+		if dockerCluster.Spec.Subnets[i].ID != "" {
+			dockerCluster.Spec.Subnets[i].DockerClusterField = "value"
+			if dockerCluster.Spec.Subnets[i].CidrBlock == "" {
+				dockerCluster.Spec.Subnets[i].CidrBlock = fmt.Sprintf("%d.%d.%d.%d/24", rand.Intn(255), rand.Intn(255), rand.Intn(255), rand.Intn(255)) //nolint:gosec
+			}
+		}
+	}
+
+	// Create subnets which don't have an id.
+	for i := range dockerCluster.Spec.Subnets {
+		if dockerCluster.Spec.Subnets[i].ID == "" {
+			dockerCluster.Spec.Subnets[i].ID = string(uuid.NewUUID())
+			dockerCluster.Spec.Subnets[i].DockerClusterField = "value"
+		}
+	}
+}
+
+func defaultSubnets() infrav1.Subnets {
+	var subnets infrav1.Subnets
+	subnets = append(subnets, infrav1.SubnetSpec{
+		CidrBlock: "10.11.12.13/24",
+	})
+	subnets = append(subnets, infrav1.SubnetSpec{
+		CidrBlock: "14.15.16.17/24",
+	})
+
+	return subnets
 }
 
 func patchDockerCluster(ctx context.Context, patchHelper *patch.Helper, dockerCluster *infrav1.DockerCluster) error {

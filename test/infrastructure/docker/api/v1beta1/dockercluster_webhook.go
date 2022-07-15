@@ -19,15 +19,14 @@ package v1beta1
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+
 	"github.com/pkg/errors"
 	admissionv1 "k8s.io/api/admission/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/pointer"
-	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -66,31 +65,7 @@ func (v *DockerClusterMutator) Handle(ctx context.Context, req admission.Request
 		}
 	}
 
-	for i, _ := range dct.Spec.Subnets1 {
-		if dct.Spec.Subnets1[i].UUID == nil || *dct.Spec.Subnets1[i].UUID == "dummy" {
-			dct.Spec.Subnets1[i].UUID = pointer.String(string(uuid.NewUUID()))
-		}
-	}
-	for i, _ := range dct.Spec.Subnets2 {
-		if dct.Spec.Subnets2[i].UUID == nil || *dct.Spec.Subnets2[i].UUID == "dummy" {
-			dct.Spec.Subnets2[i].UUID = pointer.String(string(uuid.NewUUID()))
-		}
-	}
-	for i, _ := range dct.Spec.Subnets3 {
-		if dct.Spec.Subnets3[i].UUID == nil || *dct.Spec.Subnets3[i].UUID == "dummy" {
-			if req.Operation == admissionv1.Create {
-				dct.Spec.Subnets3[i].UUID = pointer.String(string(uuid.NewUUID()))
-			}
-			if req.Operation == admissionv1.Update {
-				oldSubnet := oldDct.Spec.Subnets3.FindEqual(&dct.Spec.Subnets3[i])
-				if oldSubnet != nil {
-					dct.Spec.Subnets3[i].UUID = oldSubnet.UUID
-				} else {
-					dct.Spec.Subnets3[i].UUID = pointer.String(string(uuid.NewUUID()))
-				}
-			}
-		}
-	}
+	defaultDockerClusterSpec(&dct.Spec)
 
 	if req.Operation == admissionv1.Update {
 		updateOpts := &metav1.UpdateOptions{}
@@ -109,8 +84,8 @@ func (v *DockerClusterMutator) Handle(ctx context.Context, req admission.Request
 		// * If subnet.ID == "" => create subnet in AWS and sync fields from new subnet from AWS to subnet spec
 		//   => 2. We have to carry over fields from the current AWSCluster
 		if updateOpts.FieldManager == "capi-topology" {
-			for i, _ := range dct.Spec.Subnets4 {
-				oldSubnet := oldDct.Spec.Subnets4.FindEqual(&dct.Spec.Subnets4[i])
+			for i := range dct.Spec.Subnets {
+				oldSubnet := oldDct.Spec.Subnets.FindEqual(&dct.Spec.Subnets[i])
 				if oldSubnet == nil {
 					// Subnet has been newly added => nothing to carry-over.
 					continue
@@ -118,46 +93,34 @@ func (v *DockerClusterMutator) Handle(ctx context.Context, req admission.Request
 
 				// Subnet has been updated => 2. carry-over fields from old subnet, if they are not overwritten.
 				if oldSubnet != nil {
-					if dct.Spec.Subnets4[i].ID == "" {
-						dct.Spec.Subnets4[i].ID = oldSubnet.ID
+					if dct.Spec.Subnets[i].CidrBlock == "" {
+						dct.Spec.Subnets[i].CidrBlock = oldSubnet.CidrBlock
 					}
-					if dct.Spec.Subnets4[i].CidrBlock == "" {
-						dct.Spec.Subnets4[i].CidrBlock = oldSubnet.CidrBlock
+					if dct.Spec.Subnets[i].TopologyField == "" {
+						dct.Spec.Subnets[i].TopologyField = oldSubnet.TopologyField
 					}
-					if dct.Spec.Subnets4[i].TopologyField == "" {
-						dct.Spec.Subnets4[i].TopologyField = oldSubnet.TopologyField
-					}
-					if dct.Spec.Subnets4[i].DockerClusterField == "" {
-						dct.Spec.Subnets4[i].DockerClusterField = oldSubnet.DockerClusterField
+					if dct.Spec.Subnets[i].DockerClusterField == "" {
+						dct.Spec.Subnets[i].DockerClusterField = oldSubnet.DockerClusterField
 					}
 				}
 			}
-		}
-		// 1. We have to carry over additional subnets of the SecondaryCIDR block.
-		for i, _ := range oldDct.Spec.Subnets4 {
-			oldSubnet := oldDct.Spec.Subnets4[i]
-			newSubnet := dct.Spec.Subnets4.FindEqual(&oldSubnet)
-			if newSubnet != nil {
-				// Subnet already exists in new => nothing to carry over.
-				continue
-			}
+			// 1. We have to carry over additional subnets of the SecondaryCIDR block.
+			for i := range oldDct.Spec.Subnets {
+				oldSubnet := oldDct.Spec.Subnets[i]
+				newSubnet := dct.Spec.Subnets.FindEqual(&oldSubnet)
+				if newSubnet != nil {
+					// Subnet already exists in new => nothing to carry over.
+					continue
+				}
 
-			// Subnet does not exist in new => carry-over subnet if its of the SecondaryCIDR block.
-			// Note: That check is actually slightly more complicated (see CAPA subnets.go + cidr.SplitIntoSubnetsIPv4)
-			if dct.Spec.SecondaryCidrBlock != nil && oldSubnet.CidrBlock == *dct.Spec.SecondaryCidrBlock {
-				dct.Spec.Subnets4 = append(dct.Spec.Subnets4, oldSubnet)
+				// Subnet does not exist in new => carry-over subnet if its of the SecondaryCIDR block.
+				// Note: That check is actually slightly more complicated (see CAPA subnets.go + cidr.SplitIntoSubnetsIPv4)
+				if dct.Spec.SecondaryCidrBlock != nil && oldSubnet.CidrBlock == *dct.Spec.SecondaryCidrBlock {
+					dct.Spec.Subnets = append(dct.Spec.Subnets, oldSubnet)
+				}
 			}
 		}
 	}
-
-	// Background info:
-	// Two subnets are defined equal to each other if their id is equal
-	// or if they are in the same vpc and the cidr block is the same.
-
-	// Alternative Variant: make it immutable
-	//if updateOpts.FieldManager == "capi-topology" {
-	//	dct.Spec.Subnets4 = oldDct.Spec.Subnets4
-	//}
 
 	// Create the patch
 	marshalled, err := json.Marshal(dct)
@@ -196,6 +159,8 @@ func (c *DockerCluster) ValidateUpdate(old runtime.Object) error {
 func (c *DockerCluster) ValidateDelete() error {
 	return nil
 }
+
+func defaultDockerClusterSpec(s *DockerClusterSpec) {}
 
 func validateDockerClusterSpec(s DockerClusterSpec) field.ErrorList {
 	return nil

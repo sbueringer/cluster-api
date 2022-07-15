@@ -31,21 +31,39 @@ spec:
       name: quick-start-my-cluster
       namespace: default
   variables:
-    - name: "subnets4"
-      required: true
+    - name: "subnets"
+      required: false
       schema:
         openAPIV3Schema:
           type: array
           items:
             type: object
+    - name: "secondaryCidrBlock"
+      required: true
+      schema:
+        openAPIV3Schema:
+          type: string
   patches:
     - name: "subnets"
+      enabledIf: "{{ if .subnets }}true{{end}}"
       definitions:
         - jsonPatches:
             - op: add
-              path: "/spec/template/spec/subnets4"
+              path: "/spec/template/spec/subnets"
               valueFrom:
-                variable: "subnets4"
+                variable: "subnets"
+          selector:
+            apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+            kind: DockerClusterTemplate
+            matchResources:
+              infrastructureCluster: true
+    - name: "secondaryCidrBlock"
+      definitions:
+        - jsonPatches:
+            - op: add
+              path: "/spec/template/spec/secondaryCidrBlock"
+              valueFrom:
+                variable: "secondaryCidrBlock"
           selector:
             apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
             kind: DockerClusterTemplate
@@ -59,8 +77,7 @@ metadata:
   namespace: default
 spec:
   template:
-    spec:
-      secondaryCidrBlock: 100.64.0.0/10
+    spec: {}
 ---
 kind: KubeadmControlPlaneTemplate
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1

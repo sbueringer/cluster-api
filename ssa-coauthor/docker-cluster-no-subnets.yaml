@@ -1,0 +1,30 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: my-cluster-no-subnets
+  namespace: default
+  labels:
+    cni: "my-cluster-crs-0"
+spec:
+  topology:
+    class: "quick-start"
+    version: "v1.22.2"
+    controlPlane:
+      replicas: 1
+    variables:
+    - name: "secondaryCidrBlock"
+      value: "100.64.0.0/10"
+    # Use case: CAPA just creates default subnets
+    # => in that case we just don't set the subnets at all
+
+# Reconciles to DockerCluster:
+#    subnets:
+#    - cidrBlock: 10.11.12.13/24
+#      dockerClusterField: value
+#      id: 2190533a-ca11-4f40-87de-c40d67855a47
+#    - cidrBlock: 14.15.16.17/24
+#      dockerClusterField: value
+#      id: d92d9975-0a87-48a8-9126-9cbd5aab3743
+#    - cidrBlock: 100.64.0.0/10
+#      dockerClusterField: value
+#      id: 6c4d4d75-7929-421d-977b-333ae8e48b91

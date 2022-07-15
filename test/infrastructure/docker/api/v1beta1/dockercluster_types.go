@@ -53,22 +53,14 @@ type DockerClusterSpec struct {
 	// +optional
 	SecondaryCidrBlock *string `json:"secondaryCidrBlock,omitempty"`
 
-	Subnets1 DockerClusterSubnets1 `json:"subnets1,omitempty"`
-	Subnets2 DockerClusterSubnets2 `json:"subnets2,omitempty"`
-	Subnets3 DockerClusterSubnets3 `json:"subnets3,omitempty"`
-	Subnets4 DockerClusterSubnets4 `json:"subnets4,omitempty"`
+	Subnets Subnets `json:"subnets,omitempty"`
 }
 
-// DockerClusterSubnets1 .
-// +listType=map
-// +listMapKey=uuid
-type DockerClusterSubnets1 []DockerClusterSubnets1Spec
+// Subnets is a slice of Subnet.
+type Subnets []SubnetSpec
 
-// DockerClusterSubnets1Spec .
-type DockerClusterSubnets1Spec struct {
-	// +kubebuilder:default="dummy"
-	UUID *string `json:"uuid,omitempty"`
-
+// SubnetSpec configures a Docker Subnet.
+type SubnetSpec struct {
 	// ID defines a unique identifier to reference this resource.
 	ID string `json:"id,omitempty"`
 
@@ -79,86 +71,10 @@ type DockerClusterSubnets1Spec struct {
 	DockerClusterField string `json:"dockerClusterField,omitempty"`
 }
 
-// DockerClusterSubnets2 .
-// +listType=map
-// +listMapKey=uuid
-type DockerClusterSubnets2 []DockerClusterSubnets2Spec
-
-// DockerClusterSubnets2Spec .
-type DockerClusterSubnets2Spec struct {
-	// +kubebuilder:default="dummy"
-	UUID *string `json:"uuid,omitempty"`
-
-	// ID defines a unique identifier to reference this resource.
-	ID string `json:"id,omitempty"`
-
-	// CidrBlock is the CIDR block to be used when the provider creates a managed VPC.
-	CidrBlock string `json:"cidrBlock,omitempty"`
-
-	TopologyField      string `json:"topologyField,omitempty"`
-	DockerClusterField string `json:"dockerClusterField,omitempty"`
-}
-
-// DockerClusterSubnets3 .
-// +listType=map
-// +listMapKey=uuid
-type DockerClusterSubnets3 []DockerClusterSubnets3Spec
-
-// DockerClusterSubnets3Spec .
-type DockerClusterSubnets3Spec struct {
-	// +kubebuilder:default="dummy"
-	UUID *string `json:"uuid,omitempty"`
-
-	// ID defines a unique identifier to reference this resource.
-	ID string `json:"id,omitempty"`
-
-	// CidrBlock is the CIDR block to be used when the provider creates a managed VPC.
-	CidrBlock string `json:"cidrBlock,omitempty"`
-
-	TopologyField      string `json:"topologyField,omitempty"`
-	DockerClusterField string `json:"dockerClusterField,omitempty"`
-}
-
-// DockerClusterSubnets4 .
-type DockerClusterSubnets4 []DockerClusterSubnets4Spec
-
-// DockerClusterSubnets4Spec .
-type DockerClusterSubnets4Spec struct {
-	// ID defines a unique identifier to reference this resource.
-	ID string `json:"id,omitempty"`
-
-	// CidrBlock is the CIDR block to be used when the provider creates a managed VPC.
-	CidrBlock string `json:"cidrBlock,omitempty"`
-
-	TopologyField      string `json:"topologyField,omitempty"`
-	DockerClusterField string `json:"dockerClusterField,omitempty"`
-}
-
-func (s DockerClusterSubnets1) FindEqual(spec *DockerClusterSubnets1Spec) *DockerClusterSubnets1Spec {
-	for _, x := range s {
-		if (spec.ID != "" && x.ID == spec.ID) || (spec.CidrBlock == x.CidrBlock) {
-			return &x
-		}
-	}
-	return nil
-}
-func (s DockerClusterSubnets2) FindEqual(spec *DockerClusterSubnets2Spec) *DockerClusterSubnets2Spec {
-	for _, x := range s {
-		if (spec.ID != "" && x.ID == spec.ID) || (spec.CidrBlock == x.CidrBlock) {
-			return &x
-		}
-	}
-	return nil
-}
-func (s DockerClusterSubnets3) FindEqual(spec *DockerClusterSubnets3Spec) *DockerClusterSubnets3Spec {
-	for _, x := range s {
-		if (spec.ID != "" && x.ID == spec.ID) || (spec.CidrBlock == x.CidrBlock) {
-			return &x
-		}
-	}
-	return nil
-}
-func (s DockerClusterSubnets4) FindEqual(spec *DockerClusterSubnets4Spec) *DockerClusterSubnets4Spec {
+// FindEqual returns a subnet spec that is equal to the one passed in.
+// Two subnets are defined equal to each other if their id is equal
+// or if they are in the same vpc and the cidr block is the same.
+func (s Subnets) FindEqual(spec *SubnetSpec) *SubnetSpec {
 	// FIXME: Note added spec.CidrBlock != "" here to avoid finding "equal" subnet with empty CIDRs.
 	for _, x := range s {
 		if (spec.ID != "" && x.ID == spec.ID) || (spec.CidrBlock != "" && spec.CidrBlock == x.CidrBlock) {
