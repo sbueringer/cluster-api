@@ -23,10 +23,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gobuffalo/flect"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/pointer"
 
 	clusterctlv1 "sigs.k8s.io/cluster-api/cmd/clusterctl/api/v1alpha3"
@@ -37,8 +39,6 @@ import (
 )
 
 func Test_clusterctlClient_GetProvidersConfig(t *testing.T) {
-	customProviderConfig := config.NewProvider("custom", "url", clusterctlv1.BootstrapProviderType)
-
 	type field struct {
 		client Client
 	}
@@ -88,47 +88,6 @@ func Test_clusterctlClient_GetProvidersConfig(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{
-			name: "Returns default providers and custom providers if defined",
-			field: field{
-				client: newFakeClient(newFakeConfig().WithProvider(customProviderConfig)),
-			},
-			// note: these will be sorted by name by the Providers() call, so be sure they are in alphabetical order here too
-			wantProviders: []string{
-				config.ClusterAPIProviderName,
-				customProviderConfig.Name(),
-				config.KubeadmBootstrapProviderName,
-				config.MicroK8sBootstrapProviderName,
-				config.TalosBootstrapProviderName,
-				config.KubeadmControlPlaneProviderName,
-				config.MicroK8sControlPlaneProviderName,
-				config.NestedControlPlaneProviderName,
-				config.TalosControlPlaneProviderName,
-				config.AWSProviderName,
-				config.AzureProviderName,
-				config.BYOHProviderName,
-				config.CloudStackProviderName,
-				config.DOProviderName,
-				config.DockerProviderName,
-				config.GCPProviderName,
-				config.HetznerProviderName,
-				config.IBMCloudProviderName,
-				config.KubevirtProviderName,
-				config.MAASProviderName,
-				config.Metal3ProviderName,
-				config.NestedProviderName,
-				config.NutanixProviderName,
-				config.OCIProviderName,
-				config.OpenStackProviderName,
-				config.PacketProviderName,
-				config.SideroProviderName,
-				config.VCloudDirectorProviderName,
-				config.VclusterProviderName,
-				config.VirtinkProviderName,
-				config.VSphereProviderName,
-			},
-			wantErr: false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -143,9 +102,40 @@ func Test_clusterctlClient_GetProvidersConfig(t *testing.T) {
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(got).To(HaveLen(len(tt.wantProviders)))
 
-			for i, gotProvider := range got {
-				w := tt.wantProviders[i]
-				g.Expect(gotProvider.Name()).To(Equal(w))
+			c, err := New("")
+			g.Expect(err).ToNot(HaveOccurred())
+			cl := c.(*clusterctlClient)
+
+			for _, gotProvider := range got {
+				comp, err := cl.getComponentsByName(gotProvider.Name(), gotProvider.Type(), repository.ComponentsOptions{
+					SkipTemplateProcess: true,
+				})
+				if err != nil {
+					fmt.Printf("ERROR: error getting components for provider %q: %v\n", gotProvider.Name(), err)
+					continue
+				}
+
+				for _, obj := range comp.Objs() {
+					if obj.GetKind() != "CustomResourceDefinition" {
+						continue
+					}
+
+					group, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "group")
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(found).ToNot(BeFalse())
+
+					kind, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "names", "kind")
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(found).ToNot(BeFalse())
+
+					calculatedCRDName := fmt.Sprintf("%s.%s", flect.Pluralize(strings.ToLower(kind)), group)
+
+					if obj.GetName() != calculatedCRDName {
+						fmt.Printf("ERROR: CRD name: %q, calculated CRD name: %q\n", obj.GetName(), calculatedCRDName)
+					} else {
+						fmt.Printf("INFO: CRD name: %q, calculated CRD name: %q\n", obj.GetName(), calculatedCRDName)
+					}
+				}
 			}
 		})
 	}

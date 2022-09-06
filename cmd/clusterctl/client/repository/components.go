@@ -215,18 +215,18 @@ func NewComponents(input ComponentsInput) (Components, error) {
 	}
 
 	// Apply image overrides, if defined
-	objs, err = util.FixImages(objs, func(image string) (string, error) {
-		return input.ConfigClient.ImageMeta().AlterImage(input.Provider.ManifestLabel(), image)
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to apply image overrides")
-	}
+	//objs, err = util.FixImages(objs, func(image string) (string, error) {
+	//	return input.ConfigClient.ImageMeta().AlterImage(input.Provider.ManifestLabel(), image)
+	//})
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed to apply image overrides")
+	//}
 
 	// Inspect the list of objects for the images required by the provider component.
-	images, err := util.InspectImages(objs)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to detect required images")
-	}
+	//images, err := util.InspectImages(objs)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed to detect required images")
+	//}
 
 	// inspect the list of objects for the default target namespace
 	// the default target namespace is the namespace object defined in the component yaml read from the repository, if any
@@ -268,10 +268,10 @@ func NewComponents(input ComponentsInput) (Components, error) {
 	objs = addCommonLabels(objs, input.Provider)
 
 	return &components{
-		Provider:        input.Provider,
-		version:         input.Options.Version,
-		variables:       variables,
-		images:          images,
+		Provider:  input.Provider,
+		version:   input.Options.Version,
+		variables: variables,
+		//images:          images,
 		targetNamespace: input.Options.TargetNamespace,
 		objs:            objs,
 	}, nil
