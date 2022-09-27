@@ -41,6 +41,8 @@ Cluster associations are made via labels.
 
 The BootstrapConfig object **must** have a `status` object.
 
+The CRD name must have the format `fmt.Sprintf("%s.%s", flect.Pluralize(strings.ToLower(Kind)), Group)`.
+
 To override the bootstrap provider, a user (or external system) can directly set the `MachinePool.Spec.Bootstrap.DataSecretName`
 field. This will mark the machine as ready for bootstrapping and no bootstrap data secret name will be copied from the
 BootstrapConfig object.
@@ -72,6 +74,8 @@ status:
 ### Infrastructure provider
 
 The InfrastructureMachinePool object **must** have both `spec` and `status` objects.
+
+The CRD name must have the format `fmt.Sprintf("%s.%s", flect.Pluralize(strings.ToLower(Kind)), Group)`.
 
 #### Required `spec` fields
 
