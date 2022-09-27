@@ -131,9 +131,9 @@ func Test_clusterctlClient_GetProvidersConfig(t *testing.T) {
 					calculatedCRDName := fmt.Sprintf("%s.%s", flect.Pluralize(strings.ToLower(kind)), group)
 
 					if obj.GetName() != calculatedCRDName {
-						fmt.Printf("ERROR: CRD name: %q, calculated CRD name: %q\n", obj.GetName(), calculatedCRDName)
+						fmt.Printf("ERROR: Actual CRD name: %q, calculated CRD name: %q\n", obj.GetName(), calculatedCRDName)
 					} else {
-						fmt.Printf("INFO: CRD name: %q, calculated CRD name: %q\n", obj.GetName(), calculatedCRDName)
+						fmt.Printf("INFO: Actual CRD name: %q, calculated CRD name: %q\n", obj.GetName(), calculatedCRDName)
 					}
 				}
 			}
