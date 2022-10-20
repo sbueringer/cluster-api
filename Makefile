@@ -602,7 +602,7 @@ docker-build-all: $(addprefix docker-build-,$(ALL_ARCH)) ## Build docker images 
 docker-build-%:
 	$(MAKE) ARCH=$* docker-build
 
-ALL_DOCKER_BUILD = core kubeadm-bootstrap kubeadm-control-plane docker-infrastructure test-extension clusterctl
+ALL_DOCKER_BUILD = test-extension
 
 .PHONY: docker-build
 docker-build: docker-pull-prerequisites ## Run docker-build-* targets for all the images
@@ -902,22 +902,24 @@ promote-images: $(KPROMO)
 
 .PHONY: docker-push-all
 docker-push-all: $(addprefix docker-push-,$(ALL_ARCH))  ## Push the docker images to be included in the release for all architectures + related multiarch manifests
-	$(MAKE) docker-push-manifest-core
-	$(MAKE) docker-push-manifest-kubeadm-bootstrap
-	$(MAKE) docker-push-manifest-kubeadm-control-plane
-	$(MAKE) docker-push-manifest-docker-infrastructure
-	$(MAKE) docker-push-clusterctl
+#	$(MAKE) docker-push-manifest-core
+#	$(MAKE) docker-push-manifest-kubeadm-bootstrap
+#	$(MAKE) docker-push-manifest-kubeadm-control-plane
+#	$(MAKE) docker-push-manifest-docker-infrastructure
+#	$(MAKE) docker-push-clusterctl
+	$(MAKE) docker-push-test-extension
 
 docker-push-%:
 	$(MAKE) ARCH=$* docker-push
 
 .PHONY: docker-push
 docker-push: ## Push the docker images to be included in the release
-	docker push $(CONTROLLER_IMG)-$(ARCH):$(TAG)
-	docker push $(KUBEADM_BOOTSTRAP_CONTROLLER_IMG)-$(ARCH):$(TAG)
-	docker push $(KUBEADM_CONTROL_PLANE_CONTROLLER_IMG)-$(ARCH):$(TAG)
-	docker push $(CLUSTERCTL_IMG)-$(ARCH):$(TAG)
-	docker push $(CAPD_CONTROLLER_IMG)-$(ARCH):$(TAG)
+#	docker push $(CONTROLLER_IMG)-$(ARCH):$(TAG)
+#	docker push $(KUBEADM_BOOTSTRAP_CONTROLLER_IMG)-$(ARCH):$(TAG)
+#	docker push $(KUBEADM_CONTROL_PLANE_CONTROLLER_IMG)-$(ARCH):$(TAG)
+#	docker push $(CLUSTERCTL_IMG)-$(ARCH):$(TAG)
+#	docker push $(CAPD_CONTROLLER_IMG)-$(ARCH):$(TAG)
+	docker push $(TEST_EXTENSION_IMG)-$(ARCH):$(TAG)
 
 .PHONY: docker-push-manifest-core
 docker-push-manifest-core: ## Push the multiarch manifest for the core docker images
@@ -961,6 +963,13 @@ docker-push-clusterctl: ## Push the clusterctl images
 	docker manifest create --amend $(CLUSTERCTL_IMG):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(CLUSTERCTL_IMG)\-&:$(TAG)~g")
 	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${CLUSTERCTL_IMG}:${TAG} ${CLUSTERCTL_IMG}-$${arch}:${TAG}; done
 	docker manifest push --purge $(CLUSTERCTL_IMG):$(TAG)
+
+.PHONY: docker-push-test-extension
+docker-push-test-extension: ## Push the clusterctl images
+	## Minimum docker version 18.06.0 is required for creating and pushing manifest images.
+	docker manifest create --amend $(TEST_EXTENSION_IMG):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(TEST_EXTENSION_IMG)\-&:$(TAG)~g")
+	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${TEST_EXTENSION_IMG}:${TAG} ${TEST_EXTENSION_IMG}-$${arch}:${TAG}; done
+	docker manifest push --purge $(TEST_EXTENSION_IMG):$(TAG)
 
 .PHONY: set-manifest-pull-policy
 set-manifest-pull-policy:
