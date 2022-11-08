@@ -85,10 +85,10 @@ As of now we ask for volunteers in Slack and office hours.
 
 #### Prepare main branch for development of the new release
 
-The goal of this issue is to bump the versions on the main branch, so they are using 
-the upcoming release version and that our tests on main are testing the previous release.
+The goal of this issue is to bump the versions on the main branch so that the upcoming release version 
+is used for e.g. local development and e2e tests. We also modify tests so that they are testing the previous release.
 
-This comes down to changing occurrences of the old version to the new version (e.g. `v1.3` to `v1.4`):
+This comes down to changing occurrences of the old version to the new version, e.g. `v1.3` to `v1.4`:
 1. Add new release to top-level `metadata.yaml` and `test/e2e/data/shared/v1beta1/metadata.yaml`.
 2. Update providers in docker.yaml. Roughly:
    1. Create a new entry for each provider for `v1.3.0`.
@@ -262,7 +262,7 @@ The goal of this task to make the book for the current release available under `
 
 #### Polish release notes
 
-1. Checkout the latest commit on the `release-1.4` branch.
+1. Checkout the latest commit on the release branch, e.g. `release-1.4`.
 2. Generate release notes with `make release-notes`.
 3. Finalize the release notes:
     1. Copy & paste the release notes into a hackmd (makes collaboration very easy).
