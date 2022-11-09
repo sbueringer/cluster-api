@@ -25,7 +25,7 @@ This document details the responsibilities and tasks for each role in the releas
     - [Create a release branch](#create-a-release-branch)
     - [[Continuously] Maintain the GitHub release milestone](#continuously-maintain-the-github-release-milestone)
     - [[Repeatedly] Cut a release](#repeatedly-cut-a-release)
-    - [[Optional] [Track] Bump the ClusterAPI apiVersion](#optional-track-bump-the-clusterapi-apiversion)
+    - [[Optional] [Track] Bump the Cluster API apiVersion](#optional-track-bump-the-cluster-api-apiversion)
     - [[Optional] [Track] Bump the Kubernetes version](#optional-track-bump-the-kubernetes-version)
 - [Communications/Docs/Release Notes Manager](#communicationsdocsrelease-notes-manager)
   - [Responsibilities](#responsibilities-1)
@@ -206,7 +206,7 @@ Additional information:
     * Create a release tag on the GitHub repository.
     * Create/update/publish GitHub releases.
 
-#### [Optional] [Track] Bump the ClusterAPI apiVersion
+#### [Optional] [Track] Bump the Cluster API apiVersion
 
 **Note** This should only be done when we have to bump the apiVersion of our APIs.
 

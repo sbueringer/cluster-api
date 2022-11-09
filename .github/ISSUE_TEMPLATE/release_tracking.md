@@ -76,5 +76,5 @@ Continuously:
 * [CI Manager] Maintain and improve release automation, tooling & related developer docs
 
 If and when necessary:
-* [ ] [Release Lead] [Track] [Bump the ClusterAPI apiVersion](https://github.com/sbueringer/cluster-api/blob/pr-release-tasks/docs/release/release-tasks.md#optional-track-bump-the-clusterapi-apiversion)
+* [ ] [Release Lead] [Track] [Bump the Cluster API apiVersion](https://github.com/sbueringer/cluster-api/blob/pr-release-tasks/docs/release/release-tasks.md#optional-track-bump-the-cluster-api-apiversion)
 * [ ] [Release Lead] [Track] [Bump the Kubernetes version](https://github.com/sbueringer/cluster-api/blob/pr-release-tasks/docs/release/release-tasks.md#optional-track-bump-the-kubernetes-version)
