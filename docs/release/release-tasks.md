@@ -19,7 +19,7 @@ This document details the responsibilities and tasks for each role in the releas
     - [Assemble release team](#assemble-release-team)
     - [Finalize release schedule and team](#finalize-release-schedule-and-team)
     - [Prepare main branch for development of the new release](#prepare-main-branch-for-development-of-the-new-release)
-    - [Create a new GitHub milestone](#create-a-new-github-milestone)
+    - [Create a new GitHub milestone for the next release](#create-a-new-github-milestone-for-the-next-release)
     - [[Track] Remove previously deprecated code](#track-remove-previously-deprecated-code)
     - [[Track] Bump dependencies](#track-bump-dependencies)
     - [Create a release branch](#create-a-release-branch)
@@ -99,11 +99,12 @@ This comes down to changing occurrences of the old version to the new version, e
 
 Prior art: https://github.com/kubernetes-sigs/cluster-api/pull/6834/files
 
-#### Create a new GitHub milestone
+#### Create a new GitHub milestone for the next release
+
+The goal of this task is to create a new GitHub milestone for the next release, so that we can already move tasks
+out of the current milestone if necessary.
 
 1. Create the milestone for the new release via GitHub UI.
-2. Update the [milestone_applier config](https://github.com/kubernetes/test-infra/blob/0b17ef5ffd6c7aa7d8ca1372d837acfb85f7bec6/config/prow/plugins.yaml#L371) accordingly.
-   <br>Prior art: [cluster-api: update milestone applier config for v1.3](https://github.com/kubernetes/test-infra/pull/26631)
 
 #### [Track] Remove previously deprecated code
 
@@ -126,6 +127,9 @@ We should take a look at the following dependencies:
 
 #### Create a release branch
 
+The goal of this task is to ensure we have a release branch and the milestone applier applies milestones accordingly.
+From this point forward changes which should land in the release have to be cherry-picked into the release branch.
+
 1. Create the release branch locally based on the latest commit on main and push it:
    ```bash
    # Create the release branch
@@ -135,6 +139,8 @@ We should take a look at the following dependencies:
    # Note: `upstream` must be the remote pointing to `github.com/kubernetes-sigs/cluster-api`.
    git push -u upstream release-1.4
    ```
+2. Update the [milestone applier config](https://github.com/kubernetes/test-infra/blob/0b17ef5ffd6c7aa7d8ca1372d837acfb85f7bec6/config/prow/plugins.yaml#L371) accordingly (e.g. `release-1.4: v1.4` and `main: v1.5`)
+   <br>Prior art: [cluster-api: update milestone applier config for v1.3](https://github.com/kubernetes/test-infra/pull/26631)
 
 #### [Continuously] Maintain the GitHub release milestone
 
@@ -239,6 +245,9 @@ TODO(sbueringer): Follow-up PR (this will probably just be create an issue based
 #### Add docs to collect release notes for users and migration notes for provider implementers
 
 The goal of this task is to initially create the docs so that we can continuously add notes going forward.
+The release notes doc will be used to collect release notes during the release cycle and will be eventually 
+used to write the final release notes. The provider migration doc is part of the book and contains instructions 
+for provider authors on how to adopt to the new Cluster API version.
 
 1. Add a new migration doc for provider implementers.
    <br>Prior art: [Add v1.2 -> v1.3 migration doc](https://github.com/kubernetes-sigs/cluster-api/pull/6698)
@@ -251,9 +260,9 @@ The goal of this task is to initially create the docs so that we can continuousl
 
 #### Ensure the book for the new release is available 
 
-The goal of this task to make the book for the current release available under `https://release-1-4.cluster-api.sigs.k8s.io`.
+The goal of this task to make the book for the current release available under e.g. `https://release-1-4.cluster-api.sigs.k8s.io`.
 
-1. Add a DNS entry for the book of the new release (should be available under `https://release-1-4.cluster-api.sigs.k8s.io`).
+1. Add a DNS entry for the book of the new release (should be available under e.g. `https://release-1-4.cluster-api.sigs.k8s.io`).
    <br>Prior art: [Add DNS for CAPI release-1.2 release branch](https://github.com/kubernetes/k8s.io/pull/3872)
 2. Open `https://release-1-4.cluster-api.sigs.k8s.io/` and verify that the certificates are valid
    If they are not, talk to someone with access to Netlify, they have to click the `renew certificate` button in the Netlify UI.
@@ -279,7 +288,7 @@ The goal of this task to make the book for the current release available under `
 The goal of this task to make the book for the current release available under `https://cluster-api.sigs.k8s.io`.
 
 Someone with access to Netlify should:
-1. Change production branch in Netlify to `release-1.4` to make the book available under `https://cluster-api.sigs.k8s.io`.
+1. Change production branch in Netlify the current release branch (e.g. `release-1.4`) to make the book available under `https://cluster-api.sigs.k8s.io`.
 2. Re-deploy via the Netlify UI.
 
 #### Update clusterctl links in the quickstart 
@@ -325,7 +334,6 @@ Stakeholders are: (TBD)
 * Bug Triage:
     * Make sure blocking issues and bugs are triaged and dealt with in a timely fashion
 * Automation
-    * Help improve release automation and tools
     * Maintain and improve release automation, tooling & related developer docs
 
 ### Tasks
@@ -353,13 +361,15 @@ Prior art: [Add jobs for CAPI release 1.2](https://github.com/kubernetes/test-in
 
 The goal of this task is to keep our tests running in CI stable.
 
+**Note**: To be very clear, this is not meant to be an on-call role for Cluster API tests.
+
 1. Add yourself to the [Cluster API alert mailing list](https://github.com/kubernetes/k8s.io/blob/151899b2de933e58a4dfd1bfc2c133ce5a8bbe22/groups/sig-cluster-lifecycle/groups.yaml#L20-L35)
-2. Investigate CI failures reported by mail alerts:
-    1. Create an issue in the Cluster API repo to surface the CI failure.
-    2. Investigate the cause of the failure.
-    3. Ensure the CI failure is fixed by either:
-        * Fixing the issue.
-        * Finding someone who can fix the issue.
+    <br\>**Note**: An alternative to the alert mailing list is manually monitoring the [testgrid dashboards](https://testgrid.k8s.io/sig-cluster-lifecycle-cluster-api)
+    (also dashboards of previous releases). Using the alert mailing list has proven to be a lot less effort though.
+2. Triage CI failures reported by mail alerts or found by monitoring the testgrid dashboards:
+    1. Create an issue in the Cluster API repository to surface the CI failure.
+    2. Identify if the issue is a known issue, new issue or a regression.
+    3. Mark the issue as `release-blocking` if applicable.
 
 #### [Continuously] Reduce the amount of flaky tests
 
