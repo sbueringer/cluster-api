@@ -193,7 +193,7 @@ func Test_dropDiffForIgnoredPaths(t *testing.T) {
 						},
 					},
 				},
-				shouldDropDiffFunc: isIgnorePath(
+				shouldDropDiffFunc: IsIgnorePath(
 					[]contract.Path{
 						{"spec", "controlPlaneEndpoint"},
 					},
@@ -225,7 +225,7 @@ func Test_dropDiffForIgnoredPaths(t *testing.T) {
 						},
 					},
 				},
-				shouldDropDiffFunc: isIgnorePath(
+				shouldDropDiffFunc: IsIgnorePath(
 					[]contract.Path{
 						{"spec", "controlPlaneEndpoint"},
 					},
@@ -250,7 +250,7 @@ func Test_dropDiffForIgnoredPaths(t *testing.T) {
 						"foo": "123",
 					},
 				},
-				shouldDropDiffFunc: isIgnorePath(
+				shouldDropDiffFunc: IsIgnorePath(
 					[]contract.Path{
 						{"spec", "foo"},
 					},

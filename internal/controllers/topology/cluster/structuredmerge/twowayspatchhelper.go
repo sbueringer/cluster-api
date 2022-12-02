@@ -182,7 +182,7 @@ func applyOptions(in *applyOptionsInput) ([]byte, error) {
 			path:               contract.Path{},
 			original:           originalMap,
 			modified:           modifiedMap,
-			shouldDropDiffFunc: isIgnorePath(in.options.ignorePaths),
+			shouldDropDiffFunc: IsIgnorePath(in.options.ignorePaths),
 		})
 	}
 

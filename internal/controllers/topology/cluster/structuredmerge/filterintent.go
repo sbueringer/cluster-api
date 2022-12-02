@@ -26,58 +26,59 @@ import (
 func filterObject(obj *unstructured.Unstructured, helperOptions *HelperOptions) {
 	// filter out changes not in the allowed paths (fields to not consider, e.g. status);
 	if len(helperOptions.allowedPaths) > 0 {
-		filterIntent(&filterIntentInput{
-			path:         contract.Path{},
-			value:        obj.Object,
-			shouldFilter: isNotAllowedPath(helperOptions.allowedPaths),
+		FilterIntent(&FilterIntentInput{
+			Path:         contract.Path{},
+			Value:        obj.Object,
+			ShouldFilter: isNotAllowedPath(helperOptions.allowedPaths),
 		})
 	}
 
 	// filter out changes for ignore paths (well known fields owned by other controllers, e.g.
 	//   spec.controlPlaneEndpoint in the InfrastructureCluster object);
 	if len(helperOptions.ignorePaths) > 0 {
-		filterIntent(&filterIntentInput{
-			path:         contract.Path{},
-			value:        obj.Object,
-			shouldFilter: isIgnorePath(helperOptions.ignorePaths),
+		FilterIntent(&FilterIntentInput{
+			Path:         contract.Path{},
+			Value:        obj.Object,
+			ShouldFilter: IsIgnorePath(helperOptions.ignorePaths),
 		})
 	}
 }
 
-// filterIntent ensures that object only includes the fields and values for which the topology controller has an opinion,
+// FilterIntent ensures that object only includes the fields and values for which the topology controller has an opinion,
 // and filter out everything else by removing it from the unstructured object.
+// The function returns true if fields have been deleted.
 // NOTE: This func is called recursively only for fields of type Map, but this is ok given the current use cases
 // this func has to address. More specifically, we are using this func for filtering out not allowed paths and for ignore paths;
 // all of them are defined in reconcile_state.go and are targeting well-known fields inside nested maps.
 // Allowed paths / ignore paths which point to an array are not supported by the current implementation.
-func filterIntent(ctx *filterIntentInput) bool {
-	value, ok := ctx.value.(map[string]interface{})
+func FilterIntent(ctx *FilterIntentInput) bool {
+	value, ok := ctx.Value.(map[string]interface{})
 	if !ok {
 		return false
 	}
 
 	gotDeletions := false
 	for field := range value {
-		fieldCtx := &filterIntentInput{
+		fieldCtx := &FilterIntentInput{
 			// Compose the path for the nested field.
-			path: ctx.path.Append(field),
+			Path: ctx.Path.Append(field),
 			// Gets the original and the modified value for the field.
-			value: value[field],
+			Value: value[field],
 			// Carry over global values from the context.
-			shouldFilter: ctx.shouldFilter,
+			ShouldFilter: ctx.ShouldFilter,
 		}
 
 		// If the field should be filtered out, delete it from the modified object.
-		if fieldCtx.shouldFilter(fieldCtx.path) {
+		if fieldCtx.ShouldFilter(fieldCtx.Path) {
 			delete(value, field)
 			gotDeletions = true
 			continue
 		}
 
-		// Process nested fields and get in return if filterIntent removed fields.
-		if filterIntent(fieldCtx) {
+		// Process nested fields and get in return if FilterIntent removed fields.
+		if FilterIntent(fieldCtx) {
 			// Ensure we are not leaving empty maps around.
-			if v, ok := fieldCtx.value.(map[string]interface{}); ok && len(v) == 0 {
+			if v, ok := fieldCtx.Value.(map[string]interface{}); ok && len(v) == 0 {
 				delete(value, field)
 				gotDeletions = true
 			}
@@ -86,17 +87,17 @@ func filterIntent(ctx *filterIntentInput) bool {
 	return gotDeletions
 }
 
-// filterIntentInput holds info required while filtering the intent for server side apply.
+// FilterIntentInput holds info required while filtering the intent for server side apply.
 // NOTE: in server side apply an intent is a partial object that only includes the fields and values for which the user has an opinion.
-type filterIntentInput struct {
+type FilterIntentInput struct {
 	// the path of the field being processed.
-	path contract.Path
+	Path contract.Path
 
 	// the value for the current path.
-	value interface{}
+	Value interface{}
 
-	// shouldFilter handle the func that determine if the current path should be dropped or not.
-	shouldFilter func(path contract.Path) bool
+	// ShouldFilter handle the func that determine if the current path should be dropped or not.
+	ShouldFilter func(path contract.Path) bool
 }
 
 // isAllowedPath returns true when the path is one of the allowedPaths.
@@ -122,8 +123,8 @@ func isNotAllowedPath(allowedPaths []contract.Path) func(path contract.Path) boo
 	}
 }
 
-// isIgnorePath returns true when the path is one of the ignorePaths.
-func isIgnorePath(ignorePaths []contract.Path) func(path contract.Path) bool {
+// IsIgnorePath returns true when the path is one of the ignorePaths.
+func IsIgnorePath(ignorePaths []contract.Path) func(path contract.Path) bool {
 	return func(path contract.Path) bool {
 		for _, p := range ignorePaths {
 			if path.Equal(p) {

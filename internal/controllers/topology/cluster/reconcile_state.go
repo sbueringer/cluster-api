@@ -18,6 +18,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -556,6 +557,51 @@ func (r *Reconciler) updateMachineDeployment(ctx context.Context, cluster *clust
 	if desiredMD.MachineHealthCheck != nil || currentMD.MachineHealthCheck != nil {
 		if err := r.reconcileMachineHealthCheck(ctx, currentMD.MachineHealthCheck, desiredMD.MachineHealthCheck); err != nil {
 			return err
+		}
+	}
+
+	// If we want to drop ownership of the replica field.
+	if currentMD.Object.Spec.Replicas != nil && desiredMD.Object.Spec.Replicas == nil {
+
+		modified := currentMD.Object.DeepCopyObject().(*clusterv1.MachineDeployment)
+
+		// Remove ownership of replica field.
+		var removedReplicas bool
+		managedFields := modified.GetManagedFields()
+		for i := range managedFields {
+			if managedFields[i].Manager != structuredmerge.TopologyManagerName {
+				continue
+			}
+			if managedFields[i].Operation != metav1.ManagedFieldsOperationApply {
+				continue
+			}
+
+			// TODO: only do this if we actually still own replicas
+			fieldsV1 := map[string]interface{}{}
+			if err := json.Unmarshal(managedFields[i].FieldsV1.Raw, &fieldsV1); err != nil {
+				return errors.Wrap(err, "failed to unmarshal managed fields")
+			}
+
+			removedReplicas = structuredmerge.FilterIntent(&structuredmerge.FilterIntentInput{
+				Path:  contract.Path{},
+				Value: fieldsV1,
+				ShouldFilter: structuredmerge.IsIgnorePath([]contract.Path{
+					{"f:spec", "f:replicas"},
+				}),
+			})
+
+			fieldsV1Raw, err := json.Marshal(fieldsV1)
+			if err != nil {
+				return errors.Wrap(err, "failed to marshal managed fields")
+			}
+			managedFields[i].FieldsV1.Raw = fieldsV1Raw
+		}
+		modified.SetManagedFields(managedFields)
+
+		if removedReplicas {
+			if err := r.Client.Patch(ctx, modified, client.MergeFrom(currentMD.Object)); err != nil {
+				return err
+			}
 		}
 	}
 
