@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	runtimev1 "sigs.k8s.io/cluster-api/exp/runtime/api/v1alpha1"
@@ -65,7 +64,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	err := ctrl.NewControllerManagedBy(mgr).
 		For(&runtimev1.ExtensionConfig{}).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.secretToExtensionConfig),
 			builder.OnlyMetadata,
 		).
@@ -188,14 +187,14 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, extensionConfig *runti
 
 // secretToExtensionConfig maps a secret to ExtensionConfigs with the corresponding InjectCAFromSecretAnnotation
 // to reconcile them on updates of the secrets.
-func (r *Reconciler) secretToExtensionConfig(secret client.Object) []reconcile.Request {
+func (r *Reconciler) secretToExtensionConfig(ctx context.Context, secret client.Object) []reconcile.Request {
 	result := []ctrl.Request{}
 
 	extensionConfigs := runtimev1.ExtensionConfigList{}
 	indexKey := secret.GetNamespace() + "/" + secret.GetName()
 
 	if err := r.Client.List(
-		context.TODO(),
+		ctx,
 		&extensionConfigs,
 		client.MatchingFields{injectCAFromSecretAnnotationField: indexKey},
 	); err != nil {

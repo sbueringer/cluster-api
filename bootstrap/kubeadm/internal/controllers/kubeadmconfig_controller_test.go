@@ -80,7 +80,7 @@ func TestKubeadmConfigReconciler_MachineToBootstrapMapFuncReturn(t *testing.T) {
 	}
 	for i := 0; i < 3; i++ {
 		o := machineObjs[i]
-		configs := reconciler.MachineToBootstrapMapFunc(o)
+		configs := reconciler.MachineToBootstrapMapFunc(ctx, o)
 		if i == 1 {
 			g.Expect(configs[0].Name).To(Equal(expectedConfigName))
 		} else {
@@ -1752,7 +1752,7 @@ func TestKubeadmConfigReconciler_ClusterToKubeadmConfigs(t *testing.T) {
 	reconciler := &KubeadmConfigReconciler{
 		Client: fakeClient,
 	}
-	configs := reconciler.ClusterToKubeadmConfigs(cluster)
+	configs := reconciler.ClusterToKubeadmConfigs(ctx, cluster)
 	names := make([]string, 6)
 	for i := range configs {
 		names[i] = configs[i].Name

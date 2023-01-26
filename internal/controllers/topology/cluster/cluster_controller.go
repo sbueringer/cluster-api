@@ -23,6 +23,8 @@ import (
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
@@ -32,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/api/v1beta1/index"
@@ -83,6 +84,8 @@ type Reconciler struct {
 	patchEngine patches.Engine
 
 	patchHelperFactory structuredmerge.PatchHelperFactoryFunc
+	scheme             *runtime.Scheme
+	mapper             meta.RESTMapper
 }
 
 func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -93,11 +96,11 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		)).
 		Named("topology/cluster").
 		Watches(
-			&source.Kind{Type: &clusterv1.ClusterClass{}},
+			&clusterv1.ClusterClass{},
 			handler.EnqueueRequestsFromMapFunc(r.clusterClassToCluster),
 		).
 		Watches(
-			&source.Kind{Type: &clusterv1.MachineDeployment{}},
+			&clusterv1.MachineDeployment{},
 			handler.EnqueueRequestsFromMapFunc(r.machineDeploymentToCluster),
 			// Only trigger Cluster reconciliation if the MachineDeployment is topology owned.
 			builder.WithPredicates(predicates.ResourceIsTopologyOwned(ctrl.LoggerFrom(ctx))),
@@ -118,6 +121,8 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	if r.patchHelperFactory == nil {
 		r.patchHelperFactory = serverSideApplyPatchHelperFactory(r.Client)
 	}
+	r.scheme = mgr.GetScheme()
+	r.mapper = mgr.GetRESTMapper()
 	return nil
 }
 
@@ -255,7 +260,7 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope.Scope) (ctrl.Result
 func (r *Reconciler) setupDynamicWatches(ctx context.Context, s *scope.Scope) error {
 	if s.Current.InfrastructureCluster != nil {
 		if err := r.externalTracker.Watch(ctrl.LoggerFrom(ctx), s.Current.InfrastructureCluster,
-			&handler.EnqueueRequestForOwner{OwnerType: &clusterv1.Cluster{}},
+			handler.EnqueueRequestForOwner(r.scheme, r.mapper, &clusterv1.Cluster{}),
 			// Only trigger Cluster reconciliation if the InfrastructureCluster is topology owned.
 			predicates.ResourceIsTopologyOwned(ctrl.LoggerFrom(ctx))); err != nil {
 			return errors.Wrap(err, "error watching Infrastructure CR")
@@ -263,7 +268,7 @@ func (r *Reconciler) setupDynamicWatches(ctx context.Context, s *scope.Scope) er
 	}
 	if s.Current.ControlPlane.Object != nil {
 		if err := r.externalTracker.Watch(ctrl.LoggerFrom(ctx), s.Current.ControlPlane.Object,
-			&handler.EnqueueRequestForOwner{OwnerType: &clusterv1.Cluster{}},
+			handler.EnqueueRequestForOwner(r.scheme, r.mapper, &clusterv1.Cluster{}),
 			// Only trigger Cluster reconciliation if the ControlPlane is topology owned.
 			predicates.ResourceIsTopologyOwned(ctrl.LoggerFrom(ctx))); err != nil {
 			return errors.Wrap(err, "error watching ControlPlane CR")
@@ -295,7 +300,7 @@ func (r *Reconciler) callBeforeClusterCreateHook(ctx context.Context, s *scope.S
 
 // clusterClassToCluster is a handler.ToRequestsFunc to be used to enqueue requests for reconciliation
 // for Cluster to update when its own ClusterClass gets updated.
-func (r *Reconciler) clusterClassToCluster(o client.Object) []ctrl.Request {
+func (r *Reconciler) clusterClassToCluster(ctx context.Context, o client.Object) []ctrl.Request {
 	clusterClass, ok := o.(*clusterv1.ClusterClass)
 	if !ok {
 		panic(fmt.Sprintf("Expected a ClusterClass but got a %T", o))
@@ -303,7 +308,7 @@ func (r *Reconciler) clusterClassToCluster(o client.Object) []ctrl.Request {
 
 	clusterList := &clusterv1.ClusterList{}
 	if err := r.Client.List(
-		context.TODO(),
+		ctx,
 		clusterList,
 		client.MatchingFields{index.ClusterClassNameField: clusterClass.Name},
 		client.InNamespace(clusterClass.Namespace),
@@ -322,7 +327,7 @@ func (r *Reconciler) clusterClassToCluster(o client.Object) []ctrl.Request {
 
 // machineDeploymentToCluster is a handler.ToRequestsFunc to be used to enqueue requests for reconciliation
 // for Cluster to update when one of its own MachineDeployments gets updated.
-func (r *Reconciler) machineDeploymentToCluster(o client.Object) []ctrl.Request {
+func (r *Reconciler) machineDeploymentToCluster(_ context.Context, o client.Object) []ctrl.Request {
 	md, ok := o.(*clusterv1.MachineDeployment)
 	if !ok {
 		panic(fmt.Sprintf("Expected a MachineDeployment but got a %T", o))

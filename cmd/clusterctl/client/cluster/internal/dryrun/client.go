@@ -80,7 +80,7 @@ type changeTracker struct {
 // Client implements a dry run Client, that is a fake.Client that logs write operations.
 type Client struct {
 	fakeClient client.Client
-	apiReader  client.Reader
+	apiReader  client.Client
 
 	changeTracker *changeTracker
 }
@@ -113,7 +113,7 @@ type ChangeSummary struct {
 // If an apiReader client is passed the dry run client will use it as a fall back client for read operations (Get, List)
 // when the objects are not found in the internal object tracker. Typically the apiReader passed would be a reader client
 // to a real Kubernetes Cluster.
-func NewClient(apiReader client.Reader, objs []client.Object) *Client {
+func NewClient(apiReader client.Client, objs []client.Object) *Client {
 	fakeClient := fake.NewClientBuilder().WithObjects(objs...).WithScheme(localScheme).Build()
 	return &Client{
 		fakeClient: fakeClient,
@@ -306,6 +306,16 @@ func (c *Client) RESTMapper() meta.RESTMapper {
 // SubResource returns the sub resource this client is using.
 func (c *Client) SubResource(subResource string) client.SubResourceClient {
 	return c.fakeClient.SubResource(subResource)
+}
+
+// GroupVersionKindFor returns the GroupVersionKind for the given object.
+func (c *Client) GroupVersionKindFor(obj client.Object) (schema.GroupVersionKind, error) {
+	return c.apiReader.GroupVersionKindFor(obj)
+}
+
+// IsObjectNamespaced returns true if the GroupVersionKind of the object is namespaced.
+func (c *Client) IsObjectNamespaced(obj client.Object) (bool, error) {
+	return c.apiReader.IsObjectNamespaced(obj)
 }
 
 // Changes generates a summary of all the changes observed from the creation of the dry run client

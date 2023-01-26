@@ -198,13 +198,12 @@ func TestKubeadmControlPlaneValidateScale(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			decoder, _ := admission.NewDecoder(scheme)
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(kcpManagedEtcd, kcpExternalEtcd).Build()
 
 			// Create the webhook and add the fakeClient as its client.
 			scaleHandler := ScaleValidator{
 				Client:  fakeClient,
-				decoder: decoder,
+				decoder: admission.NewDecoder(scheme),
 			}
 
 			resp := scaleHandler.Handle(context.Background(), tt.admissionRequest)

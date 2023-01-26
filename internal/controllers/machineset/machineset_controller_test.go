@@ -618,7 +618,7 @@ func TestMachineSetToMachines(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			gs := NewWithT(t)
 
-			got := r.MachineToMachineSets(tc.mapObject)
+			got := r.MachineToMachineSets(ctx, tc.mapObject)
 			gs.Expect(got).To(Equal(tc.expected))
 		})
 	}

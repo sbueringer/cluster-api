@@ -1876,7 +1876,7 @@ func TestClusterToMachineHealthCheck(t *testing.T) {
 				gs.Eventually(getObj).Should(Succeed())
 			}
 
-			got := r.clusterToMachineHealthCheck(tc.object)
+			got := r.clusterToMachineHealthCheck(ctx, tc.object)
 			gs.Expect(got).To(ConsistOf(tc.expected))
 		})
 	}
@@ -1951,7 +1951,7 @@ func TestMachineToMachineHealthCheck(t *testing.T) {
 				gs.Eventually(getObj).Should(Succeed())
 			}
 
-			got := r.machineToMachineHealthCheck(tc.object)
+			got := r.machineToMachineHealthCheck(ctx, tc.object)
 			gs.Expect(got).To(ConsistOf(tc.expected))
 		})
 	}
@@ -2078,7 +2078,7 @@ func TestNodeToMachineHealthCheck(t *testing.T) {
 				gs.Eventually(checkStatus).Should(Equal(o.Status))
 			}
 
-			got := r.nodeToMachineHealthCheck(tc.object)
+			got := r.nodeToMachineHealthCheck(ctx, tc.object)
 			gs.Expect(got).To(ConsistOf(tc.expected))
 		})
 	}

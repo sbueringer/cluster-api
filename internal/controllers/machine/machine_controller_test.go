@@ -1979,7 +1979,7 @@ func TestNodeToMachine(t *testing.T) {
 		Client: env,
 	}
 	for _, node := range fakeNodes {
-		request := r.nodeToMachine(node)
+		request := r.nodeToMachine(ctx, node)
 		g.Expect(request).To(BeEquivalentTo([]reconcile.Request{
 			{
 				NamespacedName: client.ObjectKeyFromObject(expectedMachine),

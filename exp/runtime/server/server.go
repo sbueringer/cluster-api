@@ -229,7 +229,7 @@ func (s *Server) Start(ctx context.Context) error {
 		s.server.Register(handlerPath, http.HandlerFunc(wrappedHandler))
 	}
 
-	return s.server.StartStandalone(ctx, nil)
+	return s.server.Start(ctx)
 }
 
 // discoveryHandler generates a discovery handler based on a list of handlers.

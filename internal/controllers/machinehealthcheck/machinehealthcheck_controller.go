@@ -88,7 +88,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	controller, err := ctrl.NewControllerManagedBy(mgr).
 		For(&clusterv1.MachineHealthCheck{}).
 		Watches(
-			&source.Kind{Type: &clusterv1.Machine{}},
+			&clusterv1.Machine{},
 			handler.EnqueueRequestsFromMapFunc(r.machineToMachineHealthCheck),
 		).
 		WithOptions(options).
@@ -98,7 +98,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		return errors.Wrap(err, "failed setting up with a controller manager")
 	}
 	err = controller.Watch(
-		&source.Kind{Type: &clusterv1.Cluster{}},
+		source.Kind(mgr.GetCache(), &clusterv1.Cluster{}),
 		handler.EnqueueRequestsFromMapFunc(r.clusterToMachineHealthCheck),
 		// TODO: should this wait for Cluster.Status.InfrastructureReady similar to Infra Machine resources?
 		predicates.All(ctrl.LoggerFrom(ctx),
@@ -454,7 +454,7 @@ func (r *Reconciler) patchUnhealthyTargets(ctx context.Context, logger logr.Logg
 
 // clusterToMachineHealthCheck maps events from Cluster objects to
 // MachineHealthCheck objects that belong to the Cluster.
-func (r *Reconciler) clusterToMachineHealthCheck(o client.Object) []reconcile.Request {
+func (r *Reconciler) clusterToMachineHealthCheck(ctx context.Context, o client.Object) []reconcile.Request {
 	c, ok := o.(*clusterv1.Cluster)
 	if !ok {
 		panic(fmt.Sprintf("Expected a Cluster, got %T", o))
@@ -462,7 +462,7 @@ func (r *Reconciler) clusterToMachineHealthCheck(o client.Object) []reconcile.Re
 
 	mhcList := &clusterv1.MachineHealthCheckList{}
 	if err := r.Client.List(
-		context.TODO(),
+		ctx,
 		mhcList,
 		client.InNamespace(c.Namespace),
 		client.MatchingLabels{clusterv1.ClusterNameLabel: c.Name},
@@ -481,7 +481,7 @@ func (r *Reconciler) clusterToMachineHealthCheck(o client.Object) []reconcile.Re
 
 // machineToMachineHealthCheck maps events from Machine objects to
 // MachineHealthCheck objects that monitor the given machine.
-func (r *Reconciler) machineToMachineHealthCheck(o client.Object) []reconcile.Request {
+func (r *Reconciler) machineToMachineHealthCheck(ctx context.Context, o client.Object) []reconcile.Request {
 	m, ok := o.(*clusterv1.Machine)
 	if !ok {
 		panic(fmt.Sprintf("Expected a Machine, got %T", o))
@@ -489,7 +489,7 @@ func (r *Reconciler) machineToMachineHealthCheck(o client.Object) []reconcile.Re
 
 	mhcList := &clusterv1.MachineHealthCheckList{}
 	if err := r.Client.List(
-		context.TODO(),
+		ctx,
 		mhcList,
 		client.InNamespace(m.Namespace),
 		client.MatchingLabels{clusterv1.ClusterNameLabel: m.Spec.ClusterName},
@@ -508,18 +508,18 @@ func (r *Reconciler) machineToMachineHealthCheck(o client.Object) []reconcile.Re
 	return requests
 }
 
-func (r *Reconciler) nodeToMachineHealthCheck(o client.Object) []reconcile.Request {
+func (r *Reconciler) nodeToMachineHealthCheck(ctx context.Context, o client.Object) []reconcile.Request {
 	node, ok := o.(*corev1.Node)
 	if !ok {
 		panic(fmt.Sprintf("Expected a corev1.Node, got %T", o))
 	}
 
-	machine, err := getMachineFromNode(context.TODO(), r.Client, node.Name)
+	machine, err := getMachineFromNode(ctx, r.Client, node.Name)
 	if machine == nil || err != nil {
 		return nil
 	}
 
-	return r.machineToMachineHealthCheck(machine)
+	return r.machineToMachineHealthCheck(ctx, machine)
 }
 
 func (r *Reconciler) watchClusterNodes(ctx context.Context, cluster *clusterv1.Cluster) error {

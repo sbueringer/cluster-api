@@ -88,7 +88,7 @@ func TestClusterToKubeadmControlPlane(t *testing.T) {
 		recorder: record.NewFakeRecorder(32),
 	}
 
-	got := r.ClusterToKubeadmControlPlane(cluster)
+	got := r.ClusterToKubeadmControlPlane(ctx, cluster)
 	g.Expect(got).To(Equal(expectedResult))
 }
 
@@ -103,7 +103,7 @@ func TestClusterToKubeadmControlPlaneNoControlPlane(t *testing.T) {
 		recorder: record.NewFakeRecorder(32),
 	}
 
-	got := r.ClusterToKubeadmControlPlane(cluster)
+	got := r.ClusterToKubeadmControlPlane(ctx, cluster)
 	g.Expect(got).To(BeNil())
 }
 
@@ -126,7 +126,7 @@ func TestClusterToKubeadmControlPlaneOtherControlPlane(t *testing.T) {
 		recorder: record.NewFakeRecorder(32),
 	}
 
-	got := r.ClusterToKubeadmControlPlane(cluster)
+	got := r.ClusterToKubeadmControlPlane(ctx, cluster)
 	g.Expect(got).To(BeNil())
 }
 

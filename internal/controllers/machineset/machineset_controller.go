@@ -92,7 +92,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		For(&clusterv1.MachineSet{}).
 		Owns(&clusterv1.Machine{}).
 		Watches(
-			&source.Kind{Type: &clusterv1.Machine{}},
+			&clusterv1.Machine{},
 			handler.EnqueueRequestsFromMapFunc(r.MachineToMachineSets),
 		).
 		WithOptions(options).
@@ -103,7 +103,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	}
 
 	err = c.Watch(
-		&source.Kind{Type: &clusterv1.Cluster{}},
+		source.Kind(mgr.GetCache(), &clusterv1.Cluster{}),
 		handler.EnqueueRequestsFromMapFunc(clusterToMachineSets),
 		// TODO: should this wait for Cluster.Status.InfrastructureReady similar to Infra Machine resources?
 		predicates.All(ctrl.LoggerFrom(ctx),
@@ -638,7 +638,7 @@ func (r *Reconciler) waitForMachineDeletion(ctx context.Context, machineList []*
 
 // MachineToMachineSets is a handler.ToRequestsFunc to be used to enqueue requests for reconciliation
 // for MachineSets that might adopt an orphaned Machine.
-func (r *Reconciler) MachineToMachineSets(o client.Object) []ctrl.Request {
+func (r *Reconciler) MachineToMachineSets(ctx context.Context, o client.Object) []ctrl.Request {
 	result := []ctrl.Request{}
 
 	m, ok := o.(*clusterv1.Machine)
@@ -646,8 +646,7 @@ func (r *Reconciler) MachineToMachineSets(o client.Object) []ctrl.Request {
 		panic(fmt.Sprintf("Expected a Machine but got a %T", o))
 	}
 
-	// This won't log unless the global logger is set
-	ctx := context.Background()
+	// FIXME: This won't log unless the global logger is set
 	log := ctrl.LoggerFrom(ctx, "Machine", klog.KObj(m))
 
 	// Check if the controller reference is already set and

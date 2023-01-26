@@ -361,7 +361,7 @@ func (t *topologyClient) prepareClusters(ctx context.Context, clusters []*unstru
 // ValidateCreate is performed.
 // *Important Note*: We cannot perform defaulting and validation on provider objects as we do not have access to
 // that code.
-func (t *topologyClient) runDefaultAndValidationWebhooks(ctx context.Context, in *TopologyPlanInput, apiReader client.Reader) error {
+func (t *topologyClient) runDefaultAndValidationWebhooks(ctx context.Context, in *TopologyPlanInput, apiReader client.Client) error {
 	// Enable the ClusterTopology feature gate so that the defaulter and validators do not complain.
 	// Note: We don't need to disable it later because the CLI is short lived.
 	if err := feature.Gates.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", feature.ClusterTopology, true)); err != nil {

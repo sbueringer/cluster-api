@@ -17,6 +17,7 @@ limitations under the License.
 package machine
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -139,7 +140,7 @@ func TestGetNode(t *testing.T) {
 		Cluster: util.ObjectKey(testCluster),
 		Watcher: w,
 		Kind:    &corev1.Node{},
-		EventHandler: handler.EnqueueRequestsFromMapFunc(func(client.Object) []reconcile.Request {
+		EventHandler: handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 			return nil
 		}),
 	})).To(Succeed())
