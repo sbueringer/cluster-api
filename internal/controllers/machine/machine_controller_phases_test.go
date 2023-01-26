@@ -117,18 +117,22 @@ func TestReconcileMachinePhases(t *testing.T) {
 		bootstrapConfig := defaultBootstrap.DeepCopy()
 		infraConfig := defaultInfra.DeepCopy()
 
+		c := fake.NewClientBuilder().
+			WithScheme(scheme.Scheme).
+			WithObjects(defaultCluster,
+				defaultKubeconfigSecret,
+				machine,
+				builder.GenericBootstrapConfigCRD.DeepCopy(),
+				builder.GenericInfrastructureMachineCRD.DeepCopy(),
+				bootstrapConfig,
+				infraConfig,
+			).Build()
+
 		r := &Reconciler{
 			disableNodeLabelSync: true,
-			Client: fake.NewClientBuilder().
-				WithScheme(scheme.Scheme).
-				WithObjects(defaultCluster,
-					defaultKubeconfigSecret,
-					machine,
-					builder.GenericBootstrapConfigCRD.DeepCopy(),
-					builder.GenericInfrastructureMachineCRD.DeepCopy(),
-					bootstrapConfig,
-					infraConfig,
-				).Build(),
+			Client:               c,
+			scheme:               scheme.Scheme,
+			mapper:               c.RESTMapper(),
 		}
 
 		res, err := r.reconcile(ctx, defaultCluster, machine)
@@ -156,18 +160,22 @@ func TestReconcileMachinePhases(t *testing.T) {
 		bootstrapConfig := defaultBootstrap.DeepCopy()
 		infraConfig := defaultInfra.DeepCopy()
 
+		c := fake.NewClientBuilder().
+			WithScheme(scheme.Scheme).
+			WithObjects(defaultCluster,
+				defaultKubeconfigSecret,
+				machine,
+				builder.GenericBootstrapConfigCRD.DeepCopy(),
+				builder.GenericInfrastructureMachineCRD.DeepCopy(),
+				bootstrapConfig,
+				infraConfig,
+			).Build()
+
 		r := &Reconciler{
 			disableNodeLabelSync: true,
-			Client: fake.NewClientBuilder().
-				WithScheme(scheme.Scheme).
-				WithObjects(defaultCluster,
-					defaultKubeconfigSecret,
-					machine,
-					builder.GenericBootstrapConfigCRD.DeepCopy(),
-					builder.GenericInfrastructureMachineCRD.DeepCopy(),
-					bootstrapConfig,
-					infraConfig,
-				).Build(),
+			Client:               c,
+			scheme:               scheme.Scheme,
+			mapper:               c.RESTMapper(),
 		}
 
 		res, err := r.reconcile(ctx, defaultCluster, machine)
@@ -200,18 +208,22 @@ func TestReconcileMachinePhases(t *testing.T) {
 		lastUpdated := metav1.NewTime(time.Now().Add(-10 * time.Second))
 		machine.Status.LastUpdated = &lastUpdated
 
+		c := fake.NewClientBuilder().
+			WithScheme(scheme.Scheme).
+			WithObjects(defaultCluster,
+				defaultKubeconfigSecret,
+				machine,
+				builder.GenericBootstrapConfigCRD.DeepCopy(),
+				builder.GenericInfrastructureMachineCRD.DeepCopy(),
+				bootstrapConfig,
+				infraConfig,
+			).Build()
+
 		r := &Reconciler{
 			disableNodeLabelSync: true,
-			Client: fake.NewClientBuilder().
-				WithScheme(scheme.Scheme).
-				WithObjects(defaultCluster,
-					defaultKubeconfigSecret,
-					machine,
-					builder.GenericBootstrapConfigCRD.DeepCopy(),
-					builder.GenericInfrastructureMachineCRD.DeepCopy(),
-					bootstrapConfig,
-					infraConfig,
-				).Build(),
+			Client:               c,
+			scheme:               scheme.Scheme,
+			mapper:               c.RESTMapper(),
 		}
 
 		res, err := r.reconcile(ctx, defaultCluster, machine)
@@ -293,6 +305,8 @@ func TestReconcileMachinePhases(t *testing.T) {
 			disableNodeLabelSync: true,
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
+			scheme:               scheme.Scheme,
+			mapper:               cl.RESTMapper(),
 		}
 
 		res, err := r.reconcile(ctx, defaultCluster, machine)
@@ -361,6 +375,8 @@ func TestReconcileMachinePhases(t *testing.T) {
 			disableNodeLabelSync: true,
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
+			scheme:               scheme.Scheme,
+			mapper:               cl.RESTMapper(),
 		}
 
 		res, err := r.reconcile(ctx, defaultCluster, machine)
@@ -439,6 +455,8 @@ func TestReconcileMachinePhases(t *testing.T) {
 			disableNodeLabelSync: true,
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
+			scheme:               scheme.Scheme,
+			mapper:               cl.RESTMapper(),
 		}
 
 		res, err := r.reconcile(ctx, defaultCluster, machine)
@@ -502,6 +520,8 @@ func TestReconcileMachinePhases(t *testing.T) {
 			disableNodeLabelSync: true,
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
+			scheme:               scheme.Scheme,
+			mapper:               cl.RESTMapper(),
 		}
 
 		res, err := r.reconcile(ctx, defaultCluster, machine)
@@ -585,6 +605,8 @@ func TestReconcileMachinePhases(t *testing.T) {
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
 			recorder:             record.NewFakeRecorder(32),
+			scheme:               scheme.Scheme,
+			mapper:               cl.RESTMapper(),
 		}
 
 		res, err := r.reconcileDelete(ctx, defaultCluster, machine)
@@ -880,14 +902,18 @@ func TestReconcileBootstrap(t *testing.T) {
 			}
 
 			bootstrapConfig := &unstructured.Unstructured{Object: tc.bootstrapConfig}
+			c := fake.NewClientBuilder().
+				WithObjects(tc.machine,
+					builder.GenericBootstrapConfigCRD.DeepCopy(),
+					builder.GenericInfrastructureMachineCRD.DeepCopy(),
+					bootstrapConfig,
+				).Build()
+
 			r := &Reconciler{
 				disableNodeLabelSync: true,
-				Client: fake.NewClientBuilder().
-					WithObjects(tc.machine,
-						builder.GenericBootstrapConfigCRD.DeepCopy(),
-						builder.GenericInfrastructureMachineCRD.DeepCopy(),
-						bootstrapConfig,
-					).Build(),
+				Client:               c,
+				scheme:               scheme.Scheme,
+				mapper:               c.RESTMapper(),
 			}
 
 			res, err := r.reconcileBootstrap(ctx, defaultCluster, tc.machine)
@@ -1091,14 +1117,18 @@ func TestReconcileInfrastructure(t *testing.T) {
 			}
 
 			infraConfig := &unstructured.Unstructured{Object: tc.infraConfig}
+			c := fake.NewClientBuilder().
+				WithObjects(tc.machine,
+					builder.GenericBootstrapConfigCRD.DeepCopy(),
+					builder.GenericInfrastructureMachineCRD.DeepCopy(),
+					infraConfig,
+				).Build()
+
 			r := &Reconciler{
 				disableNodeLabelSync: true,
-				Client: fake.NewClientBuilder().
-					WithObjects(tc.machine,
-						builder.GenericBootstrapConfigCRD.DeepCopy(),
-						builder.GenericInfrastructureMachineCRD.DeepCopy(),
-						infraConfig,
-					).Build(),
+				Client:               c,
+				scheme:               scheme.Scheme,
+				mapper:               c.RESTMapper(),
 			}
 
 			result, err := r.reconcileInfrastructure(ctx, defaultCluster, tc.machine)
@@ -1333,14 +1363,18 @@ func TestReconcileCertificateExpiry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
+			c := fake.NewClientBuilder().
+				WithObjects(
+					tc.machine,
+					&unstructured.Unstructured{Object: bootstrapConfigWithExpiry},
+					&unstructured.Unstructured{Object: bootstrapConfigWithoutExpiry},
+				).Build()
+
 			r := &Reconciler{
 				disableNodeLabelSync: true,
-				Client: fake.NewClientBuilder().
-					WithObjects(
-						tc.machine,
-						&unstructured.Unstructured{Object: bootstrapConfigWithExpiry},
-						&unstructured.Unstructured{Object: bootstrapConfigWithoutExpiry},
-					).Build(),
+				Client:               c,
+				scheme:               scheme.Scheme,
+				mapper:               c.RESTMapper(),
 			}
 
 			_, _ = r.reconcileCertificateExpiry(ctx, nil, tc.machine)

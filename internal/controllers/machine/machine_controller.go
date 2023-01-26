@@ -142,6 +142,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	r.recorder = mgr.GetEventRecorderFor("machine-controller")
 	r.externalTracker = external.ObjectTracker{
 		Controller: controller,
+		Cache:      mgr.GetCache(),
 	}
 	r.scheme = mgr.GetScheme()
 	r.mapper = mgr.GetRESTMapper()

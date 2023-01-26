@@ -729,6 +729,8 @@ func TestReconcileRequest(t *testing.T) {
 				disableNodeLabelSync: true,
 				Client:               clientFake,
 				Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), clientFake, scheme.Scheme, client.ObjectKey{Name: testCluster.Name, Namespace: testCluster.Namespace}),
+				scheme:               scheme.Scheme,
+				mapper:               clientFake.RESTMapper(),
 			}
 
 			result, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: util.ObjectKey(&tc.machine)})
@@ -976,6 +978,8 @@ func TestMachineConditions(t *testing.T) {
 				disableNodeLabelSync: true,
 				Client:               clientFake,
 				Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), clientFake, scheme.Scheme, client.ObjectKey{Name: testCluster.Name, Namespace: testCluster.Namespace}),
+				scheme:               scheme.Scheme,
+				mapper:               clientFake.RESTMapper(),
 			}
 
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: util.ObjectKey(&machine)})
@@ -1062,8 +1066,12 @@ func TestReconcileDeleteExternal(t *testing.T) {
 				objs = append(objs, bootstrapConfig)
 			}
 
+			c := fake.NewClientBuilder().WithObjects(objs...).Build()
+
 			r := &Reconciler{
-				Client: fake.NewClientBuilder().WithObjects(objs...).Build(),
+				Client: c,
+				scheme: scheme.Scheme,
+				mapper: c.RESTMapper(),
 			}
 
 			obj, err := r.reconcileDeleteExternal(ctx, machine, machine.Spec.Bootstrap.ConfigRef)

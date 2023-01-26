@@ -115,6 +115,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 
 	r.externalTracker = external.ObjectTracker{
 		Controller: c,
+		Cache:      mgr.GetCache(),
 	}
 	r.patchEngine = patches.NewEngine(r.RuntimeClient)
 	r.recorder = mgr.GetEventRecorderFor("topology/cluster")
