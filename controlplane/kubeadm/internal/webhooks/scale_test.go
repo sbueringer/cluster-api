@@ -136,12 +136,12 @@ func TestKubeadmControlPlaneValidateScale(t *testing.T) {
 		name              string
 		admissionRequest  admission.Request
 		expectRespAllowed bool
-		expectRespReason  string
+		expectRespMessage string
 	}{
 		{
 			name:              "should return error when trying to scale to zero",
 			expectRespAllowed: false,
-			expectRespReason:  "replicas cannot be 0",
+			expectRespMessage: "replicas cannot be 0",
 			admissionRequest: admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
 				UID:       uuid.NewUUID(),
 				Kind:      metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
@@ -152,7 +152,7 @@ func TestKubeadmControlPlaneValidateScale(t *testing.T) {
 		{
 			name:              "should return error when trying to scale to even number of replicas with managed etcd",
 			expectRespAllowed: false,
-			expectRespReason:  "replicas cannot be an even number when etcd is stacked",
+			expectRespMessage: "replicas cannot be an even number when etcd is stacked",
 			admissionRequest: admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
 				UID:       uuid.NewUUID(),
 				Kind:      metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
@@ -163,7 +163,7 @@ func TestKubeadmControlPlaneValidateScale(t *testing.T) {
 		{
 			name:              "should allow odd number of replicas with managed etcd",
 			expectRespAllowed: true,
-			expectRespReason:  "",
+			expectRespMessage: "",
 			admissionRequest: admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
 				UID:       uuid.NewUUID(),
 				Kind:      metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
@@ -174,7 +174,7 @@ func TestKubeadmControlPlaneValidateScale(t *testing.T) {
 		{
 			name:              "should allow even number of replicas with external etcd",
 			expectRespAllowed: true,
-			expectRespReason:  "",
+			expectRespMessage: "",
 			admissionRequest: admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
 				UID:       uuid.NewUUID(),
 				Kind:      metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
@@ -185,7 +185,7 @@ func TestKubeadmControlPlaneValidateScale(t *testing.T) {
 		{
 			name:              "should allow odd number of replicas with external etcd",
 			expectRespAllowed: true,
-			expectRespReason:  "",
+			expectRespMessage: "",
 			admissionRequest: admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
 				UID:       uuid.NewUUID(),
 				Kind:      metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
@@ -208,7 +208,7 @@ func TestKubeadmControlPlaneValidateScale(t *testing.T) {
 
 			resp := scaleHandler.Handle(context.Background(), tt.admissionRequest)
 			g.Expect(resp.Allowed).Should(Equal(tt.expectRespAllowed))
-			g.Expect(string(resp.Result.Reason)).Should(Equal(tt.expectRespReason))
+			g.Expect(resp.Result.Message).Should(Equal(tt.expectRespMessage))
 		})
 	}
 }

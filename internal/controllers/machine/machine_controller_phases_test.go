@@ -131,7 +131,7 @@ func TestReconcileMachinePhases(t *testing.T) {
 		r := &Reconciler{
 			disableNodeLabelSync: true,
 			Client:               c,
-			scheme:               scheme.Scheme,
+			scheme:               c.Scheme(),
 			mapper:               c.RESTMapper(),
 		}
 
@@ -174,7 +174,7 @@ func TestReconcileMachinePhases(t *testing.T) {
 		r := &Reconciler{
 			disableNodeLabelSync: true,
 			Client:               c,
-			scheme:               scheme.Scheme,
+			scheme:               c.Scheme(),
 			mapper:               c.RESTMapper(),
 		}
 
@@ -222,7 +222,7 @@ func TestReconcileMachinePhases(t *testing.T) {
 		r := &Reconciler{
 			disableNodeLabelSync: true,
 			Client:               c,
-			scheme:               scheme.Scheme,
+			scheme:               c.Scheme(),
 			mapper:               c.RESTMapper(),
 		}
 
@@ -305,7 +305,7 @@ func TestReconcileMachinePhases(t *testing.T) {
 			disableNodeLabelSync: true,
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
-			scheme:               scheme.Scheme,
+			scheme:               cl.Scheme(),
 			mapper:               cl.RESTMapper(),
 		}
 
@@ -375,7 +375,7 @@ func TestReconcileMachinePhases(t *testing.T) {
 			disableNodeLabelSync: true,
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
-			scheme:               scheme.Scheme,
+			scheme:               cl.Scheme(),
 			mapper:               cl.RESTMapper(),
 		}
 
@@ -455,7 +455,7 @@ func TestReconcileMachinePhases(t *testing.T) {
 			disableNodeLabelSync: true,
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
-			scheme:               scheme.Scheme,
+			scheme:               cl.Scheme(),
 			mapper:               cl.RESTMapper(),
 		}
 
@@ -520,7 +520,7 @@ func TestReconcileMachinePhases(t *testing.T) {
 			disableNodeLabelSync: true,
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
-			scheme:               scheme.Scheme,
+			scheme:               cl.Scheme(),
 			mapper:               cl.RESTMapper(),
 		}
 
@@ -605,7 +605,7 @@ func TestReconcileMachinePhases(t *testing.T) {
 			Client:               cl,
 			Tracker:              remote.NewTestClusterCacheTracker(logr.New(log.NullLogSink{}), cl, scheme.Scheme, client.ObjectKey{Name: defaultCluster.Name, Namespace: defaultCluster.Namespace}),
 			recorder:             record.NewFakeRecorder(32),
-			scheme:               scheme.Scheme,
+			scheme:               cl.Scheme(),
 			mapper:               cl.RESTMapper(),
 		}
 
@@ -912,7 +912,7 @@ func TestReconcileBootstrap(t *testing.T) {
 			r := &Reconciler{
 				disableNodeLabelSync: true,
 				Client:               c,
-				scheme:               scheme.Scheme,
+				scheme:               c.Scheme(),
 				mapper:               c.RESTMapper(),
 			}
 
@@ -1127,7 +1127,7 @@ func TestReconcileInfrastructure(t *testing.T) {
 			r := &Reconciler{
 				disableNodeLabelSync: true,
 				Client:               c,
-				scheme:               scheme.Scheme,
+				scheme:               c.Scheme(),
 				mapper:               c.RESTMapper(),
 			}
 
@@ -1373,7 +1373,7 @@ func TestReconcileCertificateExpiry(t *testing.T) {
 			r := &Reconciler{
 				disableNodeLabelSync: true,
 				Client:               c,
-				scheme:               scheme.Scheme,
+				scheme:               c.Scheme(),
 				mapper:               c.RESTMapper(),
 			}
 

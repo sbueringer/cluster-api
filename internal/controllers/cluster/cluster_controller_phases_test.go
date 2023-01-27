@@ -137,6 +137,8 @@ func TestClusterReconcilePhases(t *testing.T) {
 				}
 				r := &Reconciler{
 					Client: c,
+					scheme: c.Scheme(),
+					mapper: c.RESTMapper(),
 				}
 
 				res, err := r.reconcileInfrastructure(ctx, tt.cluster)
@@ -478,8 +480,12 @@ func TestClusterReconcilePhases_reconcileFailureDomains(t *testing.T) {
 				objs = append(objs, &unstructured.Unstructured{Object: tt.infraRef})
 			}
 
+			c := fake.NewClientBuilder().WithObjects(objs...).Build()
+
 			r := &Reconciler{
-				Client: fake.NewClientBuilder().WithObjects(objs...).Build(),
+				Client: c,
+				scheme: c.Scheme(),
+				mapper: c.RESTMapper(),
 			}
 
 			_, err := r.reconcileInfrastructure(ctx, tt.cluster)
