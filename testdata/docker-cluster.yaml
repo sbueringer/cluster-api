@@ -1,0 +1,28 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: "my-cluster"
+  namespace: default
+spec:
+  clusterNetwork:
+    services:
+      cidrBlocks: ['10.128.0.0/12']
+    pods:
+      cidrBlocks: ['192.168.0.0/16']
+    serviceDomain: 'cluster.local'
+  topology:
+    class: "quick-start"
+    version: "v1.26.0"
+    controlPlane:
+      replicas: 1
+    workers:
+      machineDeployments:
+      - class: "default-worker"
+        name: "default-worker-topo-1"
+        replicas: 1
+    variables:
+    - name: TKR_DATA
+      value:
+        v1.26.0:
+          tkr: tkr-1.26.0
+          osImage: kindest/node:v1.26.0
