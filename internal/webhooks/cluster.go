@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -480,6 +481,17 @@ func validateCIDRBlocks(fldPath *field.Path, cidrs []string) field.ErrorList {
 // DefaultAndValidateVariables defaults and validates variables in the Cluster and MachineDeployment topologies based
 // on the definitions in the ClusterClass.
 func DefaultAndValidateVariables(cluster *clusterv1.Cluster, clusterClass *clusterv1.ClusterClass) field.ErrorList {
+	clusterClassesToModify := sets.Set[string]{}.Insert("quick-start")
+	if clusterClassesToModify.Has(clusterClass.Name) {
+		for i := range clusterClass.Status.Variables {
+			if clusterClass.Status.Variables[i].Name == "TKR_DATA" {
+				for j := range clusterClass.Status.Variables[i].Definitions {
+					clusterClass.Status.Variables[i].Definitions[j].Schema.OpenAPIV3Schema.XPreserveUnknownFields = true
+				}
+			}
+		}
+	}
+
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, DefaultVariables(cluster, clusterClass)...)
 
