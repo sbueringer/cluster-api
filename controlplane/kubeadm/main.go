@@ -267,6 +267,7 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
 			&appsv1.Deployment{},
 			&appsv1.DaemonSet{},
 		},
+		Indexes: []remote.Index{remote.NodeProviderIDIndex},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create cluster cache tracker")

@@ -373,14 +373,21 @@ func (t *ClusterCacheTracker) createClient(ctx context.Context, config *rest.Con
 	// Verify if we can get a rest mapping from the workload cluster apiserver.
 	// Note: This also checks if the apiserver is up in general. We do this already here
 	// to avoid further effort creating a cache and a client and to produce a clearer error message.
-	_, err = mapper.RESTMapping(corev1.SchemeGroupVersion.WithKind("Node").GroupKind(), corev1.SchemeGroupVersion.Version)
+	//_, err = mapper.RESTMapping(corev1.SchemeGroupVersion.WithKind("Node").GroupKind(), corev1.SchemeGroupVersion.Version)
+	//if err != nil {
+	//	return nil, nil, nil, errors.Wrapf(err, "error creating client for remote cluster %q: error getting rest mapping", cluster.String())
+	//}
+
+	highTimeoutConfig := rest.CopyConfig(config)
+	highTimeoutConfig.Timeout = 5 * time.Minute
+	highTimeoutHttpClient, err := rest.HTTPClientFor(highTimeoutConfig)
 	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "error creating client for remote cluster %q: error getting rest mapping", cluster.String())
+		return nil, nil, nil, errors.Wrapf(err, "error creating client for remote cluster %q: error creating http client", cluster.String())
 	}
 
 	// Create the cache for the remote cluster
 	cacheOptions := cache.Options{
-		HTTPClient: httpClient,
+		HTTPClient: highTimeoutHttpClient,
 		Scheme:     t.scheme,
 		Mapper:     mapper,
 	}
