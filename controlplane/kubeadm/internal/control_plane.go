@@ -30,6 +30,7 @@ import (
 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	controlplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	traceutil "sigs.k8s.io/cluster-api/internal/util/trace"
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/failuredomains"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -58,6 +59,9 @@ type ControlPlane struct {
 
 // NewControlPlane returns an instantiated ControlPlane.
 func NewControlPlane(ctx context.Context, managementCluster ManagementCluster, client client.Client, cluster *clusterv1.Cluster, kcp *controlplanev1.KubeadmControlPlane, ownedMachines collections.Machines) (*ControlPlane, error) {
+	ctx, span := traceutil.Start(ctx, "NewControlPlane")
+	defer span.End()
+
 	infraObjects, err := getInfraResources(ctx, client, ownedMachines)
 	if err != nil {
 		return nil, err
@@ -167,22 +171,34 @@ func (c *ControlPlane) GetKubeadmConfig(machineName string) (*bootstrapv1.Kubead
 }
 
 // MachinesNeedingRollout return a list of machines that need to be rolled out.
-func (c *ControlPlane) MachinesNeedingRollout() collections.Machines {
+func (c *ControlPlane) MachinesNeedingRollout() (collections.Machines, map[string]string) {
 	// Ignore machines to be deleted.
 	machines := c.Machines.Filter(collections.Not(collections.HasDeletionTimestamp))
 
 	// Return machines if they are scheduled for rollout or if with an outdated configuration.
-	return machines.Filter(
-		NeedsRollout(&c.reconciliationTime, c.KCP.Spec.RolloutAfter, c.KCP.Spec.RolloutBefore, c.InfraResources, c.KubeadmConfigs, c.KCP),
-	)
+	machinesNeedingRollout := make(collections.Machines, len(machines))
+	rolloutReasons := map[string]string{}
+	for _, m := range machines {
+		reason, needsRollout := NeedsRollout(&c.reconciliationTime, c.KCP.Spec.RolloutAfter, c.KCP.Spec.RolloutBefore, c.InfraResources, c.KubeadmConfigs, c.KCP, m)
+		if needsRollout {
+			machinesNeedingRollout.Insert(m)
+			rolloutReasons[m.Name] = reason
+		}
+	}
+	return machinesNeedingRollout, rolloutReasons
 }
 
 // UpToDateMachines returns the machines that are up to date with the control
 // plane's configuration and therefore do not require rollout.
 func (c *ControlPlane) UpToDateMachines() collections.Machines {
-	return c.Machines.Filter(
-		collections.Not(NeedsRollout(&c.reconciliationTime, c.KCP.Spec.RolloutAfter, c.KCP.Spec.RolloutBefore, c.InfraResources, c.KubeadmConfigs, c.KCP)),
-	)
+	upToDateMachines := make(collections.Machines, len(c.Machines))
+	for _, m := range c.Machines {
+		_, needsRollout := NeedsRollout(&c.reconciliationTime, c.KCP.Spec.RolloutAfter, c.KCP.Spec.RolloutBefore, c.InfraResources, c.KubeadmConfigs, c.KCP, m)
+		if !needsRollout {
+			upToDateMachines.Insert(m)
+		}
+	}
+	return upToDateMachines
 }
 
 // getInfraResources fetches the external infrastructure resource for each machine in the collection and returns a map of machine.Name -> infraResource.
@@ -243,6 +259,9 @@ func (c *ControlPlane) HasUnhealthyMachine() bool {
 
 // PatchMachines patches all the machines conditions.
 func (c *ControlPlane) PatchMachines(ctx context.Context) error {
+	ctx, span := traceutil.Start(ctx, "ControlPlane.PatchMachines")
+	defer span.End()
+
 	errList := []error{}
 	for i := range c.Machines {
 		machine := c.Machines[i]
