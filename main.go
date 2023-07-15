@@ -22,6 +22,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	goruntime "runtime"
 	"time"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apiserver/pkg/server/routes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -44,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -143,7 +146,7 @@ func init() {
 func InitFlags(fs *pflag.FlagSet) {
 	logsv1.AddFlags(logOptions, fs)
 
-	fs.StringVar(&metricsBindAddr, "metrics-bind-addr", "localhost:8080",
+	fs.StringVar(&metricsBindAddr, "metrics-bind-addr", ":8443",
 		"The address the metric endpoint binds to.")
 
 	fs.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -301,6 +304,12 @@ func main() {
 		PprofBindAddress:           profilerAddress,
 		Metrics: metricsserver.Options{
 			BindAddress: metricsBindAddr,
+			// FIXME(sbueringer): add flag(s) to enable these 3 fields
+			SecureServing:  true,
+			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			ExtraHandlers: map[string]http.Handler{
+				"/debug/flags/v": routes.StringFlagPutHandler(logs.GlogSetter),
+			},
 		},
 		Cache: cache.Options{
 			DefaultNamespaces: watchNamespaces,

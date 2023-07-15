@@ -65,8 +65,8 @@ providers:
   - name: v1.6.99 # next; use manifest from source files
     value: ../../../config/default
     replacements:
-    - old: --metrics-bind-addr=localhost:8080
-      new: "--metrics-bind-addr=:8080\n        - --logging-format=json"
+    - old: --metrics-bind-addr=:8443
+      new: "--metrics-bind-addr=:8443\n        - --logging-format=json"
     files:
     - sourcePath: "../data/shared/main/metadata.yaml"
 
@@ -103,8 +103,8 @@ providers:
   - name: v1.6.99 # next; use manifest from source files
     value: ../../../bootstrap/kubeadm/config/default
     replacements:
-    - old: --metrics-bind-addr=localhost:8080
-      new: "--metrics-bind-addr=:8080\n        - --logging-format=json"
+    - old: --metrics-bind-addr=:8443
+      new: "--metrics-bind-addr=:8443\n        - --logging-format=json"
     files:
     - sourcePath: "../data/shared/main/metadata.yaml"
 
@@ -141,8 +141,8 @@ providers:
   - name: v1.6.99 # next; use manifest from source files
     value: ../../../controlplane/kubeadm/config/default
     replacements:
-    - old: --metrics-bind-addr=localhost:8080
-      new: "--metrics-bind-addr=:8080\n        - --logging-format=json"
+    - old: --metrics-bind-addr=:8443
+      new: "--metrics-bind-addr=:8443\n        - --logging-format=json"
     files:
     - sourcePath: "../data/shared/main/metadata.yaml"
 
@@ -186,8 +186,8 @@ providers:
   - name: v1.6.99 # next; use manifest from source files
     value: ../../../test/infrastructure/docker/config/default
     replacements:
-    - old: --metrics-bind-addr=localhost:8080
-      new: "--metrics-bind-addr=:8080\n        - --logging-format=json"
+    - old: --metrics-bind-addr=:8443
+      new: "--metrics-bind-addr=:8443\n        - --logging-format=json"
     files:
     # Add cluster templates
     - sourcePath: "../data/infrastructure-docker/main/cluster-template.yaml"
@@ -216,8 +216,8 @@ providers:
     - name: v1.6.99 # next; use manifest from source files
       value: ../../../test/infrastructure/inmemory/config/default
       replacements:
-        - old: --metrics-bind-addr=localhost:8080
-          new: "--metrics-bind-addr=:8080\n        - --logging-format=json"
+        - old: --metrics-bind-addr=:8443
+          new: "--metrics-bind-addr=:8443\n        - --logging-format=json"
       files:
       # Add cluster templates
       - sourcePath: "../data/infrastructure-inmemory/main/clusterclass-in-memory.yaml"
