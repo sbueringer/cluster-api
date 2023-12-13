@@ -1,0 +1,239 @@
+apiVersion: v1
+binaryData: null
+data:
+  resources: |
+    kind: ClusterRole
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: kindnet
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - nodes
+        verbs:
+          - list
+          - watch
+          - patch
+      - apiGroups:
+          - ""
+        resources:
+          - configmaps
+        verbs:
+          - get
+    ---
+    kind: ClusterRoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: kindnet
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: kindnet
+    subjects:
+      - kind: ServiceAccount
+        name: kindnet
+        namespace: kube-system
+    ---
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: kindnet
+      namespace: kube-system
+    ---
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: kindnet
+      namespace: kube-system
+      labels:
+        tier: node
+        app: kindnet
+        k8s-app: kindnet
+    spec:
+      selector:
+        matchLabels:
+          app: kindnet
+      template:
+        metadata:
+          labels:
+            tier: node
+            app: kindnet
+            k8s-app: kindnet
+        spec:
+          hostNetwork: true
+          tolerations:
+            - operator: Exists
+              effect: NoSchedule
+          serviceAccountName: kindnet
+          containers:
+            - name: kindnet-cni
+              image: kindest/kindnetd:v20230511-dc714da8
+              env:
+                - name: HOST_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.hostIP
+                - name: POD_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
+                # We're using the dualstack CIDRs here. The order doesn't matter for kindnet as the loops are run concurrently.
+                # REF: https://github.com/kubernetes-sigs/kind/blob/3dbeb894e3092a336ab4278d3823e73a1d66aff7/images/kindnetd/cmd/kindnetd/main.go#L149-L175
+                - name: POD_SUBNET
+                  value: '192.168.0.0/16,fd00:100:96::/48'
+              volumeMounts:
+                - name: cni-cfg
+                  mountPath: /etc/cni/net.d
+                - name: xtables-lock
+                  mountPath: /run/xtables.lock
+                  readOnly: false
+                - name: lib-modules
+                  mountPath: /lib/modules
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "50Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "50Mi"
+              securityContext:
+                privileged: false
+                capabilities:
+                  add: ["NET_RAW", "NET_ADMIN"]
+          volumes:
+            - name: cni-bin
+              hostPath:
+                path: /opt/cni/bin
+                type: DirectoryOrCreate
+            - name: cni-cfg
+              hostPath:
+                path: /etc/cni/net.d
+                type: DirectoryOrCreate
+            - name: xtables-lock
+              hostPath:
+                path: /run/xtables.lock
+                type: FileOrCreate
+            - name: lib-modules
+              hostPath:
+                path: /lib/modules
+kind: ConfigMap
+metadata:
+  name: cni-cluster-ignition-crs-0
+---
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: cluster-ignition-crs-0
+spec:
+  clusterSelector:
+    matchLabels:
+      cni: cluster-ignition-crs-0
+  resources:
+  - kind: ConfigMap
+    name: cni-cluster-ignition-crs-0
+  strategy: ApplyOnce
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  labels:
+    cni: cluster-ignition-crs-0
+  name: cluster-ignition
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - 192.168.0.0/16
+    serviceDomain: cluster.local
+    services:
+      cidrBlocks:
+      - 10.128.0.0/12
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: cluster-ignition-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DockerCluster
+    name: cluster-ignition
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  labels:
+    kcp-adoption.step2: ""
+  name: cluster-ignition-control-plane
+spec:
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      apiServer:
+        certSANs:
+        - localhost
+        - 127.0.0.1
+        - 0.0.0.0
+        - host.docker.internal
+      controllerManager:
+        extraArgs:
+          enable-hostpath-provisioner: "true"
+    format: ignition
+    initConfiguration:
+      nodeRegistration:
+        criSocket: unix:///var/run/containerd/containerd.sock
+        kubeletExtraArgs:
+          cgroup-root: /kubelet
+          eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
+          fail-swap-on: "false"
+          runtime-cgroups: /system.slice/containerd.service
+    joinConfiguration:
+      nodeRegistration:
+        criSocket: unix:///var/run/containerd/containerd.sock
+        kubeletExtraArgs:
+          cgroup-root: /kubelet
+          eviction-hard: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
+          fail-swap-on: "false"
+          runtime-cgroups: /system.slice/containerd.service
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: DockerMachineTemplate
+      name: cluster-ignition-control-plane
+  replicas: 1
+  version: 1.29.0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DockerCluster
+metadata:
+  name: cluster-ignition
+spec:
+  failureDomains:
+    fd1:
+      controlPlane: true
+    fd2:
+      controlPlane: true
+    fd3:
+      controlPlane: true
+    fd4:
+      controlPlane: false
+    fd5:
+      controlPlane: false
+    fd6:
+      controlPlane: false
+    fd7:
+      controlPlane: false
+    fd8:
+      controlPlane: false
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: DockerMachineTemplate
+metadata:
+  name: cluster-ignition-control-plane
+spec:
+  template:
+    spec:
+      extraMounts:
+      - containerPath: /var/run/docker.sock
+        hostPath: /var/run/docker.sock
+      preLoadImages: []
+---
