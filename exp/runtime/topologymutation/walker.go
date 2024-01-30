@@ -19,6 +19,7 @@ package topologymutation
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	mergepatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
@@ -79,8 +80,8 @@ func (d PatchFormat) ApplyToWalkTemplates(in *WalkTemplatesOptions) {
 // Also, by using this func it is possible to ignore most of the details of the GeneratePatchesRequest
 // and GeneratePatchesResponse messages format and focus on writing patches/modifying the templates.
 func WalkTemplates(ctx context.Context, decoder runtime.Decoder, req *runtimehooksv1.GeneratePatchesRequest,
-	resp *runtimehooksv1.GeneratePatchesResponse, mutateFunc func(ctx context.Context, obj runtime.Object,
-		variables map[string]apiextensionsv1.JSON, holderRef runtimehooksv1.HolderReference) error, opts ...WalkTemplatesOption) {
+	resp *runtimehooksv1.GeneratePatchesResponse, variablesType interface{}, mutateFunc func(ctx context.Context, obj runtime.Object,
+		builtinVariable *patchvariables.Builtins, variables interface{}, holderRef runtimehooksv1.HolderReference) error, opts ...WalkTemplatesOption) {
 	log := ctrl.LoggerFrom(ctx)
 	globalVariables := patchvariables.ToMap(req.Variables)
 
@@ -91,6 +92,7 @@ func WalkTemplates(ctx context.Context, decoder runtime.Decoder, req *runtimehoo
 
 	// For all the templates in a request.
 	// TODO: add a notion of ordering the patch implementers can rely on. Ideally ordering could be pluggable via options.
+	//  An alternative is to provide functions to retrieve specific "templates", e.g. GetControlPlaneTemplate.
 	for _, requestItem := range req.Items {
 		// Computes the variables that apply to the template, by merging global and template variables.
 		templateVariables, err := patchvariables.MergeVariableMaps(globalVariables, patchvariables.ToMap(requestItem.Variables))
@@ -98,6 +100,35 @@ func WalkTemplates(ctx context.Context, decoder runtime.Decoder, req *runtimehoo
 			resp.Status = runtimehooksv1.ResponseStatusFailure
 			resp.Message = err.Error()
 			return
+		}
+
+		// FIXME: let's do this for all variables before we actually call `mutateFunc`
+		// FIXME: convert variable values to go types
+		// godoc, handle errors, ...
+		variableValuesJSON := map[string]apiextensionsv1.JSON{}
+		var builtinVariableJSON apiextensionsv1.JSON
+		for variableName, variableValue := range templateVariables {
+			if variableName == patchvariables.BuiltinsName {
+				builtinVariableJSON = variableValue
+				continue
+			}
+
+			variableValuesJSON[variableName] = variableValue
+		}
+
+		variableValuesJSONAll, err := json.Marshal(variableValuesJSON)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		var builtinVariableValue patchvariables.Builtins
+		if err := json.Unmarshal(builtinVariableJSON.Raw, &builtinVariableValue); err != nil {
+			fmt.Println(err)
+		}
+
+		// FIXME: just using variablesType directly is probably not clean enough
+		if err := json.Unmarshal(variableValuesJSONAll, &variablesType); err != nil {
+			fmt.Println(err)
 		}
 
 		// Convert the template object into a typed object.
@@ -138,7 +169,7 @@ func WalkTemplates(ctx context.Context, decoder runtime.Decoder, req *runtimehoo
 		// Calls the mutateFunc.
 		requestItemLog.V(4).Info("Generating patch for template")
 		modified := original.DeepCopyObject()
-		if err := mutateFunc(requestItemCtx, modified, templateVariables, requestItem.HolderReference); err != nil {
+		if err := mutateFunc(requestItemCtx, modified, &builtinVariableValue, variablesType, requestItem.HolderReference); err != nil {
 			resp.Status = runtimehooksv1.ResponseStatusFailure
 			resp.Message = err.Error()
 			return
