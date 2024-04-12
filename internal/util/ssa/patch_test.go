@@ -21,7 +21,6 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/utils/ptr"
@@ -112,11 +111,11 @@ func TestPatch(t *testing.T) {
 				Bootstrap: clusterv1.Bootstrap{
 					DataSecretName: ptr.To("data-secret"),
 				},
-				InfrastructureRef: corev1.ObjectReference{
-					// The namespace needs to get set here. Otherwise the defaulting webhook always sets this field again
-					// which would lead to an resourceVersion bump at the 3rd step and to a flaky test.
-					Namespace: ns.Name,
-				},
+				//InfrastructureRef: corev1.ObjectReference{
+				//	// The namespace needs to get set here. Otherwise the defaulting webhook always sets this field again
+				//	// which would lead to an resourceVersion bump at the 3rd step and to a flaky test.
+				//	Namespace: ns.Name,
+				//},
 			},
 		}
 		fieldManager := "test-manager"
@@ -160,6 +159,8 @@ func TestPatch(t *testing.T) {
 		g.Expect(modifiedObject.GroupVersionKind()).To(Equal(initialObject.GroupVersionKind()))
 		// Verify that request was not cached (as it changed the object)
 		g.Expect(ssaCache.Has(requestIdentifier)).To(BeFalse())
+
+		time.Sleep(time.Second)
 
 		// 3. Repeat the same update and verify that the request was cached as the object was not changed.
 		// Get the original object.

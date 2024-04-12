@@ -39,6 +39,11 @@ type DockerMachineSpec struct {
 	// +optional
 	CustomImage string `json:"customImage,omitempty"`
 
+	// TestString allows customizing the container image that is used for
+	// running the machine
+	// +optional
+	TestString string `json:"testString,omitempty"`
+
 	// PreLoadImages allows to pre-load images in a newly created machine. This can be used to
 	// speed up tests by avoiding e.g. to download CNI images on all the containers.
 	// +optional

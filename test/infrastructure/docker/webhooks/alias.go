@@ -38,6 +38,14 @@ func (webhook *DockerClusterTemplate) SetupWebhookWithManager(mgr ctrl.Manager) 
 	return (&webhooks.DockerClusterTemplate{}).SetupWebhookWithManager(mgr)
 }
 
+// DockerMachine implements a validating webhook for DockerMachine.
+type DockerMachine struct{}
+
+// SetupWebhookWithManager sets up ClusterResourceSet webhooks.
+func (webhook *DockerMachine) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	return (&webhooks.DockerMachine{}).SetupWebhookWithManager(mgr)
+}
+
 // DockerMachineTemplate implements a validating webhook for DockerMachineTemplate.
 type DockerMachineTemplate struct{}
 

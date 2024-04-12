@@ -322,6 +322,11 @@ spec:
                         description: ProviderID will be the container name in ProviderID
                           format (docker:////<containername>)
                         type: string
+                      testString:
+                        description: |-
+                          TestString allows customizing the container image that is used for
+                          running the machine
+                        type: string
                     type: object
                 required:
                 - spec
