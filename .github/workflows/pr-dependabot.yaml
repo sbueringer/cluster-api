@@ -4,14 +4,16 @@ name: PR dependabot code generation and go modules fix
 on:
   pull_request:
     branches:
-      - dependabot/**
+      - '*'
   push:
     branches:
-      - dependabot/**
+      - '*'
   workflow_dispatch:
 
 permissions:
+  actions: write # Allow to trigger the lint action.
   contents: write # Allow to update the PR.
+  pull-requests: write # Allow to trigger the lint action.
 
 jobs:
   build:
@@ -20,6 +22,9 @@ jobs:
     steps:
     - name: Check out code into the Go module directory
       uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # tag=v4.1.5
+      with:
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+        ref: ${{ github.event.pull_request.head.ref }}
     - name: Calculate go version
       id: vars
       run: echo "go_version=$(make go-version)" >> $GITHUB_OUTPUT
@@ -39,11 +44,23 @@ jobs:
     - name: Update all modules
       run: make generate-modules
     - name: Update generated code
-      run: make generate
+      run: touch test.txt
     - uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # tag=v9.1.4
       name: Commit changes
+      id: commit
       with:
         author_name: dependabot[bot]
         author_email: 49699333+dependabot[bot]@users.noreply.github.com
         default_author: github_actor
         message: 'Update generated code'
+    - name: Trigger lint action
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'pr-golangci-lint.yaml',
+            ref: context.ref,
+          })

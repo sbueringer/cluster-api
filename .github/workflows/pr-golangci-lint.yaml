@@ -3,9 +3,11 @@ name: PR golangci-lint
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  workflow_dispatch:
 
 # Remove all permissions from GITHUB_TOKEN except metadata.
-permissions: {}
+permissions:
+  statuses: write
 
 jobs:
   golangci:
@@ -33,3 +35,9 @@ jobs:
           version: v1.57.2
           args: --out-format=colored-line-number
           working-directory: ${{matrix.working-directory}}
+      - name: Set latest commit status as ${{ job.status }}
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
