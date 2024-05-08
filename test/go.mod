@@ -9,7 +9,7 @@ require (
 	github.com/docker/docker v24.0.9+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/emicklei/go-restful/v3 v3.11.0
-	github.com/evanphx/json-patch/v5 v5.7.0
+	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/flatcar/ignition v0.36.2
 	github.com/go-logr/logr v1.3.0
 	github.com/google/go-cmp v0.6.0
