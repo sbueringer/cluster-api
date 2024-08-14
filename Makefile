@@ -282,33 +282,10 @@ generate-manifests: $(addprefix generate-manifests-,$(ALL_GENERATE_MODULES)) ## 
 
 .PHONY: generate-manifests-core
 generate-manifests-core: $(CONTROLLER_GEN) $(KUSTOMIZE) ## Generate manifests e.g. CRD, RBAC etc. for core
-	$(MAKE) clean-generated-yaml SRC_DIRS="./config/crd/bases,./config/webhook/manifests.yaml"
 	$(CONTROLLER_GEN) \
-		paths=./ \
-		paths=./api/... \
-		paths=./internal/apis/core/... \
-		paths=./internal/controllers/... \
-		paths=./internal/webhooks/... \
-		paths=./$(EXP_DIR)/api/... \
-		paths=./$(EXP_DIR)/internal/controllers/... \
-		paths=./$(EXP_DIR)/internal/webhooks/... \
-		paths=./$(EXP_DIR)/addons/api/... \
-		paths=./$(EXP_DIR)/addons/internal/controllers/... \
-		paths=./$(EXP_DIR)/addons/internal/webhooks/... \
-		paths=./$(EXP_DIR)/ipam/api/... \
-		paths=./$(EXP_DIR)/ipam/internal/webhooks/... \
-		paths=./$(EXP_DIR)/runtime/api/... \
-		paths=./$(EXP_DIR)/runtime/internal/controllers/... \
+		paths=./api/test/... \
 		crd:crdVersions=v1 \
-		rbac:roleName=manager-role \
-		output:crd:dir=./config/crd/bases \
-		output:webhook:dir=./config/webhook \
-		webhook
-	$(CONTROLLER_GEN) \
-		paths=./cmd/clusterctl/api/... \
-		crd:crdVersions=v1 \
-		output:crd:dir=./cmd/clusterctl/config/crd/bases
-	$(KUSTOMIZE) build $(CLUSTERCTL_MANIFEST_DIR)/crd > $(CLUSTERCTL_MANIFEST_DIR)/manifest/clusterctl-api.yaml
+		output:crd:dir=./api/test/bases
 
 .PHONY: generate-manifests-kubeadm-bootstrap
 generate-manifests-kubeadm-bootstrap: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for kubeadm bootstrap

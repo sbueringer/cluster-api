@@ -44,34 +44,11 @@ const (
 
 // ClusterSpec defines the desired state of Cluster.
 type ClusterSpec struct {
-	// Paused can be used to prevent controllers from processing the Cluster and all its associated objects.
+	// Protocol for port. Must be UDP, TCP, or SCTP.
+	// Defaults to "TCP".
 	// +optional
-	Paused bool `json:"paused,omitempty"`
-
-	// Cluster network configuration.
-	// +optional
-	ClusterNetwork *ClusterNetwork `json:"clusterNetwork,omitempty"`
-
-	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
-	// +optional
-	ControlPlaneEndpoint APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
-
-	// ControlPlaneRef is an optional reference to a provider-specific resource that holds
-	// the details for provisioning the Control Plane for a Cluster.
-	// +optional
-	ControlPlaneRef *corev1.ObjectReference `json:"controlPlaneRef,omitempty"`
-
-	// InfrastructureRef is a reference to a provider-specific resource that holds the details
-	// for provisioning infrastructure for a cluster in said provider.
-	// +optional
-	InfrastructureRef *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
-
-	// This encapsulates the topology for the cluster.
-	// NOTE: It is required to enable the ClusterTopology
-	// feature gate flag to activate managed topologies support;
-	// this feature is highly experimental, and parts of it might still be not implemented.
-	// +optional
-	Topology *Topology `json:"topology,omitempty"`
+	// +default="TCP"
+	Protocol corev1.Protocol `json:"protocol,omitempty" protobuf:"bytes,4,opt,name=protocol,casttype=Protocol"`
 }
 
 // Topology encapsulates the information of the managed resources.
@@ -524,10 +501,10 @@ type Cluster struct {
 
 // GetClassKey returns the namespaced name for the class associated with this object.
 func (c *Cluster) GetClassKey() types.NamespacedName {
-	if c.Spec.Topology == nil {
-		return types.NamespacedName{}
-	}
-	return types.NamespacedName{Namespace: c.GetNamespace(), Name: c.Spec.Topology.Class}
+	//if c.Spec.Topology == nil {
+	//	return types.NamespacedName{}
+	//}
+	return types.NamespacedName{}
 }
 
 // GetConditions returns the set of conditions for this object.
@@ -546,14 +523,14 @@ func (c *Cluster) SetConditions(conditions Conditions) {
 // IPFamily will be dropped in a future release. More details at https://github.com/kubernetes-sigs/cluster-api/issues/7521
 func (c *Cluster) GetIPFamily() (ClusterIPFamily, error) {
 	var podCIDRs, serviceCIDRs []string
-	if c.Spec.ClusterNetwork != nil {
-		if c.Spec.ClusterNetwork.Pods != nil {
-			podCIDRs = c.Spec.ClusterNetwork.Pods.CIDRBlocks
-		}
-		if c.Spec.ClusterNetwork.Services != nil {
-			serviceCIDRs = c.Spec.ClusterNetwork.Services.CIDRBlocks
-		}
-	}
+	//if c.Spec.ClusterNetwork != nil {
+	//	if c.Spec.ClusterNetwork.Pods != nil {
+	//		podCIDRs = c.Spec.ClusterNetwork.Pods.CIDRBlocks
+	//	}
+	//	if c.Spec.ClusterNetwork.Services != nil {
+	//		serviceCIDRs = c.Spec.ClusterNetwork.Services.CIDRBlocks
+	//	}
+	//}
 	if len(podCIDRs) == 0 && len(serviceCIDRs) == 0 {
 		return IPv4IPFamily, nil
 	}
