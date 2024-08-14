@@ -32,6 +32,19 @@ type ClusterSpec struct {
 	Protocol corev1.Protocol `json:"protocol,omitempty" protobuf:"bytes,4,opt,name=protocol,casttype=Protocol"`
 }
 
+// Protocol defines network protocols supported for things like container ports.
+// +enum
+type Protocol string
+
+const (
+	// ProtocolTCP is the TCP protocol.
+	ProtocolTCP Protocol = "TCP"
+	// ProtocolUDP is the UDP protocol.
+	ProtocolUDP Protocol = "UDP"
+	// ProtocolSCTP is the SCTP protocol.
+	ProtocolSCTP Protocol = "SCTP"
+)
+
 // ANCHOR_END: APIEndpoint
 
 // +kubebuilder:object:root=true
