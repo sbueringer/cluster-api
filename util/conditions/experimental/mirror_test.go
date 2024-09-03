@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/cluster-api/internal/test/builder"
 )
 
 func TestMirrorStatusCondition(t *testing.T) {
@@ -39,7 +41,7 @@ func TestMirrorStatusCondition(t *testing.T) {
 			},
 			conditionType: "Ready",
 			options:       []MirrorOption{},
-			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good! (from V1Beta2ResourceWithConditions default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
+			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good! (from Phase3Obj default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
 		},
 		{
 			name: "Mirror a condition with override type",
@@ -48,7 +50,7 @@ func TestMirrorStatusCondition(t *testing.T) {
 			},
 			conditionType: "Ready",
 			options:       []MirrorOption{OverrideType("SomethingReady")},
-			want:          metav1.Condition{Type: "SomethingReady", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good! (from V1Beta2ResourceWithConditions default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
+			want:          metav1.Condition{Type: "SomethingReady", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good! (from Phase3Obj default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
 		},
 		{
 			name: "Mirror a condition with empty message",
@@ -57,21 +59,21 @@ func TestMirrorStatusCondition(t *testing.T) {
 			},
 			conditionType: "Ready",
 			options:       []MirrorOption{},
-			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "(from V1Beta2ResourceWithConditions default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
+			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "(from Phase3Obj default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
 		},
 		{
 			name:          "Mirror a condition not yet reported",
 			conditions:    []metav1.Condition{},
 			conditionType: "Ready",
 			options:       []MirrorOption{},
-			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionUnknown, Reason: NotYetReportedReason, Message: "Condition Ready not yet reported from V1Beta2ResourceWithConditions default/SourceObject", LastTransitionTime: now},
+			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionUnknown, Reason: NotYetReportedReason, Message: "Condition Ready not yet reported from Phase3Obj default/SourceObject", LastTransitionTime: now},
 		},
 		{
 			name:          "Mirror a condition not yet reported with override type",
 			conditions:    []metav1.Condition{},
 			conditionType: "Ready",
 			options:       []MirrorOption{OverrideType("SomethingReady")},
-			want:          metav1.Condition{Type: "SomethingReady", Status: metav1.ConditionUnknown, Reason: NotYetReportedReason, Message: "Condition Ready not yet reported from V1Beta2ResourceWithConditions default/SourceObject", LastTransitionTime: now},
+			want:          metav1.Condition{Type: "SomethingReady", Status: metav1.ConditionUnknown, Reason: NotYetReportedReason, Message: "Condition Ready not yet reported from Phase3Obj default/SourceObject", LastTransitionTime: now},
 		},
 	}
 
@@ -79,12 +81,12 @@ func TestMirrorStatusCondition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			obj := &V1Beta2ResourceWithConditions{
+			obj := &builder.Phase3Obj{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "SourceObject",
 				},
-				Status: struct{ Conditions []metav1.Condition }{
+				Status: builder.Phase3ObjStatus{
 					Conditions: tt.conditions,
 				},
 			}

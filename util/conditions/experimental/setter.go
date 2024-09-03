@@ -17,7 +17,6 @@ limitations under the License.
 package experimental
 
 import (
-	"fmt"
 	"reflect"
 	"sort"
 
@@ -173,8 +172,6 @@ func setToTypedObject(obj runtime.Object, conditions []metav1.Condition) error {
 	// The ExperimentalConditions branch should be dropped when v1beta1 API are removed.
 
 	if conditionField := statusField.FieldByName("ExperimentalConditions"); conditionField != (reflect.Value{}) {
-		fmt.Println("Status.ExperimentalConditions is a", reflect.TypeOf(conditionField.Interface()).String())
-
 		if conditionField.Type() != metav1ConditionsType {
 			return errors.Errorf("cannot set conditions on Status.ExperimentalConditions field if it isn't %s: %s type detected", metav1ConditionsType.String(), reflect.TypeOf(conditionField.Interface()).String())
 		}
@@ -184,8 +181,6 @@ func setToTypedObject(obj runtime.Object, conditions []metav1.Condition) error {
 	}
 
 	if conditionField := statusField.FieldByName("Conditions"); conditionField != (reflect.Value{}) {
-		fmt.Println("Status.Conditions is a", reflect.TypeOf(conditionField.Interface()).String())
-
 		if conditionField.Type() != metav1ConditionsType {
 			return errors.Errorf("cannot set conditions on Status.Conditions field if it isn't %s: %s type detected", metav1ConditionsType.String(), reflect.TypeOf(conditionField.Interface()).String())
 		}

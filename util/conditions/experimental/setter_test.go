@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/internal/test/builder"
 )
 
 func TestSetAll(t *testing.T) {
@@ -59,7 +60,7 @@ func TestSetAll(t *testing.T) {
 
 	t.Run("fails for nil object", func(t *testing.T) {
 		g := NewWithT(t)
-		var foo *V1Beta1ResourceWithLegacyConditions
+		var foo *builder.Phase0Obj
 
 		conditions := cloneConditions()
 		err := SetAll(foo, conditions)
@@ -123,8 +124,8 @@ func TestSetAll(t *testing.T) {
 
 	t.Run("v1beta object with legacy conditions", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta1ResourceWithLegacyConditions{
-			Status: struct{ Conditions clusterv1.Conditions }{Conditions: nil},
+		foo := &builder.Phase0Obj{
+			Status: builder.Phase0ObjStatus{Conditions: nil},
 		}
 
 		conditions := cloneConditions()
@@ -134,11 +135,8 @@ func TestSetAll(t *testing.T) {
 
 	t.Run("v1beta1 object with both legacy and experimental conditions", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta1ResourceWithLegacyAndExperimentalConditionsV1{
-			Status: struct {
-				Conditions             clusterv1.Conditions
-				ExperimentalConditions []metav1.Condition
-			}{
+		foo := &builder.Phase1Obj{
+			Status: builder.Phase1ObjStatus{
 				Conditions: clusterv1.Conditions{
 					{
 						Type:               "barCondition",
@@ -158,11 +156,8 @@ func TestSetAll(t *testing.T) {
 
 	t.Run("v1beta1 object with both legacy and experimental conditions / Unstructured", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta1ResourceWithLegacyAndExperimentalConditionsV1{
-			Status: struct {
-				Conditions             clusterv1.Conditions
-				ExperimentalConditions []metav1.Condition
-			}{
+		foo := &builder.Phase1Obj{
+			Status: builder.Phase1ObjStatus{
 				Conditions: clusterv1.Conditions{
 					{
 						Type:               "barCondition",
@@ -182,7 +177,7 @@ func TestSetAll(t *testing.T) {
 		err = SetAll(u, conditions, ConditionFields{"status", "experimentalConditions"})
 		g.Expect(err).NotTo(HaveOccurred())
 
-		fooFromUnstructured := &V1Beta1ResourceWithLegacyAndExperimentalConditionsV1{}
+		fooFromUnstructured := &builder.Phase1Obj{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), fooFromUnstructured)
 		g.Expect(err).NotTo(HaveOccurred())
 
@@ -193,13 +188,10 @@ func TestSetAll(t *testing.T) {
 
 	t.Run("v1beta2 object with conditions and backward compatible conditions", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta2ResourceWithConditionsAndBackwardCompatibleConditions{
-			Status: struct {
-				Conditions            []metav1.Condition
-				BackwardCompatibility struct{ Conditions clusterv1.Conditions }
-			}{
+		foo := &builder.Phase2Obj{
+			Status: builder.Phase2ObjStatus{
 				Conditions: nil,
-				BackwardCompatibility: struct{ Conditions clusterv1.Conditions }{
+				BackCompatibility: builder.Phase2ObjStatusBackCompatibility{
 					Conditions: clusterv1.Conditions{
 						{
 							Type:               "barCondition",
@@ -219,13 +211,10 @@ func TestSetAll(t *testing.T) {
 
 	t.Run("v1beta2 object with conditions and backward compatible conditions / Unstructured", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta2ResourceWithConditionsAndBackwardCompatibleConditions{
-			Status: struct {
-				Conditions            []metav1.Condition
-				BackwardCompatibility struct{ Conditions clusterv1.Conditions }
-			}{
+		foo := &builder.Phase2Obj{
+			Status: builder.Phase2ObjStatus{
 				Conditions: nil,
-				BackwardCompatibility: struct{ Conditions clusterv1.Conditions }{
+				BackCompatibility: builder.Phase2ObjStatusBackCompatibility{
 					Conditions: clusterv1.Conditions{
 						{
 							Type:               "barCondition",
@@ -245,7 +234,7 @@ func TestSetAll(t *testing.T) {
 		err = SetAll(u, conditions, ConditionFields{"status", "conditions"})
 		g.Expect(err).NotTo(HaveOccurred())
 
-		fooFromUnstructured := &V1Beta2ResourceWithConditionsAndBackwardCompatibleConditions{}
+		fooFromUnstructured := &builder.Phase2Obj{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), fooFromUnstructured)
 		g.Expect(err).NotTo(HaveOccurred())
 
@@ -256,10 +245,8 @@ func TestSetAll(t *testing.T) {
 
 	t.Run("v1beta2 object with conditions (end state)", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta2ResourceWithConditions{
-			Status: struct {
-				Conditions []metav1.Condition
-			}{
+		foo := &builder.Phase3Obj{
+			Status: builder.Phase3ObjStatus{
 				Conditions: nil,
 			},
 		}
@@ -272,10 +259,8 @@ func TestSetAll(t *testing.T) {
 
 	t.Run("v1beta2 object with conditions (end state) / Unstructured", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta2ResourceWithConditions{
-			Status: struct {
-				Conditions []metav1.Condition
-			}{
+		foo := &builder.Phase3Obj{
+			Status: builder.Phase3ObjStatus{
 				Conditions: nil,
 			},
 		}
@@ -288,7 +273,7 @@ func TestSetAll(t *testing.T) {
 		err = SetAll(u, conditions, ConditionFields{"status", "conditions"})
 		g.Expect(err).NotTo(HaveOccurred())
 
-		fooFromUnstructured := &V1Beta2ResourceWithConditions{}
+		fooFromUnstructured := &builder.Phase3Obj{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), fooFromUnstructured)
 		g.Expect(err).NotTo(HaveOccurred())
 

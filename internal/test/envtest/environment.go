@@ -90,6 +90,7 @@ func init() {
 	utilruntime.Must(admissionv1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(runtimev1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(ipamv1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(builder.AddTransitionV1beta2ToScheme(scheme.Scheme))
 }
 
 // RunInput is the input for Run.
@@ -230,6 +231,10 @@ func newEnvironment(uncachedObjs ...client.Object) *Environment {
 			builder.TestBootstrapConfigCRD.DeepCopy(),
 			builder.TestControlPlaneTemplateCRD.DeepCopy(),
 			builder.TestControlPlaneCRD.DeepCopy(),
+			builder.Phase0ObjCRD.DeepCopy(),
+			builder.Phase1ObjCRD.DeepCopy(),
+			builder.Phase2ObjCRD.DeepCopy(),
+			builder.Phase3ObjCRD.DeepCopy(),
 		},
 		// initialize webhook here to be able to test the envtest install via webhookOptions
 		// This should set LocalServingCertDir and LocalServingPort that are used below.

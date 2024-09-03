@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/internal/test/builder"
 )
 
 type ObjWithoutStatus struct {
@@ -74,58 +75,6 @@ func (f *ObjWithWrongExperimentalConditionType) DeepCopyObject() runtime.Object 
 	panic("implement me")
 }
 
-type V1Beta1ResourceWithLegacyConditions struct {
-	metav1.TypeMeta
-	metav1.ObjectMeta
-	Status struct {
-		Conditions clusterv1.Conditions
-	}
-}
-
-func (f *V1Beta1ResourceWithLegacyConditions) DeepCopyObject() runtime.Object {
-	panic("implement me")
-}
-
-type V1Beta1ResourceWithLegacyAndExperimentalConditionsV1 struct {
-	metav1.TypeMeta
-	metav1.ObjectMeta
-	Status struct {
-		Conditions             clusterv1.Conditions
-		ExperimentalConditions []metav1.Condition
-	}
-}
-
-func (f *V1Beta1ResourceWithLegacyAndExperimentalConditionsV1) DeepCopyObject() runtime.Object {
-	panic("implement me")
-}
-
-type V1Beta2ResourceWithConditionsAndBackwardCompatibleConditions struct {
-	metav1.TypeMeta
-	metav1.ObjectMeta
-	Status struct {
-		Conditions            []metav1.Condition
-		BackwardCompatibility struct {
-			Conditions clusterv1.Conditions
-		}
-	}
-}
-
-func (f *V1Beta2ResourceWithConditionsAndBackwardCompatibleConditions) DeepCopyObject() runtime.Object {
-	panic("implement me")
-}
-
-type V1Beta2ResourceWithConditions struct {
-	metav1.TypeMeta
-	metav1.ObjectMeta
-	Status struct {
-		Conditions []metav1.Condition
-	}
-}
-
-func (f *V1Beta2ResourceWithConditions) DeepCopyObject() runtime.Object {
-	panic("implement me")
-}
-
 func TestGetAll(t *testing.T) {
 	now := metav1.Now().Rfc3339Copy()
 
@@ -138,7 +87,7 @@ func TestGetAll(t *testing.T) {
 
 	t.Run("fails for nil object", func(t *testing.T) {
 		g := NewWithT(t)
-		var foo *V1Beta1ResourceWithLegacyConditions
+		var foo *builder.Phase0Obj
 
 		_, err := GetAll(foo)
 		g.Expect(err).To(HaveOccurred())
@@ -199,21 +148,23 @@ func TestGetAll(t *testing.T) {
 
 	t.Run("v1beta object with legacy conditions", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta1ResourceWithLegacyConditions{
-			Status: struct{ Conditions clusterv1.Conditions }{Conditions: clusterv1.Conditions{
-				{
-					Type:               "fooCondition",
-					Status:             corev1.ConditionTrue,
-					LastTransitionTime: now,
+		foo := &builder.Phase0Obj{
+			Status: builder.Phase0ObjStatus{
+				Conditions: clusterv1.Conditions{
+					{
+						Type:               "fooCondition",
+						Status:             corev1.ConditionTrue,
+						LastTransitionTime: now,
+					},
+					{
+						Type:               "fooCondition",
+						Status:             corev1.ConditionFalse,
+						LastTransitionTime: now,
+						Reason:             "FooReason",
+						Message:            "FooMessage",
+					},
 				},
-				{
-					Type:               "fooCondition",
-					Status:             corev1.ConditionFalse,
-					LastTransitionTime: now,
-					Reason:             "FooReason",
-					Message:            "FooMessage",
-				},
-			}},
+			},
 		}
 
 		expect := []metav1.Condition{
@@ -245,11 +196,8 @@ func TestGetAll(t *testing.T) {
 
 	t.Run("v1beta1 object with both legacy and experimental conditions", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta1ResourceWithLegacyAndExperimentalConditionsV1{
-			Status: struct {
-				Conditions             clusterv1.Conditions
-				ExperimentalConditions []metav1.Condition
-			}{
+		foo := &builder.Phase1Obj{
+			Status: builder.Phase1ObjStatus{
 				Conditions: clusterv1.Conditions{
 					{
 						Type:               "barCondition",
@@ -295,11 +243,8 @@ func TestGetAll(t *testing.T) {
 
 	t.Run("v1beta2 object with conditions and backward compatible conditions", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta2ResourceWithConditionsAndBackwardCompatibleConditions{
-			Status: struct {
-				Conditions            []metav1.Condition
-				BackwardCompatibility struct{ Conditions clusterv1.Conditions }
-			}{
+		foo := &builder.Phase2Obj{
+			Status: builder.Phase2ObjStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:               "fooCondition",
@@ -307,7 +252,7 @@ func TestGetAll(t *testing.T) {
 						LastTransitionTime: now,
 					},
 				},
-				BackwardCompatibility: struct{ Conditions clusterv1.Conditions }{
+				BackCompatibility: builder.Phase2ObjStatusBackCompatibility{
 					Conditions: clusterv1.Conditions{
 						{
 							Type:               "barCondition",
@@ -341,10 +286,8 @@ func TestGetAll(t *testing.T) {
 
 	t.Run("v1beta2 object with conditions (end state)", func(t *testing.T) {
 		g := NewWithT(t)
-		foo := &V1Beta2ResourceWithConditions{
-			Status: struct {
-				Conditions []metav1.Condition
-			}{
+		foo := &builder.Phase3Obj{
+			Status: builder.Phase3ObjStatus{
 				Conditions: []metav1.Condition{
 					{
 						Type:               "fooCondition",

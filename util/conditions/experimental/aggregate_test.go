@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"sigs.k8s.io/cluster-api/internal/test/builder"
 )
 
 func TestAggregate(t *testing.T) {
@@ -79,9 +81,9 @@ func TestAggregate(t *testing.T) {
 			options:       []AggregateOption{},
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
-				Status:  metav1.ConditionFalse,                                                                                        // False because there is one issue
-				Reason:  ManyIssuesReason,                                                                                             // Using a generic reason
-				Message: "(False): Message-1 from default/obj0, default/obj1, default/obj2 and 2 other V1Beta2ResourceWithConditions", // messages from all the issues & unknown conditions (info dropped)
+				Status:  metav1.ConditionFalse,                                                                     // False because there is one issue
+				Reason:  ManyIssuesReason,                                                                          // Using a generic reason
+				Message: "(False): Message-1 from default/obj0, default/obj1, default/obj2 and 2 other Phase3Objs", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
 		{
@@ -119,9 +121,9 @@ func TestAggregate(t *testing.T) {
 			options:       []AggregateOption{},
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
-				Status:  metav1.ConditionFalse,                                                                                                                                                               // False because there is one issue
-				Reason:  ManyIssuesReason,                                                                                                                                                                    // Using a generic reason
-				Message: "(False): Message-1 from default/obj0, default/obj4; (False): Message-2 from default/obj1; (False): Message-3 from default/obj5; other 2 V1Beta2ResourceWithConditions with issues", // messages from all the issues & unknown conditions (info dropped)
+				Status:  metav1.ConditionFalse,                                                                                                                                            // False because there is one issue
+				Reason:  ManyIssuesReason,                                                                                                                                                 // Using a generic reason
+				Message: "(False): Message-1 from default/obj0, default/obj4; (False): Message-2 from default/obj1; (False): Message-3 from default/obj5; other 2 Phase3Objs with issues", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
 		{
@@ -154,9 +156,9 @@ func TestAggregate(t *testing.T) {
 			options:       []AggregateOption{},
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
-				Status:  metav1.ConditionFalse,                                                                                                                                             // False because there is one issue
-				Reason:  ManyIssuesReason,                                                                                                                                                  // Using a generic reason
-				Message: "(False): Message-1 from default/obj0; (False): Message-2 from default/obj1; (False): Message-4 from default/obj3; other 1 V1Beta2ResourceWithConditions unknown", // messages from all the issues & unknown conditions (info dropped)
+				Status:  metav1.ConditionFalse,                                                                                                                          // False because there is one issue
+				Reason:  ManyIssuesReason,                                                                                                                               // Using a generic reason
+				Message: "(False): Message-1 from default/obj0; (False): Message-2 from default/obj1; (False): Message-4 from default/obj3; other 1 Phase3Objs unknown", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
 		{
@@ -174,9 +176,9 @@ func TestAggregate(t *testing.T) {
 			options:       []AggregateOption{},
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
-				Status:  metav1.ConditionUnknown,                                                                                                                                                               // False because there is one issue
-				Reason:  ManyUnknownsReason,                                                                                                                                                                    // Using a generic reason
-				Message: "(Unknown): Message-1 from default/obj0, default/obj4; (Unknown): Message-2 from default/obj1; (Unknown): Message-3 from default/obj5; other 2 V1Beta2ResourceWithConditions unknown", // messages from all the issues & unknown conditions (info dropped)
+				Status:  metav1.ConditionUnknown,                                                                                                                                            // False because there is one issue
+				Reason:  ManyUnknownsReason,                                                                                                                                                 // Using a generic reason
+				Message: "(Unknown): Message-1 from default/obj0, default/obj4; (Unknown): Message-2 from default/obj1; (Unknown): Message-3 from default/obj5; other 2 Phase3Objs unknown", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
 		{
@@ -193,9 +195,9 @@ func TestAggregate(t *testing.T) {
 			options:       []AggregateOption{},
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
-				Status:  metav1.ConditionTrue,                                                                                                                                                                    // False because there is one issue
-				Reason:  ManyInfoReason,                                                                                                                                                                          // Using a generic reason
-				Message: "(True): Message-1 from default/obj0, default/obj4; (True): Message-2 from default/obj1; (True): Message-3 from default/obj5; other 1 V1Beta2ResourceWithConditions with info messages", // messages from all the issues & unknown conditions (info dropped)
+				Status:  metav1.ConditionTrue,                                                                                                                                                 // False because there is one issue
+				Reason:  ManyInfoReason,                                                                                                                                                       // Using a generic reason
+				Message: "(True): Message-1 from default/obj0, default/obj4; (True): Message-2 from default/obj1; (True): Message-3 from default/obj5; other 1 Phase3Objs with info messages", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
 	}
@@ -206,12 +208,12 @@ func TestAggregate(t *testing.T) {
 
 			objs := make([]runtime.Object, 0, len(tt.conditions))
 			for i := range tt.conditions {
-				objs = append(objs, &V1Beta2ResourceWithConditions{
+				objs = append(objs, &builder.Phase3Obj{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: metav1.NamespaceDefault,
 						Name:      fmt.Sprintf("obj%d", i),
 					},
-					Status: struct{ Conditions []metav1.Condition }{
+					Status: builder.Phase3ObjStatus{
 						Conditions: tt.conditions[i],
 					},
 				})

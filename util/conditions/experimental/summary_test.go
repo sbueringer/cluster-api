@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/cluster-api/internal/test/builder"
 )
 
 func TestSummary(t *testing.T) {
@@ -183,12 +185,12 @@ func TestSummary(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			obj := &V1Beta2ResourceWithConditions{
+			obj := &builder.Phase3Obj{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "SourceObject",
 				},
-				Status: struct{ Conditions []metav1.Condition }{
+				Status: builder.Phase3ObjStatus{
 					Conditions: tt.conditions,
 				},
 			}
