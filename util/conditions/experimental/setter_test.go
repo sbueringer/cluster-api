@@ -183,7 +183,7 @@ func TestSetAll(t *testing.T) {
 
 		got, err := GetAll(fooFromUnstructured)
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(Equal(conditions), cmp.Diff(got, conditions))
+		g.Expect(got).To(MatchConditions(conditions), cmp.Diff(got, conditions))
 	})
 
 	t.Run("v1beta2 object with conditions and backward compatible conditions", func(t *testing.T) {
@@ -206,7 +206,7 @@ func TestSetAll(t *testing.T) {
 		conditions := cloneConditions()
 		err := SetAll(foo, conditions)
 		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(foo.Status.Conditions).To(Equal(conditions), cmp.Diff(foo.Status.Conditions, conditions))
+		g.Expect(foo.Status.Conditions).To(MatchConditions(conditions), cmp.Diff(foo.Status.Conditions, conditions))
 	})
 
 	t.Run("v1beta2 object with conditions and backward compatible conditions / Unstructured", func(t *testing.T) {
@@ -240,7 +240,7 @@ func TestSetAll(t *testing.T) {
 
 		got, err := GetAll(fooFromUnstructured)
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(Equal(conditions), cmp.Diff(got, conditions))
+		g.Expect(got).To(MatchConditions(conditions), cmp.Diff(got, conditions))
 	})
 
 	t.Run("v1beta2 object with conditions (end state)", func(t *testing.T) {
@@ -279,6 +279,6 @@ func TestSetAll(t *testing.T) {
 
 		got, err := GetAll(fooFromUnstructured)
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(Equal(conditions), cmp.Diff(got, conditions))
+		g.Expect(got).To(MatchConditions(conditions), cmp.Diff(got, conditions))
 	})
 }
