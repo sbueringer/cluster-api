@@ -154,20 +154,24 @@ func NodeDrainTimeoutSpec(ctx context.Context, inputGetter func() NodeDrainTimeo
 
 		workloadClusterProxy := input.BootstrapClusterProxy.GetWorkloadCluster(ctx, cluster.Namespace, cluster.Name)
 		By("Deploy Deployment with unevictable Pods on control plane Nodes.")
+
+		cpDeploymentAndPDBName := fmt.Sprintf("%s-%s", "unevictable-pod-cp", util.RandomString(3))
 		framework.DeployUnevictablePod(ctx, framework.DeployUnevictablePodInput{
 			WorkloadClusterProxy:               workloadClusterProxy,
 			ControlPlane:                       controlplane,
-			DeploymentName:                     fmt.Sprintf("%s-%s", "unevictable-pod-cp", util.RandomString(3)),
+			DeploymentName:                     cpDeploymentAndPDBName,
 			Namespace:                          namespace.Name + "-unevictable-workload",
 			NodeSelector:                       map[string]string{nodeOwnerLabelKey: "KubeadmControlPlane-" + controlplane.Name},
 			WaitForDeploymentAvailableInterval: input.E2EConfig.GetIntervals(specName, "wait-deployment-available"),
 		})
 		By("Deploy Deployment with unevictable Pods on MachineDeployment Nodes.")
+		mdDeploymentAndPDBNames := map[string]string{}
 		for _, md := range machineDeployments {
+			mdDeploymentAndPDBNames[md.Name] = fmt.Sprintf("%s-%s", "unevictable-pod-md", util.RandomString(3))
 			framework.DeployUnevictablePod(ctx, framework.DeployUnevictablePodInput{
 				WorkloadClusterProxy:               workloadClusterProxy,
 				MachineDeployment:                  md,
-				DeploymentName:                     fmt.Sprintf("%s-%s", "unevictable-pod-md", util.RandomString(3)),
+				DeploymentName:                     mdDeploymentAndPDBNames[md.Name],
 				Namespace:                          namespace.Name + "-unevictable-workload",
 				NodeSelector:                       map[string]string{nodeOwnerLabelKey: "MachineDeployment-" + md.Name},
 				WaitForDeploymentAvailableInterval: input.E2EConfig.GetIntervals(specName, "wait-deployment-available"),
@@ -209,7 +213,7 @@ func NodeDrainTimeoutSpec(ctx context.Context, inputGetter func() NodeDrainTimeo
 			}
 			g.Expect(condition).ToNot(BeNil())
 			g.Expect(condition.Status).To(Equal(corev1.ConditionFalse))
-			g.Expect(condition.Message).To(ContainSubstring("Cannot evict pod as it would violate the pod's disruption budget"))
+			g.Expect(condition.Message).To(ContainSubstring(fmt.Sprintf("Cannot evict pod as it would violate the pod's disruption budget. The disruption budget %s needs", cpDeploymentAndPDBName)))
 		}, input.E2EConfig.GetIntervals(specName, "wait-machine-deleted")...).Should(Succeed())
 		for _, md := range machineDeployments {
 			Eventually(func(g Gomega) {
@@ -223,7 +227,7 @@ func NodeDrainTimeoutSpec(ctx context.Context, inputGetter func() NodeDrainTimeo
 				condition := conditions.Get(&machines[0], clusterv1.DrainingSucceededCondition)
 				g.Expect(condition).ToNot(BeNil())
 				g.Expect(condition.Status).To(Equal(corev1.ConditionFalse))
-				g.Expect(condition.Message).To(ContainSubstring("Cannot evict pod as it would violate the pod's disruption budget"))
+				g.Expect(condition.Message).To(ContainSubstring(fmt.Sprintf("Cannot evict pod as it would violate the pod's disruption budget. The disruption budget %s needs", mdDeploymentAndPDBNames[md.Name])))
 			}, input.E2EConfig.GetIntervals(specName, "wait-machine-deleted")...).Should(Succeed())
 		}
 
