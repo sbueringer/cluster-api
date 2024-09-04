@@ -215,6 +215,12 @@ const (
 	// is detected (or whatever period is defined in the --remote-connection-grace-period flag).
 	ClusterRemoteConnectionProbeV1Beta2Condition = "RemoteConnectionProbe"
 
+	// ClusterRemoteConnectionProbeFailedV1Beta2Reason is the reason used when setting RemoteConnectionProbe to false.
+	ClusterRemoteConnectionProbeFailedV1Beta2Reason = "RemoteConnectionProbeFailed"
+
+	// ClusterRemoteConnectionProbeSucceededV1Beta2Reason is the reason used when setting RemoteConnectionProbe to true.
+	ClusterRemoteConnectionProbeSucceededV1Beta2Reason = "RemoteConnectionProbeSucceeded"
+
 	// ClusterScalingUpV1Beta2Condition is true if available replicas < desired replicas.
 	ClusterScalingUpV1Beta2Condition = ScalingUpV1Beta2Condition
 
