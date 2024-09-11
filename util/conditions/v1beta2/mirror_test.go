@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import (
 	"testing"
@@ -41,16 +41,16 @@ func TestMirrorStatusCondition(t *testing.T) {
 			},
 			conditionType: "Ready",
 			options:       []MirrorOption{},
-			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good! (from Phase3Obj default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
+			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good! (from Phase3Obj SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
 		},
 		{
-			name: "Mirror a condition with override type",
+			name: "Mirror a condition with target type",
 			conditions: []metav1.Condition{
 				{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good!", ObservedGeneration: 10, LastTransitionTime: now},
 			},
 			conditionType: "Ready",
-			options:       []MirrorOption{OverrideType("SomethingReady")},
-			want:          metav1.Condition{Type: "SomethingReady", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good! (from Phase3Obj default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
+			options:       []MirrorOption{TargetConditionType("SomethingReady")},
+			want:          metav1.Condition{Type: "SomethingReady", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "We are good! (from Phase3Obj SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
 		},
 		{
 			name: "Mirror a condition with empty message",
@@ -59,21 +59,21 @@ func TestMirrorStatusCondition(t *testing.T) {
 			},
 			conditionType: "Ready",
 			options:       []MirrorOption{},
-			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "(from Phase3Obj default/SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
+			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionTrue, Reason: "AllGood!", Message: "(from Phase3Obj SourceObject)", ObservedGeneration: 10, LastTransitionTime: now},
 		},
 		{
 			name:          "Mirror a condition not yet reported",
 			conditions:    []metav1.Condition{},
 			conditionType: "Ready",
 			options:       []MirrorOption{},
-			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionUnknown, Reason: NotYetReportedReason, Message: "Condition Ready not yet reported from Phase3Obj default/SourceObject", LastTransitionTime: now},
+			want:          metav1.Condition{Type: "Ready", Status: metav1.ConditionUnknown, Reason: NotYetReportedReason, Message: "Condition Ready not yet reported from Phase3Obj SourceObject", LastTransitionTime: now},
 		},
 		{
-			name:          "Mirror a condition not yet reported with override type",
+			name:          "Mirror a condition not yet reported with target type",
 			conditions:    []metav1.Condition{},
 			conditionType: "Ready",
-			options:       []MirrorOption{OverrideType("SomethingReady")},
-			want:          metav1.Condition{Type: "SomethingReady", Status: metav1.ConditionUnknown, Reason: NotYetReportedReason, Message: "Condition Ready not yet reported from Phase3Obj default/SourceObject", LastTransitionTime: now},
+			options:       []MirrorOption{TargetConditionType("SomethingReady")},
+			want:          metav1.Condition{Type: "SomethingReady", Status: metav1.ConditionUnknown, Reason: NotYetReportedReason, Message: "Condition Ready not yet reported from Phase3Obj SourceObject", LastTransitionTime: now},
 		},
 	}
 
@@ -95,9 +95,7 @@ func TestMirrorStatusCondition(t *testing.T) {
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(got).ToNot(BeNil())
 
-			// TODO: think about how to improve this; the issue happens when the condition is not yet reported and one gets generated (using time.now) - Option is to make the time overridable
 			got.LastTransitionTime = tt.want.LastTransitionTime
-
 			g.Expect(*got).To(Equal(tt.want))
 		})
 	}

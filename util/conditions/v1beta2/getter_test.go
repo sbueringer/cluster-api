@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import (
 	"testing"
@@ -62,16 +62,18 @@ func (f *ObjWithWrongConditionType) DeepCopyObject() runtime.Object {
 	panic("implement me")
 }
 
-type ObjWithWrongExperimentalConditionType struct {
+type ObjWithWrongV1beta2ConditionType struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
 	Status struct {
-		Conditions             clusterv1.Conditions
-		ExperimentalConditions []string
+		Conditions clusterv1.Conditions
+		V1Beta2    struct {
+			Conditions []string
+		}
 	}
 }
 
-func (f *ObjWithWrongExperimentalConditionType) DeepCopyObject() runtime.Object {
+func (f *ObjWithWrongV1beta2ConditionType) DeepCopyObject() runtime.Object {
 	panic("implement me")
 }
 
@@ -112,7 +114,7 @@ func TestGetAll(t *testing.T) {
 		g.Expect(err).To(HaveOccurred())
 	})
 
-	t.Run("fails for object with status without conditions or experimental conditions", func(t *testing.T) {
+	t.Run("fails for object with status without conditions or v1beta2 conditions", func(t *testing.T) {
 		g := NewWithT(t)
 		foo := &ObjWithStatusWithoutConditions{}
 
@@ -124,26 +126,6 @@ func TestGetAll(t *testing.T) {
 
 		_, err = GetAll(&unstructured.Unstructured{Object: fooUnstructured})
 		g.Expect(err).To(HaveOccurred())
-	})
-
-	t.Run("fails for object with wrong condition type", func(t *testing.T) {
-		g := NewWithT(t)
-		foo := &ObjWithWrongConditionType{}
-
-		_, err := GetAll(foo)
-		g.Expect(err).To(HaveOccurred())
-
-		// TODO: think about how unstructured can detect wrong type
-	})
-
-	t.Run("fails for object with wrong experimental condition type", func(t *testing.T) {
-		g := NewWithT(t)
-		foo := &ObjWithWrongExperimentalConditionType{}
-
-		_, err := GetAll(foo)
-		g.Expect(err).To(HaveOccurred())
-
-		// TODO: think about how unstructured can detect wrong type
 	})
 
 	t.Run("v1beta object with legacy conditions", func(t *testing.T) {
@@ -172,6 +154,7 @@ func TestGetAll(t *testing.T) {
 				Type:               string(foo.Status.Conditions[0].Type),
 				Status:             metav1.ConditionStatus(foo.Status.Conditions[0].Status),
 				LastTransitionTime: foo.Status.Conditions[0].LastTransitionTime,
+				Reason:             NoReasonReported,
 			},
 			{
 				Type:               string(foo.Status.Conditions[1].Type),
@@ -194,7 +177,7 @@ func TestGetAll(t *testing.T) {
 		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
 	})
 
-	t.Run("v1beta1 object with both legacy and experimental conditions", func(t *testing.T) {
+	t.Run("v1beta1 object with both legacy and v1beta2 conditions", func(t *testing.T) {
 		g := NewWithT(t)
 		foo := &builder.Phase1Obj{
 			Status: builder.Phase1ObjStatus{
@@ -205,14 +188,16 @@ func TestGetAll(t *testing.T) {
 						LastTransitionTime: now,
 					},
 				},
-				ExperimentalConditions: []metav1.Condition{
-					{
-						Type:               "fooCondition",
-						Status:             metav1.ConditionTrue,
-						ObservedGeneration: 10,
-						LastTransitionTime: now,
-						Reason:             "FooReason",
-						Message:            "FooMessage",
+				V1Beta2: builder.Phase1ObjStatusV1beta2{
+					Conditions: []metav1.Condition{
+						{
+							Type:               "fooCondition",
+							Status:             metav1.ConditionTrue,
+							ObservedGeneration: 10,
+							LastTransitionTime: now,
+							Reason:             "FooReason",
+							Message:            "FooMessage",
+						},
 					},
 				},
 			},
@@ -220,12 +205,12 @@ func TestGetAll(t *testing.T) {
 
 		expect := []metav1.Condition{
 			{
-				Type:               foo.Status.ExperimentalConditions[0].Type,
-				Status:             foo.Status.ExperimentalConditions[0].Status,
-				LastTransitionTime: foo.Status.ExperimentalConditions[0].LastTransitionTime,
-				ObservedGeneration: foo.Status.ExperimentalConditions[0].ObservedGeneration,
-				Reason:             foo.Status.ExperimentalConditions[0].Reason,
-				Message:            foo.Status.ExperimentalConditions[0].Message,
+				Type:               foo.Status.V1Beta2.Conditions[0].Type,
+				Status:             foo.Status.V1Beta2.Conditions[0].Status,
+				LastTransitionTime: foo.Status.V1Beta2.Conditions[0].LastTransitionTime,
+				ObservedGeneration: foo.Status.V1Beta2.Conditions[0].ObservedGeneration,
+				Reason:             foo.Status.V1Beta2.Conditions[0].Reason,
+				Message:            foo.Status.V1Beta2.Conditions[0].Message,
 			},
 		}
 
@@ -250,14 +235,17 @@ func TestGetAll(t *testing.T) {
 						Type:               "fooCondition",
 						Status:             metav1.ConditionTrue,
 						LastTransitionTime: now,
+						Reason:             "fooReason",
 					},
 				},
-				BackCompatibility: builder.Phase2ObjStatusBackCompatibility{
-					Conditions: clusterv1.Conditions{
-						{
-							Type:               "barCondition",
-							Status:             corev1.ConditionFalse,
-							LastTransitionTime: now,
+				Deprecated: builder.Phase2ObjStatusDeprecated{
+					V1Beta1: builder.Phase2ObjStatusDeprecatedV1Beta2{
+						Conditions: clusterv1.Conditions{
+							{
+								Type:               "barCondition",
+								Status:             corev1.ConditionFalse,
+								LastTransitionTime: now,
+							},
 						},
 					},
 				},
@@ -269,6 +257,7 @@ func TestGetAll(t *testing.T) {
 				Type:               foo.Status.Conditions[0].Type,
 				Status:             foo.Status.Conditions[0].Status,
 				LastTransitionTime: foo.Status.Conditions[0].LastTransitionTime,
+				Reason:             foo.Status.Conditions[0].Reason,
 			},
 		}
 
@@ -293,6 +282,7 @@ func TestGetAll(t *testing.T) {
 						Type:               "fooCondition",
 						Status:             metav1.ConditionTrue,
 						LastTransitionTime: now,
+						Reason:             "fooReason",
 					},
 				},
 			},
@@ -303,6 +293,7 @@ func TestGetAll(t *testing.T) {
 				Type:               foo.Status.Conditions[0].Type,
 				Status:             foo.Status.Conditions[0].Status,
 				LastTransitionTime: foo.Status.Conditions[0].LastTransitionTime,
+				Reason:             foo.Status.Conditions[0].Reason,
 			},
 		}
 
@@ -317,4 +308,87 @@ func TestGetAll(t *testing.T) {
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
 	})
+}
+
+func TestConvertFromV1Beta1Conditions(t *testing.T) {
+	tests := []struct {
+		name       string
+		conditions []clusterv1.Condition
+		want       []metav1.Condition
+		wantError  bool
+	}{
+		{
+			name: "Fails if Type is missing",
+			conditions: clusterv1.Conditions{
+				clusterv1.Condition{Status: corev1.ConditionTrue},
+			},
+			wantError: true,
+		},
+		{
+			name: "Fails if Status is missing",
+			conditions: clusterv1.Conditions{
+				clusterv1.Condition{Type: clusterv1.ConditionType("foo")},
+			},
+			wantError: true,
+		},
+		{
+			name: "Defaults reason for positive polarity",
+			conditions: clusterv1.Conditions{
+				clusterv1.Condition{Type: clusterv1.ConditionType("foo"), Status: corev1.ConditionTrue},
+			},
+			wantError: false,
+			want: []metav1.Condition{
+				{
+					Type:   "foo",
+					Status: metav1.ConditionTrue,
+					Reason: NoReasonReported,
+				},
+			},
+		},
+		{
+			name: "Defaults reason for negative polarity",
+			conditions: clusterv1.Conditions{
+				clusterv1.Condition{Type: clusterv1.ConditionType("foo"), Status: corev1.ConditionFalse},
+			},
+			wantError: false,
+			want: []metav1.Condition{
+				{
+					Type:   "foo",
+					Status: metav1.ConditionFalse,
+					Reason: NoReasonReported,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			got, err := convertFromV1Beta1Conditions(tt.conditions)
+			if tt.wantError {
+				g.Expect(err).To(HaveOccurred())
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			g.Expect(got).To(Equal(tt.want), cmp.Diff(tt.want, got))
+		})
+		t.Run(tt.name+" - unstructured", func(t *testing.T) {
+			g := NewWithT(t)
+
+			unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&builder.Phase0Obj{Status: builder.Phase0ObjStatus{Conditions: tt.conditions}})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(unstructuredObj).To(HaveKey("status"))
+			unstructuredStatusObj := unstructuredObj["status"].(map[string]interface{})
+			g.Expect(unstructuredStatusObj).To(HaveKey("conditions"))
+
+			got, err := convertFromUnstructuredConditions(unstructuredStatusObj["conditions"].([]interface{}))
+			if tt.wantError {
+				g.Expect(err).To(HaveOccurred())
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			g.Expect(got).To(Equal(tt.want), cmp.Diff(tt.want, got))
+		})
+	}
 }

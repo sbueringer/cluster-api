@@ -14,37 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
-// ConditionFields defines the path where conditions are defined in Unstructured objects.
-type ConditionFields []string
-
-// ApplyToSet applies this configuration to the given Set options.
-func (f ConditionFields) ApplyToSet(opts *SetOptions) {
-	opts.conditionsFields = f
-}
-
-// TODO: Think about using Less directly instead of defining a new option (might be only useful for the UX).
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // ConditionSortFunc defines the sort order when conditions are assigned to an object.
-type ConditionSortFunc Less
+type ConditionSortFunc func(i, j metav1.Condition) bool
 
 // ApplyToSet applies this configuration to the given Set options.
 func (f ConditionSortFunc) ApplyToSet(opts *SetOptions) {
-	opts.less = Less(f)
+	opts.conditionSortFunc = f
 }
 
-// OverrideType allows to override the type of new mirror or aggregate conditions.
-type OverrideType string
+// TargetConditionType allows to specify the type of new mirror or aggregate conditions.
+type TargetConditionType string
 
-// ApplyToMirror applies this configuration to the given mirrorInto options.
-func (t OverrideType) ApplyToMirror(opts *MirrorOptions) {
-	opts.overrideType = string(t)
+// ApplyToMirror applies this configuration to the given mirror options.
+func (t TargetConditionType) ApplyToMirror(opts *MirrorOptions) {
+	opts.targetConditionType = string(t)
 }
 
 // ApplyToAggregate applies this configuration to the given aggregate options.
-func (t OverrideType) ApplyToAggregate(opts *AggregateOptions) {
-	opts.overrideType = string(t)
+func (t TargetConditionType) ApplyToAggregate(opts *AggregateOptions) {
+	opts.targetConditionType = string(t)
 }
 
 // ForConditionTypes allows to define the set of conditions in scope for a summary operation.
@@ -56,12 +48,20 @@ func (t ForConditionTypes) ApplyToSummary(opts *SummaryOptions) {
 	opts.conditionTypes = t
 }
 
-// WithNegativeConditionTypes allows to define polarity for some of the conditions in scope for a summary operation.
-type WithNegativeConditionTypes []string
+// WithNegativePolarityConditionTypes allows to define polarity for some of the conditions in scope for a summary operation.
+type WithNegativePolarityConditionTypes []string
 
 // ApplyToSummary applies this configuration to the given summary options.
-func (t WithNegativeConditionTypes) ApplyToSummary(opts *SummaryOptions) {
+func (t WithNegativePolarityConditionTypes) ApplyToSummary(opts *SummaryOptions) {
 	opts.negativePolarityConditionTypes = t
+}
+
+// IgnoreTypesIfMissing allows to define conditions types that should be ignored (not defaulted to unknown) when performing a summary operation.
+type IgnoreTypesIfMissing []string
+
+// ApplyToSummary applies this configuration to the given summary options.
+func (t IgnoreTypesIfMissing) ApplyToSummary(opts *SummaryOptions) {
+	opts.ignoreTypesIfMissing = t
 }
 
 // WithMergeStrategy allows to define a custom merge strategy when creating new summary or aggregate conditions.

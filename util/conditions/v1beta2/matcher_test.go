@@ -14,16 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import (
 	"testing"
+	"time"
 
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestMatchConditions(t *testing.T) {
+	t0 := metav1.Now()
+
 	testCases := []struct {
 		name        string
 		actual      interface{}
@@ -42,7 +45,7 @@ func TestMatchConditions(t *testing.T) {
 				{
 					Type:               "type",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "reason",
 					Message:            "message",
 				},
@@ -51,7 +54,7 @@ func TestMatchConditions(t *testing.T) {
 				{
 					Type:               "type",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "reason",
 					Message:            "message",
 				},
@@ -64,14 +67,14 @@ func TestMatchConditions(t *testing.T) {
 				{
 					Type:               "type",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "reason",
 					Message:            "message",
 				},
 				{
 					Type:               "type",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "reason",
 					Message:            "message",
 				},
@@ -80,14 +83,14 @@ func TestMatchConditions(t *testing.T) {
 				{
 					Type:               "type",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "reason",
 					Message:            "message",
 				},
 				{
 					Type:               "different",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "different",
 					Message:            "different",
 				},
@@ -100,14 +103,14 @@ func TestMatchConditions(t *testing.T) {
 				{
 					Type:               "type",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "reason",
 					Message:            "message",
 				},
 				{
 					Type:               "type",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "reason",
 					Message:            "message",
 				},
@@ -116,7 +119,7 @@ func TestMatchConditions(t *testing.T) {
 				{
 					Type:               "type",
 					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
+					LastTransitionTime: t0,
 					Reason:             "reason",
 					Message:            "message",
 				},
@@ -138,16 +141,21 @@ func TestMatchConditions(t *testing.T) {
 }
 
 func TestMatchCondition(t *testing.T) {
+	t0 := metav1.Now()
+	t1 := metav1.NewTime(t0.Add(1 * -time.Minute))
+
 	testCases := []struct {
 		name        string
 		actual      interface{}
 		expected    metav1.Condition
+		options     []MatchOption
 		expectMatch bool
 	}{
 		{
 			name:        "with an empty condition",
 			actual:      metav1.Condition{},
 			expected:    metav1.Condition{},
+			options:     []MatchOption{},
 			expectMatch: true,
 		},
 		{
@@ -155,17 +163,18 @@ func TestMatchCondition(t *testing.T) {
 			actual: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Time{},
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
 			expected: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Time{},
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
+			options:     []MatchOption{},
 			expectMatch: true,
 		},
 		{
@@ -173,17 +182,37 @@ func TestMatchCondition(t *testing.T) {
 			actual: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
 			expected: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Time{},
+				LastTransitionTime: t1,
 				Reason:             "reason",
 				Message:            "message",
 			},
+			options:     []MatchOption{},
+			expectMatch: false,
+		},
+		{
+			name: "with a different LastTransitionTime but with IgnoreLastTransitionTime",
+			actual: metav1.Condition{
+				Type:               "type",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: t0,
+				Reason:             "reason",
+				Message:            "message",
+			},
+			expected: metav1.Condition{
+				Type:               "type",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: t1,
+				Reason:             "reason",
+				Message:            "message",
+			},
+			options:     []MatchOption{IgnoreLastTransitionTime(true)},
 			expectMatch: true,
 		},
 		{
@@ -191,17 +220,18 @@ func TestMatchCondition(t *testing.T) {
 			actual: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
 			expected: metav1.Condition{
 				Type:               "different",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
+			options:     []MatchOption{},
 			expectMatch: false,
 		},
 		{
@@ -209,17 +239,18 @@ func TestMatchCondition(t *testing.T) {
 			actual: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
 			expected: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionFalse,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
+			options:     []MatchOption{},
 			expectMatch: false,
 		},
 		{
@@ -227,7 +258,7 @@ func TestMatchCondition(t *testing.T) {
 			actual: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 				ObservedGeneration: 1,
@@ -235,11 +266,12 @@ func TestMatchCondition(t *testing.T) {
 			expected: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 				ObservedGeneration: 2,
 			},
+			options:     []MatchOption{},
 			expectMatch: false,
 		},
 		{
@@ -247,17 +279,18 @@ func TestMatchCondition(t *testing.T) {
 			actual: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
 			expected: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "different",
 				Message:            "message",
 			},
+			options:     []MatchOption{},
 			expectMatch: false,
 		},
 		{
@@ -265,17 +298,18 @@ func TestMatchCondition(t *testing.T) {
 			actual: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "message",
 			},
 			expected: metav1.Condition{
 				Type:               "type",
 				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: t0,
 				Reason:             "reason",
 				Message:            "different",
 			},
+			options:     []MatchOption{},
 			expectMatch: false,
 		},
 	}
@@ -284,9 +318,9 @@ func TestMatchCondition(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 			if tc.expectMatch {
-				g.Expect(tc.actual).To(MatchCondition(tc.expected))
+				g.Expect(tc.actual).To(MatchCondition(tc.expected, tc.options...))
 			} else {
-				g.Expect(tc.actual).ToNot(MatchCondition(tc.expected))
+				g.Expect(tc.actual).ToNot(MatchCondition(tc.expected, tc.options...))
 			}
 		})
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import (
 	"fmt"
@@ -23,21 +23,25 @@ import (
 	"strings"
 
 	"github.com/gobuffalo/flect"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 )
 
+// TODO: Move to the API package.
 const (
-	// ManyIssuesReason is set on conditions generated during aggregate or summary operations when many conditions/objects are reporting issues.
-	ManyIssuesReason = "MoreThanOneIssuesReported"
+	// MultipleIssuesReason is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting issues.
+	// NOTE: If a custom merge strategy is used for the aggregate or summary operations, this might not be true anymore.
+	MultipleIssuesReason = "MultipleIssuesReported"
 
-	// ManyUnknownsReason is set on conditions generated during aggregate or summary operations when many conditions/objects are reporting unknown.
-	ManyUnknownsReason = "MoreThanOneUnknownReported"
+	// MultipleUnknownReported is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting unknown.
+	// NOTE: If a custom merge strategy is used for the aggregate or summary operations, this might not be true anymore.
+	MultipleUnknownReported = "MultipleUnknownReported"
 
-	// ManyInfoReason is set on conditions generated during aggregate or summary operations when many conditions/objects are reporting info.
-	ManyInfoReason = "MoreThanOneInfoReported"
+	// MultipleInfoReason is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting info.
+	// NOTE: If a custom merge strategy is used for the aggregate or summary operations, this might not be true anymore.
+	MultipleInfoReason = "MultipleInfoReported"
 )
 
 // MergeStrategy defines a strategy used to merge conditions during the aggregate or summary operation.
@@ -50,12 +54,12 @@ type MergeStrategy interface {
 	// The list of conditionTypes has an implicit order; it is up to the implementation of merge to use this info or not.
 	// If negativeConditionTypes are in scope, the implementation of merge should treat them accordingly.
 	//
-	// It required, the implementation of merge must add a stepCounter to the output message.
+	// If stepCounter is true, the implementation of merge must add info about step progress to the output message.
 	Merge(conditions []ConditionWithOwnerInfo, conditionTypes []string, negativeConditionTypes sets.Set[string], stepCounter bool) (status metav1.ConditionStatus, reason, message string, err error)
 }
 
-// ConditionWithOwnerInfo is a wrapper  metav1.Condition with addition ConditionOwnerInfo.
-// Those info can be used when generating the message resulting from the merge operation.
+// ConditionWithOwnerInfo is a wrapper around metav1.Condition with additional ConditionOwnerInfo.
+// These infos can be used when generating the message resulting from the merge operation.
 type ConditionWithOwnerInfo struct {
 	OwnerResource ConditionOwnerInfo
 	metav1.Condition
@@ -63,9 +67,13 @@ type ConditionWithOwnerInfo struct {
 
 // ConditionOwnerInfo contains info about the object that owns the condition.
 type ConditionOwnerInfo struct {
-	metav1.TypeMeta
-	Namespace string
-	Name      string
+	Kind string
+	Name string
+}
+
+// String returns a string representation of the ConditionOwnerInfo.
+func (o *ConditionOwnerInfo) String() string {
+	return fmt.Sprintf("%s %s", o.Kind, o.Name)
 }
 
 // defaultMergeStrategy defines the default merge strategy for Cluster API conditions.
@@ -83,18 +91,22 @@ func newDefaultMergeStrategy() MergeStrategy {
 	return &defaultMergeStrategy{}
 }
 
-// Merge all the condition in input based on a strategy that surfaces issue first, then unknown conditions, the info (if none of issues and unknown condition exists).
+// Merge all conditions in input based on a strategy that surfaces issues first, then unknown conditions, then info (if none of issues and unknown condition exists).
 // - issues: conditions with positive polarity (normal True) and status False or conditions with negative polarity (normal False) and status True.
 // - unknown: conditions with status unknown.
 // - info: conditions with positive polarity (normal True) and status True or conditions with negative polarity (normal False) and status False.
 func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, conditionTypes []string, negativeConditionTypes sets.Set[string], stepCounter bool) (status metav1.ConditionStatus, reason, message string, err error) {
+	if len(conditions) == 0 {
+		return "", "", "", errors.New("can't merge an empty list of conditions")
+	}
+
 	// Infer which operation is calling this func, so it is possible to use different strategies for computing the message for the target condition.
 	// - When merge should consider a single condition type, we can assume this func is called within an aggregate operation
 	//   (Aggregate should merge the same condition across many objects)
 	isAggregateOperation := len(conditionTypes) == 1
 
 	// - Otherwise we can assume this func is called within an summary operation
-	//   (Aggregate should merge the same condition across many objects)
+	//   (Summary should merge different conditions from the same object)
 	isSummaryOperation := !isAggregateOperation
 
 	// sortConditions the relevance defined by the users (the order of condition types), LastTransition time (older first).
@@ -104,9 +116,9 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 
 	// Compute the status for the target condition:
 	// Note: This function always return a condition with positive polarity.
-	// - If the top group are issues, use false
-	// - If the top group are unknown, use unknown
-	// - If the top group are info, use true
+	// - if there are issues, use false
+	// - else if there are unknown, use unknown
+	// - else if there are info, use true
 	switch {
 	case len(issueConditions) > 0:
 		status = metav1.ConditionFalse
@@ -114,6 +126,9 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 		status = metav1.ConditionUnknown
 	case len(infoConditions) > 0:
 		status = metav1.ConditionTrue
+	default:
+		// NOTE: this is already handled above, but repeating also here for better readability.
+		return "", "", "", errors.New("can't merge an empty list of conditions")
 	}
 
 	// Compute the reason for the target condition:
@@ -123,20 +138,23 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 	case len(issueConditions) == 1:
 		reason = issueConditions[0].Reason
 	case len(issueConditions) > 1:
-		reason = ManyIssuesReason
+		reason = MultipleIssuesReason
 	case len(unknownConditions) == 1:
 		reason = unknownConditions[0].Reason
 	case len(unknownConditions) > 1:
-		reason = ManyUnknownsReason
+		reason = MultipleUnknownReported
 	case len(infoConditions) == 1:
 		reason = infoConditions[0].Reason
 	case len(infoConditions) > 1:
-		reason = ManyInfoReason
+		reason = MultipleInfoReason
+	default:
+		// NOTE: this is already handled above, but repeating also here for better readability.
+		return "", "", "", errors.New("can't merge an empty list of conditions")
 	}
 
 	// Compute the message for the target condition, which is optimized for the operation being performed.
 
-	// When performing the summary operation, usually we are merging a small set of conditions form the same object,
+	// When performing the summary operation, usually we are merging a small set of conditions from the same object,
 	// Considering the small number of conditions, involved it is acceptable/preferred to provide as much detail
 	// as possible about the messages from the conditions being merged.
 	//
@@ -152,7 +170,7 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 		for _, condition := range append(issueConditions, append(unknownConditions, infoConditions...)...) {
 			priority := getPriority(condition.Condition, negativeConditionTypes)
 			if priority == infoMergePriority {
-				// Drop info messages when we are surfacing issues on unknown.
+				// Drop info messages when we are surfacing issues or unknown.
 				if status != metav1.ConditionTrue {
 					continue
 				}
@@ -191,53 +209,34 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 	// For each message it is reported a list of max 3 objects reporting the message; if more objects are reporting the same
 	// message, the number of those objects is surfaced.
 	//
-	// e.g. (False): Message-1 from default/obj0, default/obj1, default/obj2 and 2 other Objects
+	// e.g. (False): Message-1 from obj0, obj1, obj2 and 2 more Objects
 	//
 	// If there are other objects - objects not included in the list above - reporting issues/unknown (or info there no issues/unknown),
 	// the number of those objects is surfaced.
 	//
-	// e.g. ...; other 2 Objects with issues; other 1 Objects unknown
+	// e.g. ...; 2 more Objects with issues; 1 more Objects with unknown status
 	//
 	if isAggregateOperation {
-		// Gets the kind to be used when composing messages.
-		// NOTE: This assume all the objects in an aggregate operation are of the same kind.
-		kind := ""
-		if len(conditions) > 0 {
-			kind = flect.Pluralize(conditions[0].OwnerResource.Kind)
-		}
-
 		n := 3
 		messages := []string{}
 
 		// Get max n issue messages, decrement n, and track if there are other objects reporting issues not included in the messages.
 		if len(issueConditions) > 0 {
-			issueMessages, otherIssues := aggregateMessages(issueConditions, &n, kind, false)
-
+			issueMessages := aggregateMessages(issueConditions, &n, false, "with other issues")
 			messages = append(messages, issueMessages...)
-			if otherIssues > 0 {
-				messages = append(messages, fmt.Sprintf("other %d %s with issues", otherIssues, kind))
-			}
 		}
 
 		// Get max n unknown messages, decrement n, and track if there are other objects reporting unknown not included in the messages.
 		if len(unknownConditions) > 0 {
-			unknownMessages, otherUnknown := aggregateMessages(unknownConditions, &n, kind, false)
-
+			unknownMessages := aggregateMessages(unknownConditions, &n, false, "with status unknown")
 			messages = append(messages, unknownMessages...)
-			if otherUnknown > 0 {
-				messages = append(messages, fmt.Sprintf("other %d %s unknown", otherUnknown, kind))
-			}
 		}
 
 		// Only if there are no issue or unknown,
 		// Get max n info messages, decrement n, and track if there are other objects reporting info not included in the messages.
 		if len(issueConditions) == 0 && len(unknownConditions) == 0 && len(infoConditions) > 0 {
-			infoMessages, infoUnknown := aggregateMessages(infoConditions, &n, kind, true)
-
+			infoMessages := aggregateMessages(infoConditions, &n, true, "with additional info")
 			messages = append(messages, infoMessages...)
-			if infoUnknown > 0 {
-				messages = append(messages, fmt.Sprintf("other %d %s with info messages", infoUnknown, kind))
-			}
 		}
 
 		message = strings.Join(messages, "; ")
@@ -282,7 +281,7 @@ func splitConditionsByPriority(conditions []ConditionWithOwnerInfo, negativePola
 }
 
 // getPriority returns the merge priority for each condition.
-// The default implementation identifies as:
+// It assign to conditions the following priority values:
 // - issues: conditions with positive polarity (normal True) and status False or conditions with negative polarity (normal False) and status True.
 // - unknown: conditions with status unknown.
 // - info: conditions with positive polarity (normal True) and status True or conditions with negative polarity (normal False) and status False.
@@ -307,60 +306,83 @@ func getPriority(condition metav1.Condition, negativePolarityConditionTypes sets
 }
 
 // aggregateMessages return messages for the aggregate operation.
-func aggregateMessages(conditions []ConditionWithOwnerInfo, n *int, kind string, dropEmpty bool) (messages []string, other int) {
+func aggregateMessages(conditions []ConditionWithOwnerInfo, n *int, dropEmpty bool, otherMessage string) (messages []string) {
 	// create a map with all the messages and the list of objects reporting the same message.
-	messageObjMap := map[string][]string{}
+	messageObjMap := map[string]map[string][]string{}
 	for _, condition := range conditions {
 		if dropEmpty && condition.Message == "" {
 			continue
 		}
 
-		m := fmt.Sprintf("(%s)", condition.Status)
-		if condition.Message != "" {
-			m += fmt.Sprintf(": %s", condition.Message)
+		m := condition.Message
+		if _, ok := messageObjMap[condition.OwnerResource.Kind]; !ok {
+			messageObjMap[condition.OwnerResource.Kind] = map[string][]string{}
 		}
-		if _, ok := messageObjMap[m]; !ok {
-			messageObjMap[m] = []string{}
-		}
-		messageObjMap[m] = append(messageObjMap[m], klog.KRef(condition.OwnerResource.Namespace, condition.OwnerResource.Name).String())
+		messageObjMap[condition.OwnerResource.Kind][m] = append(messageObjMap[condition.OwnerResource.Kind][m], condition.OwnerResource.Name)
 	}
 
-	// compute the order of messages according to the number of objects reporting the same message.
-	// Note: The message text is used as a secondary criteria to sort messages with the same number of objects.
-	messageIndex := make([]string, 0, len(messageObjMap))
-	for m := range messageObjMap {
-		messageIndex = append(messageIndex, m)
+	// Gets the objects kind (with a stable order).
+	kinds := make([]string, 0, len(messageObjMap))
+	for kind := range messageObjMap {
+		kinds = append(kinds, kind)
 	}
+	sort.Strings(kinds)
 
-	sort.SliceStable(messageIndex, func(i, j int) bool {
-		return len(messageObjMap[messageIndex[i]]) > len(messageObjMap[messageIndex[j]]) ||
-			(len(messageObjMap[messageIndex[i]]) == len(messageObjMap[messageIndex[j]]) && messageIndex[i] < messageIndex[j])
-	})
+	// Aggregate messages for each object kind.
+	for _, kind := range kinds {
+		kindPlural := flect.Pluralize(kind)
+		messageObjMapForKind := messageObjMap[kind]
 
-	// Pick the first n messages, decrement n.
-	// For each message, add up to three objects; if more add the number of the remaining objects with the same message.
-	// Count the number of objects reporting messages not included in the above.
-	// Note: we are showing up to three objects because usually control plane has 3 machines, and we want to show all issues
-	// to control plane machines if any,
-	for i := range len(messageIndex) {
-		if *n == 0 {
-			other += len(messageObjMap[messageIndex[i]])
-			continue
+		// compute the order of messages according to the number of objects reporting the same message.
+		// Note: The message text is used as a secondary criteria to sort messages with the same number of objects.
+		messageIndex := make([]string, 0, len(messageObjMapForKind))
+		for m := range messageObjMapForKind {
+			messageIndex = append(messageIndex, m)
 		}
 
-		m := messageIndex[i]
-		allObjects := messageObjMap[messageIndex[i]]
-		if len(allObjects) <= 3 {
-			m += fmt.Sprintf(" from %s", strings.Join(allObjects, ", "))
-		} else {
-			m += fmt.Sprintf(" from %s and %d other %s", strings.Join(allObjects[:3], ", "), len(allObjects)-3, kind)
+		sort.SliceStable(messageIndex, func(i, j int) bool {
+			return len(messageObjMapForKind[messageIndex[i]]) > len(messageObjMapForKind[messageIndex[j]]) ||
+				(len(messageObjMapForKind[messageIndex[i]]) == len(messageObjMapForKind[messageIndex[j]]) && messageIndex[i] < messageIndex[j])
+		})
+
+		// Pick the first n messages, decrement n.
+		// For each message, add up to three objects; if more add the number of the remaining objects with the same message.
+		// Count the number of objects reporting messages not included in the above.
+		// Note: we are showing up to three objects because usually control plane has 3 machines, and we want to show all issues
+		// to control plane machines if any,
+		var other = 0
+		for _, m := range messageIndex {
+			if *n == 0 {
+				other += len(messageObjMapForKind[m])
+				continue
+			}
+
+			msg := m
+			allObjects := messageObjMapForKind[m]
+			switch {
+			case len(allObjects) == 0:
+				// This should never happen, entry in the map exists only when an object report a message.
+			case len(allObjects) == 1:
+				msg += fmt.Sprintf(" from %s %s", kind, strings.Join(allObjects, ", "))
+			case len(allObjects) <= 3:
+				msg += fmt.Sprintf(" from %s %s", kindPlural, strings.Join(allObjects, ", "))
+			default:
+				msg += fmt.Sprintf(" from %s %s and %d more", kindPlural, strings.Join(allObjects[:3], ", "), len(allObjects)-3)
+			}
+
+			messages = append(messages, msg)
+			*n--
 		}
 
-		messages = append(messages, m)
-		*n--
+		if other == 1 {
+			messages = append(messages, fmt.Sprintf("%d %s %s", other, kind, otherMessage))
+		}
+		if other > 1 {
+			messages = append(messages, fmt.Sprintf("%d %s %s", other, kindPlural, otherMessage))
+		}
 	}
 
-	return messages, other
+	return messages
 }
 
 // getConditionsWithOwnerInfo return all the conditions from an object each one with the corresponding ConditionOwnerInfo.
@@ -370,9 +392,10 @@ func getConditionsWithOwnerInfo(obj runtime.Object) ([]ConditionWithOwnerInfo, e
 	if err != nil {
 		return nil, err
 	}
+	ownerInfo := getConditionOwnerInfo(obj)
 	for _, condition := range conditions {
 		ret = append(ret, ConditionWithOwnerInfo{
-			OwnerResource: getConditionOwnerInfo(obj),
+			OwnerResource: ownerInfo,
 			Condition:     condition,
 		})
 	}
@@ -380,10 +403,12 @@ func getConditionsWithOwnerInfo(obj runtime.Object) ([]ConditionWithOwnerInfo, e
 }
 
 // getConditionOwnerInfo return the ConditionOwnerInfo for the given object.
+// Note: Given that controller runtime often does not set typeMeta for objects,
+// in case kind is missing we are falling back to the type name, which in most cases
+// is the same of kind.
 func getConditionOwnerInfo(obj runtime.Object) ConditionOwnerInfo {
-	var apiVersion, kind, name, namespace string
+	var kind, name string
 	kind = obj.GetObjectKind().GroupVersionKind().Kind
-	apiVersion = obj.GetObjectKind().GroupVersionKind().GroupVersion().String()
 
 	if kind == "" {
 		t := reflect.TypeOf(obj)
@@ -394,15 +419,10 @@ func getConditionOwnerInfo(obj runtime.Object) ConditionOwnerInfo {
 
 	if objMeta, ok := obj.(metav1.Object); ok {
 		name = objMeta.GetName()
-		namespace = objMeta.GetNamespace()
 	}
 
 	return ConditionOwnerInfo{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       kind,
-			APIVersion: apiVersion,
-		},
-		Namespace: namespace,
-		Name:      name,
+		Kind: kind,
+		Name: name,
 	}
 }

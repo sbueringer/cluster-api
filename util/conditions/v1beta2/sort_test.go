@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import (
 	"sort"
@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestLexicographicLess(t *testing.T) {
+func TestDefaultSortLessFunc(t *testing.T) {
 	g := NewWithT(t)
 
 	conditions := []metav1.Condition{
@@ -36,7 +36,7 @@ func TestLexicographicLess(t *testing.T) {
 	}
 
 	sort.Slice(conditions, func(i, j int) bool {
-		return lexicographicLess(conditions[i], conditions[j])
+		return defaultSortLessFunc(conditions[i], conditions[j])
 	})
 
 	g.Expect(conditions).To(Equal([]metav1.Condition{

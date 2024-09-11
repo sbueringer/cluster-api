@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -26,13 +26,10 @@ const (
 	ReadyCondition = "Ready"
 )
 
-// Less reports whether the i condition must sort before j condition.
-type Less func(i, j metav1.Condition) bool
-
-// lexicographicLess returns true if a condition is less than another with regards to the
+// defaultSortLessFunc returns true if a condition is less than another with regards to the
 // to order of conditions designed for convenience of the consumer, i.e. kubectl get.
 // According to this order the Available and the Ready condition always goes first, followed by all the other
 // conditions sorted by Type.
-func lexicographicLess(i, j metav1.Condition) bool {
+func defaultSortLessFunc(i, j metav1.Condition) bool {
 	return (i.Type == AvailableCondition || (i.Type == ReadyCondition || i.Type < j.Type) && j.Type != ReadyCondition) && j.Type != AvailableCondition
 }

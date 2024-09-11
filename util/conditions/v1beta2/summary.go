@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// SummaryOption is some configuration that modifies options for a summary request.
+// SummaryOption is some configuration that modifies options for a summary call.
 type SummaryOption interface {
 	// ApplyToSummary applies this configuration to the given summary options.
 	ApplyToSummary(*SummaryOptions)
@@ -35,6 +36,7 @@ type SummaryOptions struct {
 	mergeStrategy                  MergeStrategy
 	conditionTypes                 []string
 	negativePolarityConditionTypes []string
+	ignoreTypesIfMissing           []string
 	stepCounter                    bool
 }
 
@@ -50,23 +52,21 @@ func (o *SummaryOptions) ApplyOptions(opts []SummaryOption) *SummaryOptions {
 // NewSummaryCondition creates a new condition by summarizing a set of conditions from an object.
 // If any of the condition in scope does not exist in the source object, missing conditions are considered Unknown, reason NotYetReported.
 //
-// By default, the Aggregate condition has the same type of the source condition, but this can be changed by using
-// the OverrideType option.
-//
 // Additionally, it is possible to inject custom merge strategies using the WithMergeStrategy option or
 // to add a step counter to the generated message by using the WithStepCounter option.
-func NewSummaryCondition(obj runtime.Object, conditionType string, opts ...SummaryOption) (*metav1.Condition, error) {
+func NewSummaryCondition(sourceObj runtime.Object, targetConditionTYpe string, opts ...SummaryOption) (*metav1.Condition, error) {
 	summarizeOpt := &SummaryOptions{
 		mergeStrategy: newDefaultMergeStrategy(),
 	}
 	summarizeOpt.ApplyOptions(opts)
 
-	conditions, err := getConditionsWithOwnerInfo(obj)
+	conditions, err := getConditionsWithOwnerInfo(sourceObj)
 	if err != nil {
 		return nil, err
 	}
 
 	expectedConditionTypes := sets.New[string](summarizeOpt.conditionTypes...)
+	ignoreTypesIfMissing := sets.New[string](summarizeOpt.ignoreTypesIfMissing...)
 	existingConditionTypes := sets.New[string]()
 
 	// Drops all the conditions not in scope for the merge operation
@@ -81,23 +81,27 @@ func NewSummaryCondition(obj runtime.Object, conditionType string, opts ...Summa
 
 	// Add the expected conditions which do net exists, so we are compliant with K8s guidelines
 	// (all missing conditions should be considered unknown).
-	// TODO: consider if we want to allow exception to this rule. e.g it is ok that HealthCheckSucceeded is missing.
 
-	diff := expectedConditionTypes.Difference(existingConditionTypes).UnsortedList()
+	diff := expectedConditionTypes.Difference(existingConditionTypes).Difference(ignoreTypesIfMissing).UnsortedList()
 	if len(diff) > 0 {
-		conditionOwner := getConditionOwnerInfo(obj)
+		conditionOwner := getConditionOwnerInfo(sourceObj)
 
-		for _, conditionType := range diff {
+		for _, c := range diff {
 			conditionsInScope = append(conditionsInScope, ConditionWithOwnerInfo{
 				OwnerResource: conditionOwner,
 				Condition: metav1.Condition{
-					Type:    conditionType,
+					Type:    c,
 					Status:  metav1.ConditionUnknown,
 					Reason:  NotYetReportedReason,
-					Message: fmt.Sprintf("Condition %s not yet reported", conditionType),
+					Message: fmt.Sprintf("Condition %s not yet reported", c),
+					// NOTE: LastTransitionTime and ObservedGeneration are not relevant for merge.
 				},
 			})
 		}
+	}
+
+	if len(conditionsInScope) == 0 {
+		return nil, errors.New("summary can't be performed when the list of conditions to be summarized is empty")
 	}
 
 	status, reason, message, err := summarizeOpt.mergeStrategy.Merge(
@@ -111,17 +115,18 @@ func NewSummaryCondition(obj runtime.Object, conditionType string, opts ...Summa
 	}
 
 	return &metav1.Condition{
-		Type:    conditionType,
+		Type:    targetConditionTYpe,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
+		// NOTE: LastTransitionTime and ObservedGeneration will be set when this condition is added to an object by calling Set.
 	}, err
 }
 
 // SetSummaryCondition is a convenience method that calls NewSummaryCondition to create a summary condition from the source object,
 // and then calls Set to add the new condition to the target object.
-func SetSummaryCondition(sourceObj, targetObj runtime.Object, conditionType string, opts ...MirrorOption) error {
-	mirrorCondition, err := NewMirrorCondition(sourceObj, conditionType, opts...)
+func SetSummaryCondition(sourceObj, targetObj runtime.Object, targetConditionTYpe string, opts ...MirrorOption) error {
+	mirrorCondition, err := NewMirrorCondition(sourceObj, targetConditionTYpe, opts...)
 	if err != nil {
 		return err
 	}

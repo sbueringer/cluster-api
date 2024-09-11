@@ -14,16 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// AggregateOption is some configuration that modifies options for a aggregate request.
+// AggregateOption is some configuration that modifies options for a aggregate call.
 type AggregateOption interface {
 	// ApplyToAggregate applies this configuration to the given aggregate options.
 	ApplyToAggregate(option *AggregateOptions)
@@ -31,8 +32,8 @@ type AggregateOption interface {
 
 // AggregateOptions allows to set options for the aggregate operation.
 type AggregateOptions struct {
-	mergeStrategy MergeStrategy
-	overrideType  string
+	mergeStrategy       MergeStrategy
+	targetConditionType string
 }
 
 // ApplyOptions applies the given list options on these options,
@@ -44,35 +45,42 @@ func (o *AggregateOptions) ApplyOptions(opts []AggregateOption) *AggregateOption
 	return o
 }
 
-// NewAggregateCondition aggregates a condition from a list of objects; if the given condition does not exist in the source object,
-// missing conditions are considered Unknown, reason NotYetReported.
+// NewAggregateCondition aggregates a condition from a list of objects; the given condition must have positive polarity;
+// if the given condition does not exist in one of the source objects, missing conditions are considered Unknown, reason NotYetReported.
 //
 // By default, the Aggregate condition has the same type of the source condition, but this can be changed by using
-// the OverrideType option.
+// the TargetConditionType option.
 //
 // Additionally, it is possible to inject custom merge strategies using the WithMergeStrategy option.
-func NewAggregateCondition(objects []runtime.Object, conditionType string, opts ...AggregateOption) (*metav1.Condition, error) {
+func NewAggregateCondition(sourceObjs []runtime.Object, sourceConditionType string, opts ...AggregateOption) (*metav1.Condition, error) {
+	if len(sourceObjs) == 0 {
+		return nil, errors.New("sourceObjs can't be empty")
+	}
+
 	aggregateOpt := &AggregateOptions{
-		mergeStrategy: newDefaultMergeStrategy(),
+		mergeStrategy:       newDefaultMergeStrategy(),
+		targetConditionType: sourceConditionType,
 	}
 	aggregateOpt.ApplyOptions(opts)
 
-	conditionsInScope := make([]ConditionWithOwnerInfo, 0, len(objects))
-	for _, obj := range objects {
-		// TODO: consider if we want to aggregate all errors before returning
+	conditionsInScope := make([]ConditionWithOwnerInfo, 0, len(sourceObjs))
+	for _, obj := range sourceObjs {
 		conditions, err := getConditionsWithOwnerInfo(obj)
 		if err != nil {
+			// Note: considering all sourceObjs are usually of the same type (and thus getConditionsWithOwnerInfo will either pass or fail for all sourceObjs), we are returning at the first error.
+			// This also avoid to implement fancy error aggregation, which is required to manage a potentially high number of sourceObjs/errors.
 			return nil, err
 		}
 
 		// Drops all the conditions not in scope for the merge operation
 		hasConditionType := false
 		for _, condition := range conditions {
-			if condition.Type != conditionType {
+			if condition.Type != sourceConditionType {
 				continue
 			}
 			conditionsInScope = append(conditionsInScope, condition)
 			hasConditionType = true
+			break
 		}
 
 		// Add the expected conditions if it does not exist, so we are compliant with K8s guidelines
@@ -83,10 +91,11 @@ func NewAggregateCondition(objects []runtime.Object, conditionType string, opts 
 			conditionsInScope = append(conditionsInScope, ConditionWithOwnerInfo{
 				OwnerResource: conditionOwner,
 				Condition: metav1.Condition{
-					Type:    conditionType,
+					Type:    aggregateOpt.targetConditionType,
 					Status:  metav1.ConditionUnknown,
 					Reason:  NotYetReportedReason,
-					Message: fmt.Sprintf("Condition %s not yet reported from %s", conditionType, conditionOwner.String()),
+					Message: fmt.Sprintf("Condition %s not yet reported from %s", sourceConditionType, conditionOwner.Kind),
+					// NOTE: LastTransitionTime and ObservedGeneration are not relevant for merge.
 				},
 			})
 		}
@@ -94,7 +103,7 @@ func NewAggregateCondition(objects []runtime.Object, conditionType string, opts 
 
 	status, reason, message, err := aggregateOpt.mergeStrategy.Merge(
 		conditionsInScope,
-		[]string{conditionType},
+		[]string{sourceConditionType},
 		nil,   // negative conditions
 		false, // step counter
 	)
@@ -103,14 +112,11 @@ func NewAggregateCondition(objects []runtime.Object, conditionType string, opts 
 	}
 
 	c := &metav1.Condition{
-		Type:    conditionType,
+		Type:    aggregateOpt.targetConditionType,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
-	}
-
-	if aggregateOpt.overrideType != "" {
-		c.Type = aggregateOpt.overrideType
+		// NOTE: LastTransitionTime and ObservedGeneration will be set when this condition is added to an object by calling Set.
 	}
 
 	return c, err
@@ -119,9 +125,9 @@ func NewAggregateCondition(objects []runtime.Object, conditionType string, opts 
 // SetAggregateCondition is a convenience method that calls NewAggregateCondition to create an aggregate condition from the source objects,
 // and then calls Set to add the new condition to the target object.
 func SetAggregateCondition(sourceObjs []runtime.Object, targetObj runtime.Object, conditionType string, opts ...AggregateOption) error {
-	mirrorCondition, err := NewAggregateCondition(sourceObjs, conditionType, opts...)
+	aggregateCondition, err := NewAggregateCondition(sourceObjs, conditionType, opts...)
 	if err != nil {
 		return err
 	}
-	return Set(targetObj, *mirrorCondition)
+	return Set(targetObj, *aggregateCondition)
 }

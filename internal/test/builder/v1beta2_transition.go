@@ -17,7 +17,6 @@ limitations under the License.
 package builder
 
 import (
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,29 +24,12 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+// This files provide types to validate transition from clusterv1.Conditions in v1Beta1 API to the metav1.Conditions in the v1Beta2 API.
+// Please refer to util/conditions/v1beta2/doc.go for more context.
+
 var (
-	// TransitionV1beta2GroupVersion is group version used for test CRDs used for validating the v1beta2 transition.
-	TransitionV1beta2GroupVersion = schema.GroupVersion{Group: "transition.v1beta2.cluster.x-k8s.io", Version: "v1beta1"}
-
-	// Phase0ObjKind is the kind for the Phase0Obj type.
-	Phase0ObjKind = "Phase0Obj"
-	// Phase0ObjCRD is a Phase0Obj CRD.
-	Phase0ObjCRD = phase0ObjCRD(TransitionV1beta2GroupVersion.WithKind(Phase0ObjKind))
-
-	// Phase1ObjKind is the kind for the Phase1Obj type.
-	Phase1ObjKind = "Phase1Obj"
-	// Phase1ObjCRD is a Phase1Obj CRD.
-	Phase1ObjCRD = phase1ObjCRD(TransitionV1beta2GroupVersion.WithKind(Phase1ObjKind))
-
-	// Phase2ObjKind is the kind for the Phase2Obj type.
-	Phase2ObjKind = "Phase2Obj"
-	// Phase2ObjCRD is a Phase2Obj CRD.
-	Phase2ObjCRD = phase2ObjCRD(TransitionV1beta2GroupVersion.WithKind(Phase2ObjKind))
-
-	// Phase3ObjKind is the kind for the Phase3Obj type.
-	Phase3ObjKind = "Phase3Obj"
-	// Phase3ObjCRD is a Phase3Obj CRD.
-	Phase3ObjCRD = phase3ObjCRD(TransitionV1beta2GroupVersion.WithKind(Phase3ObjKind))
+	// TestGroupVersion is group version used for test CRDs used for validating the v1beta2 transition.
+	TestGroupVersion = schema.GroupVersion{Group: "test.cluster.x-k8s.io", Version: "v1alpha1"}
 
 	// schemeBuilder is used to add go types to the GroupVersionKind scheme.
 	schemeBuilder = runtime.NewSchemeBuilder(addTransitionV1beta2Types)
@@ -57,13 +39,13 @@ var (
 )
 
 func addTransitionV1beta2Types(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(TransitionV1beta2GroupVersion,
+	scheme.AddKnownTypes(TestGroupVersion,
 		&Phase0Obj{}, &Phase0ObjList{},
 		&Phase1Obj{}, &Phase1ObjList{},
 		&Phase2Obj{}, &Phase2ObjList{},
 		&Phase3Obj{}, &Phase3ObjList{},
 	)
-	metav1.AddToGroupVersion(scheme, TransitionV1beta2GroupVersion)
+	metav1.AddToGroupVersion(scheme, TestGroupVersion)
 	return nil
 }
 
@@ -77,6 +59,9 @@ type Phase0ObjList struct {
 
 // Phase0Obj defines an object with clusterv1.Conditions.
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=phase0obj,scope=Namespaced,categories=cluster-api
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 type Phase0Obj struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -91,7 +76,9 @@ type Phase0ObjSpec struct {
 
 // Phase0ObjStatus defines the status of a Phase0Obj.
 type Phase0ObjStatus struct {
-	Bar        string               `json:"bar,omitempty"`
+	Bar string `json:"bar,omitempty"`
+
+	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 }
 
@@ -105,45 +92,6 @@ func (o *Phase0Obj) SetConditions(conditions clusterv1.Conditions) {
 	o.Status.Conditions = conditions
 }
 
-func phase0ObjCRD(gvk schema.GroupVersionKind) *apiextensionsv1.CustomResourceDefinition {
-	return generateCRD(gvk, map[string]apiextensionsv1.JSONSchemaProps{
-		"metadata": {
-			// NOTE: in CRD there is only a partial definition of metadata schema.
-			// Ref https://github.com/kubernetes-sigs/controller-tools/blob/59485af1c1f6a664655dad49543c474bb4a0d2a2/pkg/crd/gen.go#L185
-			Type: "object",
-		},
-		"spec": {
-			Type: "object",
-			Properties: map[string]apiextensionsv1.JSONSchemaProps{
-				"foo": {Type: "string"},
-			},
-		},
-		"status": {
-			Type: "object",
-			Properties: map[string]apiextensionsv1.JSONSchemaProps{
-				"bar": {Type: "string"},
-				"conditions": {
-					Type: "array",
-					Items: &apiextensionsv1.JSONSchemaPropsOrArray{
-						Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"type":               {Type: "string"},
-								"status":             {Type: "string"},
-								"severity":           {Type: "string"},
-								"reason":             {Type: "string"},
-								"message":            {Type: "string"},
-								"lastTransitionTime": {Type: "string"},
-							},
-							Required: []string{"type", "status"},
-						},
-					},
-				},
-			},
-		},
-	})
-}
-
 // Phase1ObjList is a list of Phase1Obj.
 // +kubebuilder:object:root=true
 type Phase1ObjList struct {
@@ -154,6 +102,9 @@ type Phase1ObjList struct {
 
 // Phase1Obj defines an object with conditions and experimental conditions.
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=phase1obj,scope=Namespaced,categories=cluster-api
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 type Phase1Obj struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -168,9 +119,22 @@ type Phase1ObjSpec struct {
 
 // Phase1ObjStatus defines the status of a Phase1Obj.
 type Phase1ObjStatus struct {
-	Bar                    string               `json:"bar,omitempty"`
-	Conditions             clusterv1.Conditions `json:"conditions,omitempty"`
-	ExperimentalConditions []metav1.Condition   `json:"experimentalConditions,omitempty"`
+	Bar string `json:"bar,omitempty"`
+
+	// +optional
+	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+
+	// +optional
+	V1Beta2 Phase1ObjStatusV1beta2 `json:"v1beta2,omitempty"`
+}
+
+// Phase1ObjStatusV1beta2 defines the status.V1Beta1 of a Phase1Obj.
+type Phase1ObjStatusV1beta2 struct {
+
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // GetConditions returns the set of conditions for this object.
@@ -183,62 +147,6 @@ func (o *Phase1Obj) SetConditions(conditions clusterv1.Conditions) {
 	o.Status.Conditions = conditions
 }
 
-func phase1ObjCRD(gvk schema.GroupVersionKind) *apiextensionsv1.CustomResourceDefinition {
-	return generateCRD(gvk, map[string]apiextensionsv1.JSONSchemaProps{
-		"metadata": {
-			// NOTE: in CRD there is only a partial definition of metadata schema.
-			// Ref https://github.com/kubernetes-sigs/controller-tools/blob/59485af1c1f6a664655dad49543c474bb4a0d2a2/pkg/crd/gen.go#L185
-			Type: "object",
-		},
-		"spec": {
-			Type: "object",
-			Properties: map[string]apiextensionsv1.JSONSchemaProps{
-				"foo": {Type: "string"},
-			},
-		},
-		"status": {
-			Type: "object",
-			Properties: map[string]apiextensionsv1.JSONSchemaProps{
-				"bar": {Type: "string"},
-				"conditions": {
-					Type: "array",
-					Items: &apiextensionsv1.JSONSchemaPropsOrArray{
-						Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"type":               {Type: "string"},
-								"status":             {Type: "string"},
-								"severity":           {Type: "string"},
-								"reason":             {Type: "string"},
-								"message":            {Type: "string"},
-								"lastTransitionTime": {Type: "string"},
-							},
-							Required: []string{"type", "status"},
-						},
-					},
-				},
-				"experimentalConditions": {
-					Type: "array",
-					Items: &apiextensionsv1.JSONSchemaPropsOrArray{
-						Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"type":               {Type: "string"},
-								"status":             {Type: "string"},
-								"observedGeneration": {Type: "integer"},
-								"reason":             {Type: "string"},
-								"message":            {Type: "string"},
-								"lastTransitionTime": {Type: "string"},
-							},
-							Required: []string{"type", "status"},
-						},
-					},
-				},
-			},
-		},
-	})
-}
-
 // Phase2ObjList is a list of Phase2Obj.
 // +kubebuilder:object:root=true
 type Phase2ObjList struct {
@@ -249,6 +157,9 @@ type Phase2ObjList struct {
 
 // Phase2Obj defines an object with conditions and back compatibility conditions.
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=phase2obj,scope=Namespaced,categories=cluster-api
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 type Phase2Obj struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -263,85 +174,39 @@ type Phase2ObjSpec struct {
 
 // Phase2ObjStatus defines the status of a Phase2Obj.
 type Phase2ObjStatus struct {
-	Bar               string                           `json:"bar,omitempty"`
-	Conditions        []metav1.Condition               `json:"conditions,omitempty"`
-	BackCompatibility Phase2ObjStatusBackCompatibility `json:"backCompatibility,omitempty"`
+	Bar string `json:"bar,omitempty"`
+
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// +optional
+	Deprecated Phase2ObjStatusDeprecated `json:"deprecated,omitempty"`
 }
 
-// Phase2ObjStatusBackCompatibility defines the status.BackCompatibility of a Phase2Obj.
-type Phase2ObjStatusBackCompatibility struct {
+// Phase2ObjStatusDeprecated defines the status.Deprecated of a Phase2Obj.
+type Phase2ObjStatusDeprecated struct {
+
+	// +optional
+	V1Beta1 Phase2ObjStatusDeprecatedV1Beta2 `json:"v1beta1,omitempty"`
+}
+
+// Phase2ObjStatusDeprecatedV1Beta2 defines the status.Deprecated.V1Beta2 of a Phase2Obj.
+type Phase2ObjStatusDeprecatedV1Beta2 struct {
+
+	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 }
 
 // GetConditions returns the set of conditions for this object.
 func (o *Phase2Obj) GetConditions() clusterv1.Conditions {
-	return o.Status.BackCompatibility.Conditions
+	return o.Status.Deprecated.V1Beta1.Conditions
 }
 
 // SetConditions sets the conditions on this object.
 func (o *Phase2Obj) SetConditions(conditions clusterv1.Conditions) {
-	o.Status.BackCompatibility.Conditions = conditions
-}
-
-func phase2ObjCRD(gvk schema.GroupVersionKind) *apiextensionsv1.CustomResourceDefinition {
-	return generateCRD(gvk, map[string]apiextensionsv1.JSONSchemaProps{
-		"metadata": {
-			// NOTE: in CRD there is only a partial definition of metadata schema.
-			// Ref https://github.com/kubernetes-sigs/controller-tools/blob/59485af1c1f6a664655dad49543c474bb4a0d2a2/pkg/crd/gen.go#L185
-			Type: "object",
-		},
-		"spec": {
-			Type: "object",
-			Properties: map[string]apiextensionsv1.JSONSchemaProps{
-				"foo": {Type: "string"},
-			},
-		},
-		"status": {
-			Type: "object",
-			Properties: map[string]apiextensionsv1.JSONSchemaProps{
-				"bar": {Type: "string"},
-				"conditions": {
-					Type: "array",
-					Items: &apiextensionsv1.JSONSchemaPropsOrArray{
-						Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"type":               {Type: "string"},
-								"status":             {Type: "string"},
-								"observedGeneration": {Type: "integer"},
-								"reason":             {Type: "string"},
-								"message":            {Type: "string"},
-								"lastTransitionTime": {Type: "string"},
-							},
-							Required: []string{"type", "status"},
-						},
-					},
-				},
-				"backCompatibility": {
-					Type: "object",
-					Properties: map[string]apiextensionsv1.JSONSchemaProps{
-						"conditions": {
-							Type: "array",
-							Items: &apiextensionsv1.JSONSchemaPropsOrArray{
-								Schema: &apiextensionsv1.JSONSchemaProps{
-									Type: "object",
-									Properties: map[string]apiextensionsv1.JSONSchemaProps{
-										"type":               {Type: "string"},
-										"status":             {Type: "string"},
-										"severity":           {Type: "string"},
-										"reason":             {Type: "string"},
-										"message":            {Type: "string"},
-										"lastTransitionTime": {Type: "string"},
-									},
-									Required: []string{"type", "status"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
+	o.Status.Deprecated.V1Beta1.Conditions = conditions
 }
 
 // Phase3ObjList is a list of Phase3Obj.
@@ -354,6 +219,9 @@ type Phase3ObjList struct {
 
 // Phase3Obj defines an object with metav1.conditions.
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=phase3obj,scope=Namespaced,categories=cluster-api
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 type Phase3Obj struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -368,45 +236,10 @@ type Phase3ObjSpec struct {
 
 // Phase3ObjStatus defines the status of a Phase3Obj.
 type Phase3ObjStatus struct {
-	Bar        string             `json:"bar,omitempty"`
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-}
+	Bar string `json:"bar,omitempty"`
 
-func phase3ObjCRD(gvk schema.GroupVersionKind) *apiextensionsv1.CustomResourceDefinition {
-	return generateCRD(gvk, map[string]apiextensionsv1.JSONSchemaProps{
-		"metadata": {
-			// NOTE: in CRD there is only a partial definition of metadata schema.
-			// Ref https://github.com/kubernetes-sigs/controller-tools/blob/59485af1c1f6a664655dad49543c474bb4a0d2a2/pkg/crd/gen.go#L185
-			Type: "object",
-		},
-		"spec": {
-			Type: "object",
-			Properties: map[string]apiextensionsv1.JSONSchemaProps{
-				"foo": {Type: "string"},
-			},
-		},
-		"status": {
-			Type: "object",
-			Properties: map[string]apiextensionsv1.JSONSchemaProps{
-				"bar": {Type: "string"},
-				"conditions": {
-					Type: "array",
-					Items: &apiextensionsv1.JSONSchemaPropsOrArray{
-						Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"type":               {Type: "string"},
-								"status":             {Type: "string"},
-								"observedGeneration": {Type: "integer"},
-								"reason":             {Type: "string"},
-								"message":            {Type: "string"},
-								"lastTransitionTime": {Type: "string"},
-							},
-							Required: []string{"type", "status"},
-						},
-					},
-				},
-			},
-		},
-	})
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

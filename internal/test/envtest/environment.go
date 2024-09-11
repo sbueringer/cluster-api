@@ -207,6 +207,7 @@ func newEnvironment(uncachedObjs ...client.Object) *Environment {
 			filepath.Join(root, "config", "crd", "bases"),
 			filepath.Join(root, "controlplane", "kubeadm", "config", "crd", "bases"),
 			filepath.Join(root, "bootstrap", "kubeadm", "config", "crd", "bases"),
+			filepath.Join(root, "internal", "test", "builder", "crd"),
 		},
 		CRDs: []*apiextensionsv1.CustomResourceDefinition{
 			builder.GenericBootstrapConfigCRD.DeepCopy(),
@@ -231,10 +232,6 @@ func newEnvironment(uncachedObjs ...client.Object) *Environment {
 			builder.TestBootstrapConfigCRD.DeepCopy(),
 			builder.TestControlPlaneTemplateCRD.DeepCopy(),
 			builder.TestControlPlaneCRD.DeepCopy(),
-			builder.Phase0ObjCRD.DeepCopy(),
-			builder.Phase1ObjCRD.DeepCopy(),
-			builder.Phase2ObjCRD.DeepCopy(),
-			builder.Phase3ObjCRD.DeepCopy(),
 		},
 		// initialize webhook here to be able to test the envtest install via webhookOptions
 		// This should set LocalServingCertDir and LocalServingPort that are used below.

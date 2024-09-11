@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package experimental
+package v1beta2
 
 import (
 	"testing"
@@ -29,27 +29,31 @@ func TestAggregateMessages(t *testing.T) {
 	g := NewWithT(t)
 
 	conditions := []ConditionWithOwnerInfo{
-		{OwnerResource: ConditionOwnerInfo{Name: "obj1"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
-		{OwnerResource: ConditionOwnerInfo{Name: "obj2"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
-		{OwnerResource: ConditionOwnerInfo{Name: "obj3"}, Condition: metav1.Condition{Type: "A", Message: "Message-2", Status: metav1.ConditionFalse}},
-		{OwnerResource: ConditionOwnerInfo{Name: "obj4"}, Condition: metav1.Condition{Type: "A", Message: "Message-2", Status: metav1.ConditionFalse}},
-		{OwnerResource: ConditionOwnerInfo{Name: "obj5"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
-		{OwnerResource: ConditionOwnerInfo{Name: "obj6"}, Condition: metav1.Condition{Type: "A", Message: "Message-3", Status: metav1.ConditionFalse}},
-		{OwnerResource: ConditionOwnerInfo{Name: "obj7"}, Condition: metav1.Condition{Type: "A", Message: "Message-4", Status: metav1.ConditionFalse}},
-		{OwnerResource: ConditionOwnerInfo{Name: "obj8"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
-		{OwnerResource: ConditionOwnerInfo{Name: "obj9"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj01"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj02"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj03"}, Condition: metav1.Condition{Type: "A", Message: "Message-2", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj04"}, Condition: metav1.Condition{Type: "A", Message: "Message-2", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj05"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj06"}, Condition: metav1.Condition{Type: "A", Message: "Message-3", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj07"}, Condition: metav1.Condition{Type: "A", Message: "Message-4", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj08"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj09"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineDeployment", Name: "obj10"}, Condition: metav1.Condition{Type: "A", Message: "Message-5", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineSet", Name: "obj11"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
+		{OwnerResource: ConditionOwnerInfo{Kind: "MachineSet", Name: "obj12"}, Condition: metav1.Condition{Type: "A", Message: "Message-1", Status: metav1.ConditionFalse}},
 	}
 
 	n := 3
-	messages, others := aggregateMessages(conditions, &n, "objects", false)
+	messages := aggregateMessages(conditions, &n, false, "with other issues")
 
 	g.Expect(n).To(Equal(0))
 	g.Expect(messages).To(Equal([]string{
-		"(False): Message-1 from obj1, obj2, obj5 and 2 other objects",
-		"(False): Message-2 from obj3, obj4",
-		"(False): Message-3 from obj6",
+		"Message-1 from MachineDeployments obj01, obj02, obj05 and 2 more", // MachineDeployments obj08, obj09
+		"Message-2 from MachineDeployments obj03, obj04",
+		"Message-3 from MachineDeployment obj06",
+		"2 MachineDeployments with other issues", // MachineDeployments  obj07 (Message-4), obj10 (Message-5)
+		"2 MachineSets with other issues",        // MachineSet obj11, obj12 (Message-1)
 	}))
-	g.Expect(others).To(Equal(1))
 }
 
 func TestSortConditions(t *testing.T) {
