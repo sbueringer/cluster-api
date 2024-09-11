@@ -78,7 +78,7 @@ func (f *ObjWithWrongV1beta2ConditionType) DeepCopyObject() runtime.Object {
 }
 
 func TestGetAll(t *testing.T) {
-	now := metav1.Now().Rfc3339Copy()
+	now := metav1.Time{Time: metav1.Now().Rfc3339Copy().UTC()}
 
 	t.Run("fails with nil", func(t *testing.T) {
 		g := NewWithT(t)
@@ -174,7 +174,7 @@ func TestGetAll(t *testing.T) {
 
 		got, err = GetAll(&unstructured.Unstructured{Object: fooUnstructured})
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
+		g.Expect(got).To(MatchConditions(expect, IgnoreLastTransitionTime(true)), cmp.Diff(got, expect))
 	})
 
 	t.Run("v1beta1 object with both legacy and v1beta2 conditions", func(t *testing.T) {
@@ -216,14 +216,14 @@ func TestGetAll(t *testing.T) {
 
 		got, err := GetAll(foo)
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
+		g.Expect(got).To(MatchConditions(expect, IgnoreLastTransitionTime(true)), cmp.Diff(got, expect))
 
 		fooUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(foo)
 		g.Expect(err).NotTo(HaveOccurred())
 
 		got, err = GetAll(&unstructured.Unstructured{Object: fooUnstructured})
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
+		g.Expect(got).To(MatchConditions(expect, IgnoreLastTransitionTime(true)), cmp.Diff(got, expect))
 	})
 
 	t.Run("v1beta2 object with conditions and backward compatible conditions", func(t *testing.T) {
@@ -263,14 +263,14 @@ func TestGetAll(t *testing.T) {
 
 		got, err := GetAll(foo)
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
+		g.Expect(got).To(MatchConditions(expect, IgnoreLastTransitionTime(true)), cmp.Diff(got, expect))
 
 		fooUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(foo)
 		g.Expect(err).NotTo(HaveOccurred())
 
 		got, err = GetAll(&unstructured.Unstructured{Object: fooUnstructured})
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
+		g.Expect(got).To(MatchConditions(expect, IgnoreLastTransitionTime(true)), cmp.Diff(got, expect))
 	})
 
 	t.Run("v1beta2 object with conditions (end state)", func(t *testing.T) {
@@ -299,14 +299,14 @@ func TestGetAll(t *testing.T) {
 
 		got, err := GetAll(foo)
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
+		g.Expect(got).To(MatchConditions(expect, IgnoreLastTransitionTime(true)), cmp.Diff(got, expect))
 
 		fooUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(foo)
 		g.Expect(err).NotTo(HaveOccurred())
 
 		got, err = GetAll(&unstructured.Unstructured{Object: fooUnstructured})
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(got).To(MatchConditions(expect), cmp.Diff(got, expect))
+		g.Expect(got).To(MatchConditions(expect, IgnoreLastTransitionTime(true)), cmp.Diff(got, expect))
 	})
 }
 
