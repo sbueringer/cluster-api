@@ -54,7 +54,7 @@ func (o *SummaryOptions) ApplyOptions(opts []SummaryOption) *SummaryOptions {
 //
 // Additionally, it is possible to inject custom merge strategies using the WithMergeStrategy option or
 // to add a step counter to the generated message by using the WithStepCounter option.
-func NewSummaryCondition(sourceObj runtime.Object, targetConditionTYpe string, opts ...SummaryOption) (*metav1.Condition, error) {
+func NewSummaryCondition(sourceObj runtime.Object, targetConditionType string, opts ...SummaryOption) (*metav1.Condition, error) {
 	summarizeOpt := &SummaryOptions{
 		mergeStrategy: newDefaultMergeStrategy(),
 	}
@@ -115,7 +115,7 @@ func NewSummaryCondition(sourceObj runtime.Object, targetConditionTYpe string, o
 	}
 
 	return &metav1.Condition{
-		Type:    targetConditionTYpe,
+		Type:    targetConditionType,
 		Status:  status,
 		Reason:  reason,
 		Message: message,
@@ -125,8 +125,8 @@ func NewSummaryCondition(sourceObj runtime.Object, targetConditionTYpe string, o
 
 // SetSummaryCondition is a convenience method that calls NewSummaryCondition to create a summary condition from the source object,
 // and then calls Set to add the new condition to the target object.
-func SetSummaryCondition(sourceObj, targetObj runtime.Object, targetConditionTYpe string, opts ...MirrorOption) error {
-	mirrorCondition, err := NewMirrorCondition(sourceObj, targetConditionTYpe, opts...)
+func SetSummaryCondition(sourceObj, targetObj runtime.Object, targetConditionType string, opts ...MirrorOption) error {
+	mirrorCondition, err := NewMirrorCondition(sourceObj, targetConditionType, opts...)
 	if err != nil {
 		return err
 	}

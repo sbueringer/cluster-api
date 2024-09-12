@@ -215,6 +215,21 @@ func TestAggregate(t *testing.T) {
 				Message: "Message-1 from Phase3Objs obj0, obj4; Message-2 from Phase3Obj obj1; Message-3 from Phase3Obj obj5; 1 Phase3Obj with additional info", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
+		{
+			name: "Missing conditions are defaulted",
+			conditions: [][]metav1.Condition{
+				{{Type: AvailableCondition, Status: metav1.ConditionFalse, Reason: "Reason-1", Message: "Message-1"}}, // obj1
+				{}, // obj2 without available condition
+			},
+			conditionType: AvailableCondition,
+			options:       []AggregateOption{},
+			want: &metav1.Condition{
+				Type:    AvailableCondition,
+				Status:  metav1.ConditionFalse,                                                                                    // False because there is one issue
+				Reason:  "Reason-1",                                                                                               // Picking the reason from the only existing issue
+				Message: "Message-1 from Phase3Obj obj0; Condition Available not yet reported from Phase3Obj from Phase3Obj obj1", // messages from all the issues & unknown conditions (info dropped)
+			},
+		},
 	}
 
 	for _, tt := range tests {

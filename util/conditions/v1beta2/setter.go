@@ -60,7 +60,7 @@ func (o *SetOptions) ApplyOptions(opts []SetOption) *SetOptions {
 //
 // Set can't be used with unstructured objects.
 //
-// Additionally, Set enforce the a default condition order (Available and Ready fist, everything else in alphabetical order),
+// Additionally, Set enforces the a default condition order (Available and Ready fist, everything else in alphabetical order),
 // but this can be changed by using the ConditionSortFunc option.
 func Set(targetObj runtime.Object, condition metav1.Condition, opts ...SetOption) error {
 	conditions, err := GetAll(targetObj)

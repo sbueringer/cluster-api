@@ -60,33 +60,31 @@ func NewMirrorCondition(sourceObj runtime.Object, sourceConditionType string, op
 	}
 	mirrorOpt.ApplyOptions(opts)
 
-	conditions, err := GetAll(sourceObj)
-	if err != nil {
-		return nil, err
-	}
 	conditionOwner := getConditionOwnerInfo(sourceObj)
 	conditionOwnerString := fmt.Sprintf("%s %s", conditionOwner.Kind, conditionOwner.Name)
 
-	for i := range conditions {
-		if conditions[i].Type == sourceConditionType {
-			return &metav1.Condition{
-				Type:               mirrorOpt.targetConditionType,
-				Status:             conditions[i].Status,
-				ObservedGeneration: conditions[i].ObservedGeneration,
-				LastTransitionTime: conditions[i].LastTransitionTime,
-				Reason:             conditions[i].Reason,
-				Message:            strings.TrimSpace(fmt.Sprintf("%s (from %s)", conditions[i].Message, conditionOwnerString)),
-				// NOTE: LastTransitionTime and ObservedGeneration will be set when this condition is added to an object by calling Set.
-			}, nil
-		}
+	condition, err := Get(sourceObj, sourceConditionType)
+	if err != nil {
+		return nil, err
+	}
+	if condition == nil {
+		return &metav1.Condition{
+			Type:               mirrorOpt.targetConditionType,
+			Status:             metav1.ConditionUnknown,
+			LastTransitionTime: metav1.Now(),
+			Reason:             NotYetReportedReason,
+			Message:            fmt.Sprintf("Condition %s not yet reported from %s", sourceConditionType, conditionOwnerString),
+			// NOTE: LastTransitionTime and ObservedGeneration will be set when this condition is added to an object by calling Set.
+		}, nil
 	}
 
 	return &metav1.Condition{
 		Type:               mirrorOpt.targetConditionType,
-		Status:             metav1.ConditionUnknown,
-		LastTransitionTime: metav1.Now(),
-		Reason:             NotYetReportedReason,
-		Message:            fmt.Sprintf("Condition %s not yet reported from %s", sourceConditionType, conditionOwnerString),
+		Status:             condition.Status,
+		ObservedGeneration: condition.ObservedGeneration,
+		LastTransitionTime: condition.LastTransitionTime,
+		Reason:             condition.Reason,
+		Message:            strings.TrimSpace(fmt.Sprintf("%s (from %s)", condition.Message, conditionOwnerString)),
 		// NOTE: LastTransitionTime and ObservedGeneration will be set when this condition is added to an object by calling Set.
 	}, nil
 }
