@@ -61,7 +61,7 @@ func TestSummary(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionFalse,                         // False because there are many issues
-				Reason:  MultipleIssuesReason,                          // Using a generic reason
+				Reason:  MultipleIssuesReportedReason,                  // Using a generic reason
 				Message: "B (False): Message-B; !C (True): Message-!C", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -77,7 +77,7 @@ func TestSummary(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionFalse,                                                 // False because there are many issues
-				Reason:  MultipleIssuesReason,                                                  // Using a generic reason
+				Reason:  MultipleIssuesReportedReason,                                          // Using a generic reason
 				Message: "B (False): Message-B; !C (True): Message-!C; A (Unknown): Message-A", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -109,7 +109,7 @@ func TestSummary(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionUnknown,                            // Unknown because there are many unknown
-				Reason:  MultipleUnknownReported,                            // Using a generic reason
+				Reason:  MultipleUnknownReportedReason,                      // Using a generic reason
 				Message: "B (Unknown): Message-B; !C (Unknown): Message-!C", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -126,7 +126,7 @@ func TestSummary(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionTrue,                          // True because there are many info
-				Reason:  MultipleInfoReason,                            // Using a generic reason
+				Reason:  MultipleInfoReportedReason,                    // Using a generic reason
 				Message: "B (True): Message-B; !C (False): Message-!C", // messages from all the info conditions (empty messages are dropped)
 			},
 		},
@@ -141,7 +141,7 @@ func TestSummary(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionUnknown,                                                                  // Unknown because there more than one unknown
-				Reason:  MultipleUnknownReported,                                                                  // Using a generic reason
+				Reason:  MultipleUnknownReportedReason,                                                            // Using a generic reason
 				Message: "B (Unknown): Condition B not yet reported; !C (Unknown): Condition !C not yet reported", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -161,6 +161,21 @@ func TestSummary(t *testing.T) {
 			},
 		},
 		{
+			name: "No issue considering IgnoreTypesIfMissing",
+			conditions: []metav1.Condition{
+				{Type: "A", Status: metav1.ConditionTrue, Reason: "Reason-A", Message: "Message-A"}, // info
+				// B and !C missing
+			},
+			conditionType: AvailableCondition,
+			options:       []SummaryOption{ForConditionTypes{"A", "B", "!C"}, WithNegativePolarityConditionTypes{"!C"}, IgnoreTypesIfMissing{"B", "!C"}}, // A is required!
+			want: &metav1.Condition{
+				Type:    AvailableCondition,
+				Status:  metav1.ConditionTrue,  // True because B and !C are ignored
+				Reason:  "Reason-A",            // Picking the reason from A, the only existing info
+				Message: "A (True): Message-A", // messages from A, the only existing info
+			},
+		},
+		{
 			name: "Ignore conditions not in scope",
 			conditions: []metav1.Condition{
 				{Type: "B", Status: metav1.ConditionTrue, Reason: "Reason-B", Message: "Message-B"},       // info
@@ -171,9 +186,9 @@ func TestSummary(t *testing.T) {
 			options:       []SummaryOption{ForConditionTypes{"A", "B"}}, // C not in scope
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
-				Status:  metav1.ConditionTrue,  // True because there are many info
-				Reason:  MultipleInfoReason,    // Using a generic reason
-				Message: "B (True): Message-B", // messages from all the info conditions (empty messages are dropped)
+				Status:  metav1.ConditionTrue,       // True because there are many info
+				Reason:  MultipleInfoReportedReason, // Using a generic reason
+				Message: "B (True): Message-B",      // messages from all the info conditions (empty messages are dropped)
 			},
 		},
 		{

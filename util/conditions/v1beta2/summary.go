@@ -79,7 +79,7 @@ func NewSummaryCondition(sourceObj runtime.Object, targetConditionType string, o
 		existingConditionTypes.Insert(condition.Type)
 	}
 
-	// Add the expected conditions which do net exists, so we are compliant with K8s guidelines
+	// Add the expected conditions which do not exist, so we are compliant with K8s guidelines
 	// (all missing conditions should be considered unknown).
 
 	diff := expectedConditionTypes.Difference(existingConditionTypes).Difference(ignoreTypesIfMissing).UnsortedList()
@@ -125,8 +125,8 @@ func NewSummaryCondition(sourceObj runtime.Object, targetConditionType string, o
 
 // SetSummaryCondition is a convenience method that calls NewSummaryCondition to create a summary condition from the source object,
 // and then calls Set to add the new condition to the target object.
-func SetSummaryCondition(sourceObj, targetObj runtime.Object, targetConditionType string, opts ...MirrorOption) error {
-	mirrorCondition, err := NewMirrorCondition(sourceObj, targetConditionType, opts...)
+func SetSummaryCondition(sourceObj, targetObj runtime.Object, targetConditionType string, opts ...SummaryOption) error {
+	mirrorCondition, err := NewSummaryCondition(sourceObj, targetConditionType, opts...)
 	if err != nil {
 		return err
 	}

@@ -75,7 +75,7 @@ func TestSetAll(t *testing.T) {
 		g.Expect(err).To(HaveOccurred())
 	})
 
-	t.Run("v1beta object with legacy conditions", func(t *testing.T) {
+	t.Run("v1beta1 object with legacy conditions", func(t *testing.T) {
 		g := NewWithT(t)
 		foo := &builder.Phase0Obj{
 			Status: builder.Phase0ObjStatus{Conditions: nil},
@@ -97,7 +97,7 @@ func TestSetAll(t *testing.T) {
 						LastTransitionTime: now,
 					},
 				},
-				V1Beta2: builder.Phase1ObjStatusV1beta2{Conditions: nil},
+				V1Beta2: builder.Phase1ObjStatusV1Beta2{Conditions: nil},
 			},
 		}
 
@@ -113,7 +113,7 @@ func TestSetAll(t *testing.T) {
 			Status: builder.Phase2ObjStatus{
 				Conditions: nil,
 				Deprecated: builder.Phase2ObjStatusDeprecated{
-					V1Beta1: builder.Phase2ObjStatusDeprecatedV1Beta2{
+					V1Beta1: builder.Phase2ObjStatusDeprecatedV1Beta1{
 						Conditions: clusterv1.Conditions{
 							{
 								Type:               "barCondition",

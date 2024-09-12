@@ -20,14 +20,16 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 const (
 	// AvailableCondition documents availability for an object.
+	// TODO: Move to the API package.
 	AvailableCondition = "Available"
 
 	// ReadyCondition documents readiness for an object.
+	// TODO: Move to the API package.
 	ReadyCondition = "Ready"
 )
 
 // defaultSortLessFunc returns true if a condition is less than another with regards to the
-// to order of conditions designed for convenience of the consumer, i.e. kubectl get.
+// order of conditions designed for convenience of the consumer, i.e. kubectl get.
 // According to this order the Available and the Ready condition always goes first, followed by all the other
 // conditions sorted by Type.
 func defaultSortLessFunc(i, j metav1.Condition) bool {

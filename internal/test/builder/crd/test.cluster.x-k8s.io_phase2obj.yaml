@@ -114,7 +114,7 @@ spec:
                   of a Phase2Obj.
                 properties:
                   v1beta1:
-                    description: Phase2ObjStatusDeprecatedV1Beta2 defines the status.Deprecated.V1Beta2
+                    description: Phase2ObjStatusDeprecatedV1Beta1 defines the status.Deprecated.V1Beta2
                       of a Phase2Obj.
                     properties:
                       conditions:

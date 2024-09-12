@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// IgnoreLastTransitionTime instruct MatchConditions and MatchCondition to ignore the LastTransitionTime field.
+// IgnoreLastTransitionTime instructs MatchConditions and MatchCondition to ignore the LastTransitionTime field.
 type IgnoreLastTransitionTime bool
 
 // ApplyMatch applies this configuration to the given Match options.
@@ -32,7 +32,7 @@ func (f IgnoreLastTransitionTime) ApplyMatch(opts *MatchOptions) {
 	opts.ignoreLastTransitionTime = bool(f)
 }
 
-// MatchOption is some configuration that modifies options for a match request.
+// MatchOption is some configuration that modifies options for a match call.
 type MatchOption interface {
 	// ApplyMatch applies this configuration to the given match options.
 	ApplyMatch(option *MatchOptions)
@@ -82,7 +82,7 @@ func (m matchConditions) NegatedFailureMessage(actual interface{}) (message stri
 	return fmt.Sprintf("expected\n\t%#v\nto not match\n\t%#v\n", actual, m.expected)
 }
 
-// MatchCondition returns a custom matcher to check equality of []metav1.Condition.
+// MatchCondition returns a custom matcher to check equality of metav1.Condition.
 func MatchCondition(expected metav1.Condition, opts ...MatchOption) types.GomegaMatcher {
 	return &matchCondition{
 		opts:     opts,

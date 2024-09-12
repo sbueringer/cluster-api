@@ -90,7 +90,7 @@ func init() {
 	utilruntime.Must(admissionv1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(runtimev1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(ipamv1.AddToScheme(scheme.Scheme))
-	utilruntime.Must(builder.AddTransitionV1beta2ToScheme(scheme.Scheme))
+	utilruntime.Must(builder.AddTransitionV1Beta2ToScheme(scheme.Scheme))
 }
 
 // RunInput is the input for Run.

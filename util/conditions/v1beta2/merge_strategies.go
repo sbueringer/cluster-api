@@ -31,25 +31,25 @@ import (
 
 // TODO: Move to the API package.
 const (
-	// MultipleIssuesReason is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting issues.
+	// MultipleIssuesReportedReason is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting issues.
 	// NOTE: If a custom merge strategy is used for the aggregate or summary operations, this might not be true anymore.
-	MultipleIssuesReason = "MultipleIssuesReported"
+	MultipleIssuesReportedReason = "MultipleIssuesReported"
 
-	// MultipleUnknownReported is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting unknown.
+	// MultipleUnknownReportedReason is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting unknown.
 	// NOTE: If a custom merge strategy is used for the aggregate or summary operations, this might not be true anymore.
-	MultipleUnknownReported = "MultipleUnknownReported"
+	MultipleUnknownReportedReason = "MultipleUnknownReported"
 
-	// MultipleInfoReason is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting info.
+	// MultipleInfoReportedReason is set on conditions generated during aggregate or summary operations when multiple conditions/objects are reporting info.
 	// NOTE: If a custom merge strategy is used for the aggregate or summary operations, this might not be true anymore.
-	MultipleInfoReason = "MultipleInfoReported"
+	MultipleInfoReportedReason = "MultipleInfoReported"
 )
 
 // MergeStrategy defines a strategy used to merge conditions during the aggregate or summary operation.
 type MergeStrategy interface {
-	// Merge all the condition in input.
+	// Merge passed in conditions.
 	//
 	// It is up to the caller to ensure that all the expected conditions exist (e.g. by adding new conditions with status Unknown).
-	// Condition in input must be of the given conditionTypes (other condition types must be discarded);
+	// Conditions passed in must be of the given conditionTypes (other condition types must be discarded).
 	//
 	// The list of conditionTypes has an implicit order; it is up to the implementation of merge to use this info or not.
 	// If negativeConditionTypes are in scope, the implementation of merge should treat them accordingly.
@@ -65,7 +65,7 @@ type ConditionWithOwnerInfo struct {
 	metav1.Condition
 }
 
-// ConditionOwnerInfo contains info about the object that owns the condition.
+// ConditionOwnerInfo contains infos about the object that owns the condition.
 type ConditionOwnerInfo struct {
 	Kind string
 	Name string
@@ -105,7 +105,7 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 	//   (Aggregate should merge the same condition across many objects)
 	isAggregateOperation := len(conditionTypes) == 1
 
-	// - Otherwise we can assume this func is called within an summary operation
+	// - Otherwise we can assume this func is called within a summary operation
 	//   (Summary should merge different conditions from the same object)
 	isSummaryOperation := !isAggregateOperation
 
@@ -115,7 +115,7 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 	issueConditions, unknownConditions, infoConditions := splitConditionsByPriority(conditions, negativeConditionTypes)
 
 	// Compute the status for the target condition:
-	// Note: This function always return a condition with positive polarity.
+	// Note: This function always returns a condition with positive polarity.
 	// - if there are issues, use false
 	// - else if there are unknown, use unknown
 	// - else if there are info, use true
@@ -138,15 +138,15 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 	case len(issueConditions) == 1:
 		reason = issueConditions[0].Reason
 	case len(issueConditions) > 1:
-		reason = MultipleIssuesReason
+		reason = MultipleIssuesReportedReason
 	case len(unknownConditions) == 1:
 		reason = unknownConditions[0].Reason
 	case len(unknownConditions) > 1:
-		reason = MultipleUnknownReported
+		reason = MultipleUnknownReportedReason
 	case len(infoConditions) == 1:
 		reason = infoConditions[0].Reason
 	case len(infoConditions) > 1:
-		reason = MultipleInfoReason
+		reason = MultipleInfoReportedReason
 	default:
 		// NOTE: this is already handled above, but repeating also here for better readability.
 		return "", "", "", errors.New("can't merge an empty list of conditions")
@@ -164,7 +164,7 @@ func (d *defaultMergeStrategy) Merge(conditions []ConditionWithOwnerInfo, condit
 	// e.g. Condition-B (False): Message-B; Condition-!C (True): Message-!C; Condition-A (Unknown): Message-A
 	//
 	// When including messages from conditions, they are sorted by issue/unknown and by the implicit order of condition types
-	// provided by the user (it is consider as order of relevance).
+	// provided by the user (it is considered as order of relevance).
 	if isSummaryOperation {
 		messages := []string{}
 		for _, condition := range append(issueConditions, append(unknownConditions, infoConditions...)...) {
@@ -281,7 +281,7 @@ func splitConditionsByPriority(conditions []ConditionWithOwnerInfo, negativePola
 }
 
 // getPriority returns the merge priority for each condition.
-// It assign to conditions the following priority values:
+// It assigns following priority values to conditions:
 // - issues: conditions with positive polarity (normal True) and status False or conditions with negative polarity (normal False) and status True.
 // - unknown: conditions with status unknown.
 // - info: conditions with positive polarity (normal True) and status True or conditions with negative polarity (normal False) and status False.
@@ -301,11 +301,11 @@ func getPriority(condition metav1.Condition, negativePolarityConditionTypes sets
 		return unknownMergePriority
 	}
 
-	// Note: this should never happen. In case, those conditions are considered like condition with unknown status.
+	// Note: this should never happen. In case, those conditions are considered like conditions with unknown status.
 	return unknownMergePriority
 }
 
-// aggregateMessages return messages for the aggregate operation.
+// aggregateMessages returns messages for the aggregate operation.
 func aggregateMessages(conditions []ConditionWithOwnerInfo, n *int, dropEmpty bool, otherMessage string) (messages []string) {
 	// create a map with all the messages and the list of objects reporting the same message.
 	messageObjMap := map[string]map[string][]string{}
@@ -361,7 +361,7 @@ func aggregateMessages(conditions []ConditionWithOwnerInfo, n *int, dropEmpty bo
 			allObjects := messageObjMapForKind[m]
 			switch {
 			case len(allObjects) == 0:
-				// This should never happen, entry in the map exists only when an object report a message.
+				// This should never happen, entry in the map exists only when an object reports a message.
 			case len(allObjects) == 1:
 				msg += fmt.Sprintf(" from %s %s", kind, strings.Join(allObjects, ", "))
 			case len(allObjects) <= 3:
@@ -405,7 +405,7 @@ func getConditionsWithOwnerInfo(obj runtime.Object) ([]ConditionWithOwnerInfo, e
 // getConditionOwnerInfo return the ConditionOwnerInfo for the given object.
 // Note: Given that controller runtime often does not set typeMeta for objects,
 // in case kind is missing we are falling back to the type name, which in most cases
-// is the same of kind.
+// is the same as kind.
 func getConditionOwnerInfo(obj runtime.Object) ConditionOwnerInfo {
 	var kind, name string
 	kind = obj.GetObjectKind().GroupVersionKind().Kind

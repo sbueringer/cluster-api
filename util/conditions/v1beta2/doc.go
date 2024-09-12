@@ -18,10 +18,10 @@ limitations under the License.
 //
 // Please note that in order to make this change while respecting API deprecation rules, it is required
 // to go through a phased approach:
-// - Phase 1. metav1.Conditions will be added into v1beta1 API types under the Status.V1beta2.Conditions struct (clusterv1.Conditions will remain in Status.Condition)
+// - Phase 1. metav1.Conditions will be added into v1beta1 API types under the Status.V1Beta2.Conditions struct (clusterv1.Conditions will remain in Status.Conditions)
 // - Phase 2. when introducing v1beta2 API types:
-//   - clusterv1.Conditions will be moved from Status.Condition to Status.Deprecated.V1Beta1.Conditions
-//   - metav1.Conditions will be moved from Status.V1beta2.Conditions from Status.Condition
+//   - clusterv1.Conditions will be moved from Status.Conditions to Status.Deprecated.V1Beta1.Conditions
+//   - metav1.Conditions will be moved from Status.V1Beta2.Conditions to Status.Conditions
 //
 // - Phase 3. when removing v1beta1 API types, Status.Deprecated will be dropped.
 //

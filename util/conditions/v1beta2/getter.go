@@ -34,19 +34,19 @@ const (
 	NoReasonReported = "NoReasonReported"
 )
 
-// Get returns a conditions from the object.
+// Get returns a condition from the sourceObj.
 //
-// Get support retrieving conditions from objects at different stages of the transition to metav1.condition type:
-//   - Objects with clusterv1.condition in status.Conditions; in this case a best effort conversion
-//     to metav1.condition is performed, just enough to allow surfacing a condition from a providers object with Mirror
-//   - Objects with metav1.condition in status.V1Beta2.Conditions conditions
-//   - Objects with metav1.condition in status.conditions
+// Get supports retrieving conditions from objects at different stages of the transition to the metav1.Condition type:
+//   - Objects with clusterv1.Condition in status.conditions; in this case a best effort conversion
+//     to metav1.Condition is performed, just enough to allow surfacing a condition from a provider object with Mirror
+//   - Objects with metav1.Condition in status.v1beta2.conditions
+//   - Objects with metav1.Condition in status.conditions
 //
 // Please note that Get also supports reading conditions from unstructured objects; in this case, best effort
 // conversion from a map is performed, just enough to allow surfacing a condition from a providers object with Mirror
 //
-// In case the object does not have metav1.conditions, Get tries to read clusterv1.condition from status.conditions
-// and convert them to metav1.conditions.
+// In case the object does not have metav1.Conditions, Get tries to read clusterv1.Conditions from status.conditions
+// and convert them to metav1.Conditions.
 func Get(sourceObj runtime.Object, sourceConditionType string) (*metav1.Condition, error) {
 	conditions, err := GetAll(sourceObj)
 	if err != nil {
@@ -57,17 +57,17 @@ func Get(sourceObj runtime.Object, sourceConditionType string) (*metav1.Conditio
 
 // GetAll returns all the conditions from the object.
 //
-// Get support retrieving conditions from objects at different stages of the transition to metav1.condition type:
-//   - Objects with clusterv1.condition in status.Conditions; in this case a best effort conversion
-//     to metav1.condition is performed, just enough to allow surfacing a condition from a providers object with Mirror
-//   - Objects with metav1.condition in status.V1Beta2.Conditions conditions
-//   - Objects with metav1.condition in status.conditions
+// GetAll supports retrieving conditions from objects at different stages of the transition to the metav1.Condition type:
+//   - Objects with clusterv1.Condition in status.conditions; in this case a best effort conversion
+//     to metav1.Condition is performed, just enough to allow surfacing a condition from a providers object with Mirror
+//   - Objects with metav1.Condition in status.v1beta2.conditions
+//   - Objects with metav1.Condition in status.conditions
 //
-// Please note that Get also supports reading conditions from unstructured objects; in this case, best effort
+// Please note that GetAll also supports reading conditions from unstructured objects; in this case, best effort
 // conversion from a map is performed, just enough to allow surfacing a condition from a providers object with Mirror
 //
-// In case the object does not have metav1.conditions, GetAll tries to read clusterv1.condition from status.conditions
-// and convert them to metav1.conditions.
+// In case the object does not have metav1.Conditions, GetAll tries to read clusterv1.Conditions from status.conditions
+// and convert them to metav1.Conditions.
 func GetAll(sourceObj runtime.Object) ([]metav1.Condition, error) {
 	if sourceObj == nil {
 		return nil, errors.New("sourceObj cannot be nil")
@@ -99,7 +99,7 @@ func getFromUnstructuredObject(obj runtime.Object) ([]metav1.Condition, error) {
 		if conditions, ok := value.([]interface{}); ok {
 			r, err := convertFromUnstructuredConditions(conditions)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failied to convert %s.status.v1beta2.conditions to []metav1.Condition", ownerInfo)
+				return nil, errors.Wrapf(err, "failed to convert %s.status.v1beta2.conditions to []metav1.Condition", ownerInfo)
 			}
 			return r, nil
 		}
@@ -110,7 +110,7 @@ func getFromUnstructuredObject(obj runtime.Object) ([]metav1.Condition, error) {
 		if conditions, ok := value.([]interface{}); ok {
 			r, err := convertFromUnstructuredConditions(conditions)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failied to convert %s.status.conditions to []metav1.Condition", ownerInfo)
+				return nil, errors.Wrapf(err, "failed to convert %s.status.conditions to []metav1.Condition", ownerInfo)
 			}
 			return r, nil
 		}
@@ -119,7 +119,7 @@ func getFromUnstructuredObject(obj runtime.Object) ([]metav1.Condition, error) {
 	return nil, errors.Errorf("%s must have status with one of conditions or v1beta2.conditions", ownerInfo)
 }
 
-// convertFromUnstructuredConditions converts []interface{} to metav1.Condition; this operation must account for
+// convertFromUnstructuredConditions converts []interface{} to []metav1.Condition; this operation must account for
 // objects which are not transitioning to metav1.Condition, or not yet fully transitioned, and thus a best
 // effort conversion of values to metav1.Condition is performed.
 func convertFromUnstructuredConditions(conditions []interface{}) ([]metav1.Condition, error) {
@@ -152,7 +152,7 @@ func convertFromUnstructuredConditions(conditions []interface{}) ([]metav1.Condi
 		var lastTransitionTime metav1.Time
 		if v, ok := cMap["lastTransitionTime"]; ok && v != nil && v.(string) != "" {
 			if err := lastTransitionTime.UnmarshalQueryParameter(v.(string)); err != nil {
-				return nil, errors.Wrapf(err, "failed to unmarshal last transition time value: %s", v)
+				return nil, errors.Wrapf(err, "failed to unmarshal lastTransitionTime value: %s", v)
 			}
 		}
 
@@ -202,9 +202,9 @@ func getFromTypedObject(obj runtime.Object) ([]metav1.Condition, error) {
 	}
 
 	// Get conditions.
-	// NOTE: Given that we allow providers to migrate at different speed, it is required to support objects at the different stage of the transition from legacy conditions to metav1.conditions.
+	// NOTE: Given that we allow providers to migrate at different speed, it is required to support objects at the different stage of the transition from legacy conditions to metav1.Condition.
 	// In order to handle this, first try to read Status.V1Beta2.Conditions, then Status.Conditions; for Status.Conditions, also support conversion from legacy conditions.
-	// The V1Beta2 branch and the conversion from legacy conditions should be dropped when v1beta1 API are removed.
+	// The V1Beta2 branch and the conversion from legacy conditions should be dropped when the v1beta1 API is removed.
 
 	if v1beta2Field := statusField.FieldByName("V1Beta2"); v1beta2Field != (reflect.Value{}) {
 		if conditionField := v1beta2Field.FieldByName("Conditions"); conditionField != (reflect.Value{}) {
@@ -228,15 +228,15 @@ func getFromTypedObject(obj runtime.Object) ([]metav1.Condition, error) {
 		}
 		r, err := convertFromV1Beta1Conditions(v1betaConditions)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failied to convert %s.status.conditions to []metav1.Condition", ownerInfo)
+			return nil, errors.Wrapf(err, "failed to convert %s.status.conditions to []metav1.Condition", ownerInfo)
 		}
 		return r, nil
 	}
 
-	return nil, errors.Errorf("%s.status must have one of conditions or v1Beta2.conditions", ownerInfo)
+	return nil, errors.Errorf("%s.status must have one of conditions or v1beta2.conditions", ownerInfo)
 }
 
-// convertFromV1Beta1Conditions converts a clusterv1.Condition to metav1.Condition.
+// convertFromV1Beta1Conditions converts a clusterv1.Conditions to []metav1.Condition.
 // NOTE: this operation is performed at best effort and assuming conditions have been set using Cluster API condition utils.
 func convertFromV1Beta1Conditions(v1betaConditions clusterv1.Conditions) ([]metav1.Condition, error) {
 	convertedConditions := make([]metav1.Condition, len(v1betaConditions))
@@ -273,12 +273,12 @@ func validateAndFixConvertedCondition(c *metav1.Condition) error {
 		case metav1.ConditionTrue: // When using old Cluster API condition utils, for conditions with Status true, Reason can be empty only when a condition has positive polarity (means "good").
 			c.Reason = NoReasonReported
 		case metav1.ConditionUnknown:
-			return errors.New("condition must be set when a condition is unknown")
+			return errors.New("condition reason must be set when a condition is unknown")
 		}
 	}
 
 	// NOTE: Empty LastTransitionTime is tolerated because it will be set when assigning the newly generated mirror condition to an object.
-	// NOTE: Others metav1.Condition validations rules, e.g. regex, are not enforced at this stage; they will be enforced by the API server at a later stage.
+	// NOTE: Other metav1.Condition validations rules, e.g. regex, are not enforced at this stage; they will be enforced by the API server at a later stage.
 
 	return nil
 }

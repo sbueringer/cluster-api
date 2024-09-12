@@ -52,7 +52,7 @@ func (o *MirrorOptions) ApplyOptions(opts []MirrorOption) *MirrorOptions {
 // NewMirrorCondition create a mirror of the given condition from obj; if the given condition does not exist in the source obj,
 // a new condition with status Unknown, reason NotYetReported is created.
 //
-// By default, the Mirror condition has the same type of the source condition, but this can be changed by using
+// By default, the Mirror condition has the same type as the source condition, but this can be changed by using
 // the TargetConditionType option.
 func NewMirrorCondition(sourceObj runtime.Object, sourceConditionType string, opts ...MirrorOption) (*metav1.Condition, error) {
 	mirrorOpt := &MirrorOptions{

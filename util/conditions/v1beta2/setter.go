@@ -48,15 +48,15 @@ func (o *SetOptions) ApplyOptions(opts []SetOption) *SetOptions {
 
 // Set a condition on the given object.
 //
-// Set support adding conditions to objects at different stages of the transition to metav1.condition type:
-// - Objects with metav1.condition in status.v1beta2.conditions conditions
-// - Objects with metav1.condition in status.conditions
+// Set supports adding conditions to objects at different stages of the transition to the metav1.Condition type:
+// - Objects with metav1.Condition in status.v1beta2.conditions
+// - Objects with metav1.Condition in status.conditions
 //
 // When setting a condition:
 // - condition.ObservedGeneration will be set to object.Metadata.Generation.
 // - If the condition does not exist and condition.LastTransitionTime is not set, time.Now is used.
-// - If the condition already exist, condition.Status is changing and condition.LastTransitionTime is not set, time.Now is used.
-// - If the condition already exist, condition.Status is NOT changing, all the fields can be changed except for condition.LastTransitionTime.
+// - If the condition already exists, condition.Status is changing and condition.LastTransitionTime is not set, time.Now is used.
+// - If the condition already exists, condition.Status is NOT changing, all the fields can be changed except for condition.LastTransitionTime.
 //
 // Set can't be used with unstructured objects.
 //
@@ -81,9 +81,9 @@ func Set(targetObj runtime.Object, condition metav1.Condition, opts ...SetOption
 
 // SetAll the conditions on the given object.
 //
-// SetAll support adding conditions to objects at different stages of the transition to metav1.condition type:
-// - Objects with metav1.condition in status.v1beta2.conditions conditions
-// - Objects with metav1.condition in status.conditions
+// SetAll supports adding conditions to objects at different stages of the transition to the metav1.Condition type:
+// - Objects with metav1.Condition in status.v1beta2.conditions
+// - Objects with metav1.Condition in status.conditions
 //
 // SetAll can't be used with unstructured objects.
 //
@@ -91,7 +91,7 @@ func Set(targetObj runtime.Object, condition metav1.Condition, opts ...SetOption
 // but this can be changed by using the ConditionSortFunc option.
 func SetAll(targetObj runtime.Object, conditions []metav1.Condition, opts ...SetOption) error {
 	setOpt := &SetOptions{
-		// By default sort condition by the default condition order (first available, then ready, then the other conditions if alphabetical order.
+		// By default, sort conditions by the default condition order: first available, then ready, then the other conditions in alphabetical order.
 		conditionSortFunc: defaultSortLessFunc,
 	}
 	setOpt.ApplyOptions(opts)
@@ -119,7 +119,7 @@ func setToTypedObject(obj runtime.Object, conditions []metav1.Condition) error {
 
 	ptr := reflect.ValueOf(obj)
 	if ptr.Kind() != reflect.Pointer {
-		return errors.New("cannot set conditions on a object that is not a pointer")
+		return errors.New("cannot set conditions on an object that is not a pointer")
 	}
 
 	elem := ptr.Elem()
@@ -135,14 +135,14 @@ func setToTypedObject(obj runtime.Object, conditions []metav1.Condition) error {
 	}
 
 	// Set conditions.
-	// NOTE: Given that we allow providers to migrate at different speed, it is required to support objects at the different stage of the transition from legacy conditions to metav1.conditions.
+	// NOTE: Given that we allow providers to migrate at different speed, it is required to support objects at the different stage of the transition from legacy conditions to metav1.Conditions.
 	// In order to handle this, first try to set Status.V1Beta2.Conditions, then Status.Conditions.
-	// The V1Beta2 branch should be dropped when v1beta1 API are removed.
+	// The V1Beta2 branch should be dropped when the v1beta1 API is removed.
 
 	if v1beta2Field := statusField.FieldByName("V1Beta2"); v1beta2Field != (reflect.Value{}) {
 		if conditionField := v1beta2Field.FieldByName("Conditions"); conditionField != (reflect.Value{}) {
 			if conditionField.Type() != metav1ConditionsType {
-				return errors.Errorf("cannot set conditions on %s.v1beta2.conditions, the field doesn't have []metav1.Condition type: %s type detected", ownerInfo, reflect.TypeOf(conditionField.Interface()).String())
+				return errors.Errorf("cannot set conditions on %s.status.v1beta2.conditions, the field doesn't have []metav1.Condition type: %s type detected", ownerInfo, reflect.TypeOf(conditionField.Interface()).String())
 			}
 
 			setToTypedField(conditionField, conditions)
@@ -152,7 +152,7 @@ func setToTypedObject(obj runtime.Object, conditions []metav1.Condition) error {
 
 	if conditionField := statusField.FieldByName("Conditions"); conditionField != (reflect.Value{}) {
 		if conditionField.Type() != metav1ConditionsType {
-			return errors.Errorf("cannot set conditions on %s.conditions, the field doesn't have []metav1.Condition type []metav1.Condition: %s type detected", ownerInfo, reflect.TypeOf(conditionField.Interface()).String())
+			return errors.Errorf("cannot set conditions on %s.status.conditions, the field doesn't have []metav1.Condition type: %s type detected", ownerInfo, reflect.TypeOf(conditionField.Interface()).String())
 		}
 
 		setToTypedField(conditionField, conditions)

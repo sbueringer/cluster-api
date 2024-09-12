@@ -94,7 +94,7 @@ func NewAggregateCondition(sourceObjs []runtime.Object, sourceConditionType stri
 					Type:    aggregateOpt.targetConditionType,
 					Status:  metav1.ConditionUnknown,
 					Reason:  NotYetReportedReason,
-					Message: fmt.Sprintf("Condition %s not yet reported from %s", sourceConditionType, conditionOwner.Kind),
+					Message: fmt.Sprintf("Condition %s not yet reported", sourceConditionType),
 					// NOTE: LastTransitionTime and ObservedGeneration are not relevant for merge.
 				},
 			})

@@ -66,7 +66,7 @@ func TestAggregate(t *testing.T) {
 			},
 		},
 		{
-			name: "Same issue from up to tree objects",
+			name: "Same issue from up to three objects",
 			conditions: [][]metav1.Condition{
 				{{Type: AvailableCondition, Status: metav1.ConditionFalse, Reason: "Reason-1", Message: "Message-1"}},  // obj1
 				{{Type: AvailableCondition, Status: metav1.ConditionFalse, Reason: "Reason-1", Message: "Message-1"}},  // obj2
@@ -78,12 +78,12 @@ func TestAggregate(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionFalse,                        // False because there is one issue
-				Reason:  MultipleIssuesReason,                         // Using a generic reason
+				Reason:  MultipleIssuesReportedReason,                 // Using a generic reason
 				Message: "Message-1 from Phase3Objs obj0, obj1, obj2", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
 		{
-			name: "Same issue from more than tree objects",
+			name: "Same issue from more than three objects",
 			conditions: [][]metav1.Condition{
 				{{Type: AvailableCondition, Status: metav1.ConditionFalse, Reason: "Reason-1", Message: "Message-1"}}, // obj1
 				{{Type: AvailableCondition, Status: metav1.ConditionFalse, Reason: "Reason-1", Message: "Message-1"}}, // obj2
@@ -97,7 +97,7 @@ func TestAggregate(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionFalse,                                   // False because there is one issue
-				Reason:  MultipleIssuesReason,                                    // Using a generic reason
+				Reason:  MultipleIssuesReportedReason,                            // Using a generic reason
 				Message: "Message-1 from Phase3Objs obj0, obj1, obj2 and 2 more", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -117,7 +117,7 @@ func TestAggregate(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionFalse,                                                                                             // False because there is one issue
-				Reason:  MultipleIssuesReason,                                                                                              // Using a generic reason
+				Reason:  MultipleIssuesReportedReason,                                                                                      // Using a generic reason
 				Message: "Message-1 from Phase3Objs obj0, obj3, obj4; Message-2 from Phase3Objs obj1, obj2; Message-3 from Phase3Obj obj5", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -137,7 +137,7 @@ func TestAggregate(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionFalse,                                                                                                                // False because there is one issue
-				Reason:  MultipleIssuesReason,                                                                                                                 // Using a generic reason
+				Reason:  MultipleIssuesReportedReason,                                                                                                         // Using a generic reason
 				Message: "Message-1 from Phase3Objs obj0, obj4; Message-2 from Phase3Obj obj1; Message-3 from Phase3Obj obj5; 2 Phase3Objs with other issues", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -154,7 +154,7 @@ func TestAggregate(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionFalse,                                                                         // False because there is one issue
-				Reason:  MultipleIssuesReason,                                                                          // Using a generic reason
+				Reason:  MultipleIssuesReportedReason,                                                                  // Using a generic reason
 				Message: "Message-1 from Phase3Obj obj0; Message-2 from Phase3Obj obj1; Message-3 from Phase3Obj obj2", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -172,7 +172,7 @@ func TestAggregate(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionFalse,                                                                                                          // False because there is one issue
-				Reason:  MultipleIssuesReason,                                                                                                           // Using a generic reason
+				Reason:  MultipleIssuesReportedReason,                                                                                                   // Using a generic reason
 				Message: "Message-1 from Phase3Obj obj0; Message-2 from Phase3Obj obj1; Message-4 from Phase3Obj obj3; 1 Phase3Obj with status unknown", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -192,7 +192,7 @@ func TestAggregate(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionUnknown,                                                                                                                // False because there is one issue
-				Reason:  MultipleUnknownReported,                                                                                                                // Using a generic reason
+				Reason:  MultipleUnknownReportedReason,                                                                                                          // Using a generic reason
 				Message: "Message-1 from Phase3Objs obj0, obj4; Message-2 from Phase3Obj obj1; Message-3 from Phase3Obj obj5; 2 Phase3Objs with status unknown", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -211,7 +211,7 @@ func TestAggregate(t *testing.T) {
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
 				Status:  metav1.ConditionTrue,                                                                                                                   // False because there is one issue
-				Reason:  MultipleInfoReason,                                                                                                                     // Using a generic reason
+				Reason:  MultipleInfoReportedReason,                                                                                                             // Using a generic reason
 				Message: "Message-1 from Phase3Objs obj0, obj4; Message-2 from Phase3Obj obj1; Message-3 from Phase3Obj obj5; 1 Phase3Obj with additional info", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
@@ -225,9 +225,9 @@ func TestAggregate(t *testing.T) {
 			options:       []AggregateOption{},
 			want: &metav1.Condition{
 				Type:    AvailableCondition,
-				Status:  metav1.ConditionFalse,                                                                                    // False because there is one issue
-				Reason:  "Reason-1",                                                                                               // Picking the reason from the only existing issue
-				Message: "Message-1 from Phase3Obj obj0; Condition Available not yet reported from Phase3Obj from Phase3Obj obj1", // messages from all the issues & unknown conditions (info dropped)
+				Status:  metav1.ConditionFalse,                                                                     // False because there is one issue
+				Reason:  "Reason-1",                                                                                // Picking the reason from the only existing issue
+				Message: "Message-1 from Phase3Obj obj0; Condition Available not yet reported from Phase3Obj obj1", // messages from all the issues & unknown conditions (info dropped)
 			},
 		},
 	}
@@ -256,9 +256,9 @@ func TestAggregate(t *testing.T) {
 		})
 	}
 
-	t.Run("Fails if conditions in scope are empty", func(t *testing.T) {
+	t.Run("Fails if source objects are empty", func(t *testing.T) {
 		g := NewWithT(t)
-		_, err := NewAggregateCondition(nil, AvailableCondition) // no source objs --> Condition in scope will be empty
+		_, err := NewAggregateCondition(nil, AvailableCondition)
 		g.Expect(err).To(HaveOccurred())
 	})
 }

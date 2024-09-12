@@ -34,8 +34,8 @@ var (
 	// schemeBuilder is used to add go types to the GroupVersionKind scheme.
 	schemeBuilder = runtime.NewSchemeBuilder(addTransitionV1beta2Types)
 
-	// AddTransitionV1beta2ToScheme adds the types for validating the transition to v1Beta2 in this group-version to the given scheme.
-	AddTransitionV1beta2ToScheme = schemeBuilder.AddToScheme
+	// AddTransitionV1Beta2ToScheme adds the types for validating the transition to v1Beta2 in this group-version to the given scheme.
+	AddTransitionV1Beta2ToScheme = schemeBuilder.AddToScheme
 )
 
 func addTransitionV1beta2Types(scheme *runtime.Scheme) error {
@@ -71,11 +71,13 @@ type Phase0Obj struct {
 
 // Phase0ObjSpec defines the spec of a Phase0Obj.
 type Phase0ObjSpec struct {
+	// +optional
 	Foo string `json:"foo,omitempty"`
 }
 
 // Phase0ObjStatus defines the status of a Phase0Obj.
 type Phase0ObjStatus struct {
+	// +optional
 	Bar string `json:"bar,omitempty"`
 
 	// +optional
@@ -114,22 +116,24 @@ type Phase1Obj struct {
 
 // Phase1ObjSpec defines the spec of a Phase1Obj.
 type Phase1ObjSpec struct {
+	// +optional
 	Foo string `json:"foo,omitempty"`
 }
 
 // Phase1ObjStatus defines the status of a Phase1Obj.
 type Phase1ObjStatus struct {
+	// +optional
 	Bar string `json:"bar,omitempty"`
 
 	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 
 	// +optional
-	V1Beta2 Phase1ObjStatusV1beta2 `json:"v1beta2,omitempty"`
+	V1Beta2 Phase1ObjStatusV1Beta2 `json:"v1beta2,omitempty"`
 }
 
-// Phase1ObjStatusV1beta2 defines the status.V1Beta1 of a Phase1Obj.
-type Phase1ObjStatusV1beta2 struct {
+// Phase1ObjStatusV1Beta2 defines the status.V1Beta2 of a Phase1Obj.
+type Phase1ObjStatusV1Beta2 struct {
 
 	// +optional
 	// +listType=map
@@ -169,11 +173,13 @@ type Phase2Obj struct {
 
 // Phase2ObjSpec defines the spec of a Phase2Obj.
 type Phase2ObjSpec struct {
+	// +optional
 	Foo string `json:"foo,omitempty"`
 }
 
 // Phase2ObjStatus defines the status of a Phase2Obj.
 type Phase2ObjStatus struct {
+	// +optional
 	Bar string `json:"bar,omitempty"`
 
 	// +optional
@@ -189,11 +195,11 @@ type Phase2ObjStatus struct {
 type Phase2ObjStatusDeprecated struct {
 
 	// +optional
-	V1Beta1 Phase2ObjStatusDeprecatedV1Beta2 `json:"v1beta1,omitempty"`
+	V1Beta1 Phase2ObjStatusDeprecatedV1Beta1 `json:"v1beta1,omitempty"`
 }
 
-// Phase2ObjStatusDeprecatedV1Beta2 defines the status.Deprecated.V1Beta2 of a Phase2Obj.
-type Phase2ObjStatusDeprecatedV1Beta2 struct {
+// Phase2ObjStatusDeprecatedV1Beta1 defines the status.Deprecated.V1Beta2 of a Phase2Obj.
+type Phase2ObjStatusDeprecatedV1Beta1 struct {
 
 	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
@@ -231,11 +237,13 @@ type Phase3Obj struct {
 
 // Phase3ObjSpec defines the spec of a Phase3Obj.
 type Phase3ObjSpec struct {
+	// +optional
 	Foo string `json:"foo,omitempty"`
 }
 
 // Phase3ObjStatus defines the status of a Phase3Obj.
 type Phase3ObjStatus struct {
+	// +optional
 	Bar string `json:"bar,omitempty"`
 
 	// +optional
