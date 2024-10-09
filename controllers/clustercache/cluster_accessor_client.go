@@ -240,7 +240,7 @@ func createCachedClient(ctx context.Context, clusterAccessorConfig *clusterAcces
 		}
 	}
 
-	// Create the client for the cluster
+	// Create the client for the cluster.
 	cachedClient, err := client.New(config, client.Options{
 		Scheme:     clusterAccessorConfig.Scheme,
 		Mapper:     mapper,
@@ -255,10 +255,10 @@ func createCachedClient(ctx context.Context, clusterAccessorConfig *clusterAcces
 		return nil, nil, errors.Wrapf(err, "error creating cached client")
 	}
 
-	// Start the cache!!!
+	// Start the cache!
 	go cache.Start(cacheCtx) //nolint:errcheck
 
-	// Wait until the cache is initially synced
+	// Wait until the cache is initially synced.
 	cacheSyncCtx, cacheSyncCtxCancel := context.WithTimeout(ctx, clusterAccessorConfig.Cache.InitialSyncTimeout)
 	defer cacheSyncCtxCancel()
 	if !cache.WaitForCacheSync(cacheSyncCtx) {

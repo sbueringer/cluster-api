@@ -324,6 +324,11 @@ func (ca *clusterAccessor) Disconnect(ctx context.Context) {
 func (ca *clusterAccessor) HealthCheck(ctx context.Context) (bool, bool) {
 	log := ctrl.LoggerFrom(ctx)
 
+	if !ca.Connected(ctx) {
+		log.V(6).Info("Skipping health check, not connected")
+		return false, false
+	}
+
 	ca.rLock(ctx)
 	restClient := ca.lockedState.connection.restClient
 	ca.rUnlock(ctx)

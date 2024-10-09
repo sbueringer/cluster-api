@@ -18,6 +18,7 @@ package clustercache
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -111,6 +112,11 @@ func TestConnect(t *testing.T) {
 	g.Expect(accessor.lockedState.connection.cache).ToNot(BeNil())
 	g.Expect(accessor.lockedState.connection.watches).ToNot(BeNil())
 
+	// Check if cache was started / synced
+	cacheSyncCtx, cacheSyncCtxCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cacheSyncCtxCancel()
+	g.Expect(accessor.lockedState.connection.cache.WaitForCacheSync(cacheSyncCtx)).To(BeTrue())
+
 	g.Expect(accessor.lockedState.clientCertificatePrivateKey).ToNot(BeNil())
 
 	g.Expect(accessor.lockedState.healthChecking.lastProbeTimestamp.IsZero()).To(BeFalse())
@@ -176,6 +182,12 @@ func TestDisconnect(t *testing.T) {
 	// Disconnect again (no-op)
 	accessor.Disconnect(ctx)
 	g.Expect(accessor.Connected(ctx)).To(BeFalse())
+
+	// Verify health checking state was preserved
+	g.Expect(accessor.lockedState.clientCertificatePrivateKey).ToNot(BeNil())
+
+	g.Expect(accessor.lockedState.healthChecking.lastProbeTimestamp.IsZero()).To(BeFalse())
+	g.Expect(accessor.lockedState.healthChecking.lastProbeSuccessTimestamp.IsZero()).To(BeFalse())
 }
 
 func TestHealthCheck(t *testing.T) {
@@ -189,6 +201,7 @@ func TestHealthCheck(t *testing.T) {
 
 	tests := []struct {
 		name                           string
+		connected                      bool
 		restClientHTTPResponse         *http.Response
 		initialConsecutiveFailures     int
 		wantTooManyConsecutiveFailures bool
@@ -196,7 +209,8 @@ func TestHealthCheck(t *testing.T) {
 		wantConsecutiveFailures        int
 	}{
 		{
-			name: "Health probe failed with unauthorized error",
+			name:      "Health probe failed with unauthorized error",
+			connected: true,
 			restClientHTTPResponse: &http.Response{
 				StatusCode: http.StatusUnauthorized,
 				Header:     header(),
@@ -207,7 +221,8 @@ func TestHealthCheck(t *testing.T) {
 			wantConsecutiveFailures:        1,
 		},
 		{
-			name: "Health probe failed with other error",
+			name:      "Health probe failed with other error",
+			connected: true,
 			restClientHTTPResponse: &http.Response{
 				StatusCode: http.StatusBadRequest,
 				Header:     header(),
@@ -218,7 +233,8 @@ func TestHealthCheck(t *testing.T) {
 			wantConsecutiveFailures:        1,
 		},
 		{
-			name: "Health probe failed with other error (failure threshold met)",
+			name:      "Health probe failed with other error (failure threshold met)",
+			connected: true,
 			restClientHTTPResponse: &http.Response{
 				StatusCode: http.StatusBadRequest,
 				Header:     header(),
@@ -230,7 +246,18 @@ func TestHealthCheck(t *testing.T) {
 			wantConsecutiveFailures:        5,
 		},
 		{
-			name: "Health probe succeeded",
+			name:      "Health probe succeeded",
+			connected: true,
+			restClientHTTPResponse: &http.Response{
+				StatusCode: http.StatusOK,
+			},
+			wantTooManyConsecutiveFailures: false,
+			wantUnauthorizedErrorOccurred:  false,
+			wantConsecutiveFailures:        0,
+		},
+		{
+			name:      "Health probe skipped (not connected)",
+			connected: false,
 			restClientHTTPResponse: &http.Response{
 				StatusCode: http.StatusOK,
 			},
@@ -259,6 +286,10 @@ func TestHealthCheck(t *testing.T) {
 			}
 			accessor.lockedState.healthChecking = clusterAccessorLockedHealthCheckingState{
 				consecutiveFailures: tt.initialConsecutiveFailures,
+			}
+
+			if !tt.connected {
+				accessor.lockedState.connection = nil
 			}
 
 			gotTooManyConsecutiveFailures, gotUnauthorizedErrorOccurred := accessor.HealthCheck(ctx)

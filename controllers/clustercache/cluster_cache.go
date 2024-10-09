@@ -93,24 +93,23 @@ type CacheOptionsIndex struct {
 
 // ClientOptions are the client options for the clients that are created per cluster.
 type ClientOptions struct {
-	// Timeout is the timeout used for the rest config, client and cache.
+	// Timeout is the timeout used for the REST config, client and cache.
 	// Defaults to 10s.
 	Timeout time.Duration
 
 	// QPS is the maximum queries per second from the controller client
 	// to the Kubernetes API server of workload clusters.
-	// It is used for the rest config, client and cache.
+	// It is used for the REST config, client and cache.
 	// Defaults to 20.
 	QPS float32
 
 	// Burst is the maximum number of queries that should be allowed in
 	// one burst from the controller client to the Kubernetes API server of workload clusters.
-	// It is used for the rest config, client and cache.
+	// It is used for the REST config, client and cache.
 	// Default 30.
 	Burst int
 
-	// UserAgent is the user agent used for the client and cache.
-	// It is used for the rest config, client and cache.
+	// UserAgent is the user agent used for the REST config, client and cache.
 	UserAgent string
 
 	// Cache are the cache options defining how clients should interact with the underlying cache.
@@ -312,7 +311,7 @@ type clusterSource struct {
 }
 
 func (cc *clusterCache) GetClient(ctx context.Context, cluster client.ObjectKey) (client.Client, error) {
-	accessor := cc.getClusterAccessor(ctx, cluster)
+	accessor := cc.getClusterAccessor(cluster)
 	if accessor == nil {
 		return nil, errors.Wrapf(ErrClusterNotConnected, "error getting client")
 	}
@@ -320,7 +319,7 @@ func (cc *clusterCache) GetClient(ctx context.Context, cluster client.ObjectKey)
 }
 
 func (cc *clusterCache) GetReader(ctx context.Context, cluster client.ObjectKey) (client.Reader, error) {
-	accessor := cc.getClusterAccessor(ctx, cluster)
+	accessor := cc.getClusterAccessor(cluster)
 	if accessor == nil {
 		return nil, errors.Wrapf(ErrClusterNotConnected, "error getting client reader")
 	}
@@ -328,7 +327,7 @@ func (cc *clusterCache) GetReader(ctx context.Context, cluster client.ObjectKey)
 }
 
 func (cc *clusterCache) GetRESTConfig(ctx context.Context, cluster client.ObjectKey) (*rest.Config, error) {
-	accessor := cc.getClusterAccessor(ctx, cluster)
+	accessor := cc.getClusterAccessor(cluster)
 	if accessor == nil {
 		return nil, errors.Wrapf(ErrClusterNotConnected, "error getting REST config")
 	}
@@ -336,7 +335,7 @@ func (cc *clusterCache) GetRESTConfig(ctx context.Context, cluster client.Object
 }
 
 func (cc *clusterCache) GetClientCertificatePrivateKey(ctx context.Context, cluster client.ObjectKey) (*rsa.PrivateKey, error) {
-	accessor := cc.getClusterAccessor(ctx, cluster)
+	accessor := cc.getClusterAccessor(cluster)
 	if accessor == nil {
 		return nil, errors.New("error getting client certificate private key: private key was not generated yet")
 	}
@@ -344,7 +343,7 @@ func (cc *clusterCache) GetClientCertificatePrivateKey(ctx context.Context, clus
 }
 
 func (cc *clusterCache) Watch(ctx context.Context, cluster client.ObjectKey, input WatchInput) error {
-	accessor := cc.getClusterAccessor(ctx, cluster)
+	accessor := cc.getClusterAccessor(cluster)
 	if accessor == nil {
 		return errors.Wrapf(ErrClusterNotConnected, "error creating watch %s for %T", input.Name, input.Kind)
 	}
@@ -352,7 +351,7 @@ func (cc *clusterCache) Watch(ctx context.Context, cluster client.ObjectKey, inp
 }
 
 func (cc *clusterCache) GetLastProbeSuccessTimestamp(ctx context.Context, cluster client.ObjectKey) time.Time {
-	accessor := cc.getClusterAccessor(ctx, cluster)
+	accessor := cc.getClusterAccessor(cluster)
 	if accessor == nil {
 		return time.Time{}
 	}
@@ -369,14 +368,14 @@ func (cc *clusterCache) Reconcile(ctx context.Context, req reconcile.Request) (r
 	log := ctrl.LoggerFrom(ctx)
 	clusterKey := client.ObjectKey{Namespace: req.Namespace, Name: req.Name}
 
-	accessor := cc.getOrCreateClusterAccessor(ctx, clusterKey)
+	accessor := cc.getOrCreateClusterAccessor(clusterKey)
 
 	cluster := &clusterv1.Cluster{}
 	if err := cc.client.Get(ctx, req.NamespacedName, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("Cluster has been deleted, disconnecting")
 			accessor.Disconnect(ctx)
-			cc.deleteClusterAccessor(ctx, clusterKey)
+			cc.deleteClusterAccessor(clusterKey)
 			cc.cleanupClusterSourcesForCluster(clusterKey)
 			return ctrl.Result{}, nil
 		}
@@ -478,7 +477,7 @@ func (cc *clusterCache) Reconcile(ctx context.Context, req reconcile.Request) (r
 // Note: This method should only be called in the ClusterCache Reconcile method. Otherwise it could happen
 // that a new clusterAccessor is created even after ClusterCache Reconcile deleted the clusterAccessor after
 // Cluster object deletion.
-func (cc *clusterCache) getOrCreateClusterAccessor(_ context.Context, cluster client.ObjectKey) *clusterAccessor {
+func (cc *clusterCache) getOrCreateClusterAccessor(cluster client.ObjectKey) *clusterAccessor {
 	cc.clusterAccessorsLock.Lock()
 	defer cc.clusterAccessorsLock.Unlock()
 
@@ -492,7 +491,7 @@ func (cc *clusterCache) getOrCreateClusterAccessor(_ context.Context, cluster cl
 }
 
 // getClusterAccessor returns a clusterAccessor if it exists, otherwise nil.
-func (cc *clusterCache) getClusterAccessor(_ context.Context, cluster client.ObjectKey) *clusterAccessor {
+func (cc *clusterCache) getClusterAccessor(cluster client.ObjectKey) *clusterAccessor {
 	cc.clusterAccessorsLock.RLock()
 	defer cc.clusterAccessorsLock.RUnlock()
 
@@ -500,7 +499,7 @@ func (cc *clusterCache) getClusterAccessor(_ context.Context, cluster client.Obj
 }
 
 // deleteClusterAccessor deletes the clusterAccessor for the given cluster in the clusterAccessors map.
-func (cc *clusterCache) deleteClusterAccessor(_ context.Context, cluster client.ObjectKey) {
+func (cc *clusterCache) deleteClusterAccessor(cluster client.ObjectKey) {
 	cc.clusterAccessorsLock.Lock()
 	defer cc.clusterAccessorsLock.Unlock()
 

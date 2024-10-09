@@ -27,10 +27,13 @@ limitations under the License.
 //
 // Typically the ClusterCache is passed to controllers and then it can be used by e.g. simply calling
 // GetClient to retrieve a client for the given Cluster (see the ClusterCache interface for more details).
+// If GetClient does return an error, controllers should not requeue, requeue after or return an error and
+// go in exponential backoff. Instead, they should register a source (via GetClusterSource) to receive reconnect
+// events from the ClusterCache.
 //
 // # Implementation details
 //
-// The ClusterCache internally run a reconciler that:
+// The ClusterCache internally runs a reconciler that:
 // - tries to create a connection to a workload cluster
 //   - if it fails, it will retry after roughly the ConnectionCreationRetryInterval
 //
