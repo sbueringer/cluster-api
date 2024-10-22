@@ -86,6 +86,8 @@ type KubeadmControlPlaneReconciler struct {
 	// WatchFilterValue is the label value used to filter events prior to reconciliation.
 	WatchFilterValue string
 
+	RemoteConditionsGracePeriod time.Duration
+
 	// Deprecated: DeprecatedInfraMachineNaming. Name the InfraStructureMachines after the InfraMachineTemplate.
 	DeprecatedInfraMachineNaming bool
 
@@ -95,6 +97,14 @@ type KubeadmControlPlaneReconciler struct {
 }
 
 func (r *KubeadmControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
+	if r.Client == nil || r.SecretCachingClient == nil || r.ClusterCache == nil ||
+		r.EtcdDialTimeout == time.Duration(0) || r.EtcdCallTimeout == time.Duration(0) ||
+		r.RemoteConditionsGracePeriod < 2*time.Minute {
+		return errors.New("Client, SecretCachingClient and ClusterCache must not be nil, " +
+			"EtcdDialTimeout and EtcdCallTimeout must not be 0, " +
+			"RemoteConditionsGracePeriod must not < 2m")
+	}
+
 	predicateLog := ctrl.LoggerFrom(ctx).WithValues("controller", "kubeadmcontrolplane")
 	c, err := ctrl.NewControllerManagedBy(mgr).
 		For(&controlplanev1.KubeadmControlPlane{}).
@@ -111,7 +121,8 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(ctx context.Context, mg
 				),
 			),
 		).
-		WatchesRawSource(r.ClusterCache.GetClusterSource("kubeadmcontrolplane", r.ClusterToKubeadmControlPlane)).
+		WatchesRawSource(r.ClusterCache.GetClusterSource("kubeadmcontrolplane", r.ClusterToKubeadmControlPlane,
+			clustercache.WatchForProbeFailure(r.RemoteConditionsGracePeriod))).
 		Build(r)
 	if err != nil {
 		return errors.Wrap(err, "failed setting up with a controller manager")
@@ -825,12 +836,75 @@ func (r *KubeadmControlPlaneReconciler) reconcileControlPlaneConditions(ctx cont
 
 	workloadCluster, err := controlPlane.GetWorkloadCluster(ctx)
 	if err != nil {
-		return errors.Wrap(err, "cannot get remote client to workload cluster")
+		if errors.Is(err, clustercache.ErrClusterNotConnected) { // FIXME: Verify this check actually works
+			lastProbeSuccessTime := r.ClusterCache.GetLastProbeSuccessTimestamp(ctx, client.ObjectKeyFromObject(controlPlane.Cluster)) // FIXME: move this above GetWorkloadCluster
+			if time.Since(lastProbeSuccessTime) > r.RemoteConditionsGracePeriod {
+				// Overwrite conditions to RemoteConnectionFailed (Unknown) on Machine & KCP
+				setConditionsToUnknown(setConditionsToUnknownInput{
+					ControlPlane:                        controlPlane,
+					Overwrite:                           true,
+					EtcdClusterHealthyReason:            controlplanev1.KubeadmControlPlaneEtcdClusterRemoteConnectionFailedV1Beta2Reason,
+					ControlPlaneComponentsHealthyReason: controlplanev1.KubeadmControlPlaneControlPlaneComponentsRemoteConnectionFailedV1Beta2Reason,
+					StaticPodReason:                     controlplanev1.KubeadmControlPlaneMachinePodRemoteConnectionFailedV1Beta2Reason,
+					EtcdMemberHealthyReason:             controlplanev1.KubeadmControlPlaneMachineEtcdMemberRemoteConnectionFailedV1Beta2Reason,
+					Message:                             calculateRemoteConditionsGracePeriodMessage(lastProbeSuccessTime),
+				})
+			} else {
+				// If KCP conditions are not set => set conditions to RemoteConnectionDown (Unknown) on Machine & KCP
+				setConditionsToUnknown(setConditionsToUnknownInput{
+					ControlPlane:                        controlPlane,
+					Overwrite:                           false,
+					EtcdClusterHealthyReason:            controlplanev1.KubeadmControlPlaneEtcdClusterRemoteConnectionDownV1Beta2Reason,
+					ControlPlaneComponentsHealthyReason: controlplanev1.KubeadmControlPlaneControlPlaneComponentsRemoteConnectionDownV1Beta2Reason,
+					StaticPodReason:                     controlplanev1.KubeadmControlPlaneMachinePodRemoteConnectionDownV1Beta2Reason,
+					EtcdMemberHealthyReason:             controlplanev1.KubeadmControlPlaneMachineEtcdMemberRemoteConnectionDownV1Beta2Reason,
+					Message:                             "Connection to the cluster is down",
+				})
+			}
+		} else {
+			// If KCP conditions are not set => set conditions to InspectionFailed (Unknown) on Machine & KCP
+			setConditionsToUnknown(setConditionsToUnknownInput{
+				ControlPlane:                        controlPlane,
+				Overwrite:                           false,
+				EtcdClusterHealthyReason:            controlplanev1.KubeadmControlPlaneEtcdClusterInspectionFailedV1Beta2Reason,
+				ControlPlaneComponentsHealthyReason: controlplanev1.KubeadmControlPlaneControlPlaneComponentsInspectionFailedV1Beta2Reason,
+				StaticPodReason:                     controlplanev1.KubeadmControlPlaneMachinePodInspectionFailedV1Beta2Reason,
+				EtcdMemberHealthyReason:             controlplanev1.KubeadmControlPlaneMachineEtcdMemberInspectionFailedV1Beta2Reason,
+				Message:                             "Please check controller logs for errors",
+			})
+		}
+
+		// Patch machines with the updated conditions.
+		patchErr := controlPlane.PatchMachines(ctx)
+
+		// Patch machines with the updated conditions.
+		return kerrors.NewAggregate([]error{errors.Wrap(err, "cannot get remote client to workload cluster"), patchErr})
+	}
+
+	v1Beta2ConditionsSet := v1beta2conditions.Set
+
+	// This case should never happen, because before the remote-conditions-grace-period the ClusterCache should
+	// have dropped the connection and then we end up in the if above.
+	lastProbeSuccessTime := r.ClusterCache.GetLastProbeSuccessTimestamp(ctx, client.ObjectKeyFromObject(controlPlane.Cluster))
+	if time.Since(lastProbeSuccessTime) > r.RemoteConditionsGracePeriod {
+		// Overwrite conditions to RemoteConnectionFailed (Unknown) on Machine & KCP
+		setConditionsToUnknown(setConditionsToUnknownInput{
+			ControlPlane:                        controlPlane,
+			Overwrite:                           true,
+			EtcdClusterHealthyReason:            controlplanev1.KubeadmControlPlaneEtcdClusterRemoteConnectionFailedV1Beta2Reason,
+			ControlPlaneComponentsHealthyReason: controlplanev1.KubeadmControlPlaneControlPlaneComponentsRemoteConnectionFailedV1Beta2Reason,
+			StaticPodReason:                     controlplanev1.KubeadmControlPlaneMachinePodRemoteConnectionFailedV1Beta2Reason,
+			EtcdMemberHealthyReason:             controlplanev1.KubeadmControlPlaneMachineEtcdMemberRemoteConnectionFailedV1Beta2Reason,
+			Message:                             calculateRemoteConditionsGracePeriodMessage(lastProbeSuccessTime),
+		})
+
+		// Set noop setter to ensure UpdateStaticPodConditions & UpdateEtcdConditions are not overwriting v1beta2 conditions
+		v1Beta2ConditionsSet = func(_ v1beta2conditions.Setter, _ metav1.Condition, _ ...v1beta2conditions.SetOption) {}
 	}
 
 	// Update conditions status
-	workloadCluster.UpdateStaticPodConditions(ctx, controlPlane)
-	workloadCluster.UpdateEtcdConditions(ctx, controlPlane)
+	workloadCluster.UpdateStaticPodConditions(ctx, controlPlane, v1Beta2ConditionsSet)
+	workloadCluster.UpdateEtcdConditions(ctx, controlPlane, v1Beta2ConditionsSet)
 
 	// Patch machines with the updated conditions.
 	if err := controlPlane.PatchMachines(ctx); err != nil {
@@ -839,6 +913,76 @@ func (r *KubeadmControlPlaneReconciler) reconcileControlPlaneConditions(ctx cont
 
 	// KCP will be patched at the end of Reconcile to reflect updated conditions, so we can return now.
 	return nil
+}
+
+type setConditionsToUnknownInput struct {
+	ControlPlane                        *internal.ControlPlane
+	Overwrite                           bool
+	EtcdClusterHealthyReason            string
+	ControlPlaneComponentsHealthyReason string
+	StaticPodReason                     string
+	EtcdMemberHealthyReason             string
+	Message                             string
+}
+
+func calculateRemoteConditionsGracePeriodMessage(lastProbeSuccessTime time.Time) string {
+	if lastProbeSuccessTime.IsZero() {
+		return "Remote connection down"
+	}
+
+	return fmt.Sprintf("Remote connection down since %s", lastProbeSuccessTime.Format(time.RFC3339))
+}
+
+func setConditionsToUnknown(input setConditionsToUnknownInput) {
+	etcdClusterHealthySet := v1beta2conditions.Has(input.ControlPlane.KCP, controlplanev1.KubeadmControlPlaneEtcdClusterHealthyV1Beta2Condition)
+	controlPlaneComponentsHealthySet := v1beta2conditions.Has(input.ControlPlane.KCP, controlplanev1.KubeadmControlPlaneControlPlaneComponentsHealthyV1Beta2Condition)
+
+	if input.Overwrite || !etcdClusterHealthySet {
+		v1beta2conditions.Set(input.ControlPlane.KCP, metav1.Condition{
+			Type:    controlplanev1.KubeadmControlPlaneEtcdClusterHealthyV1Beta2Condition,
+			Status:  metav1.ConditionUnknown,
+			Reason:  input.EtcdClusterHealthyReason,
+			Message: input.Message,
+		})
+		for _, machine := range input.ControlPlane.Machines {
+			if input.ControlPlane.IsEtcdManaged() {
+				v1beta2conditions.Set(machine, metav1.Condition{
+					Type:    controlplanev1.KubeadmControlPlaneMachineEtcdMemberHealthyV1Beta2Condition,
+					Status:  metav1.ConditionUnknown,
+					Reason:  input.EtcdMemberHealthyReason,
+					Message: input.Message,
+				})
+			}
+		}
+	}
+
+	if input.Overwrite || !controlPlaneComponentsHealthySet {
+		v1beta2conditions.Set(input.ControlPlane.KCP, metav1.Condition{
+			Type:    controlplanev1.KubeadmControlPlaneControlPlaneComponentsHealthyV1Beta2Condition,
+			Status:  metav1.ConditionUnknown,
+			Reason:  input.ControlPlaneComponentsHealthyReason,
+			Message: input.Message,
+		})
+
+		allMachinePodV1beta2Conditions := []string{
+			controlplanev1.KubeadmControlPlaneMachineAPIServerPodHealthyV1Beta2Condition,
+			controlplanev1.KubeadmControlPlaneMachineControllerManagerPodHealthyV1Beta2Condition,
+			controlplanev1.KubeadmControlPlaneMachineSchedulerPodHealthyV1Beta2Condition,
+		}
+		if input.ControlPlane.IsEtcdManaged() {
+			allMachinePodV1beta2Conditions = append(allMachinePodV1beta2Conditions, controlplanev1.KubeadmControlPlaneMachineEtcdPodHealthyV1Beta2Condition)
+		}
+		for _, machine := range input.ControlPlane.Machines {
+			for _, condition := range allMachinePodV1beta2Conditions {
+				v1beta2conditions.Set(machine, metav1.Condition{
+					Type:    condition,
+					Status:  metav1.ConditionUnknown,
+					Reason:  input.StaticPodReason,
+					Message: input.Message,
+				})
+			}
+		}
+	}
 }
 
 // reconcileEtcdMembers ensures the number of etcd members is in sync with the number of machines/nodes.

@@ -52,6 +52,16 @@ const (
 	// etcd cluster hosted on KubeadmControlPlane controlled machines.
 	KubeadmControlPlaneEtcdClusterInspectionFailedV1Beta2Reason = clusterv1.InspectionFailedV1Beta2Reason
 
+	// KubeadmControlPlaneEtcdClusterRemoteConnectionFailedV1Beta2Reason surfaces that the remote connection failed.
+	// If the remote connection probe failed for longer than remote conditions grace period,
+	// this reason is used when setting the EtcdClusterHealthy condition to `Unknown`.
+	KubeadmControlPlaneEtcdClusterRemoteConnectionFailedV1Beta2Reason = clusterv1.RemoteConnectionFailedV1Beta2Reason
+
+	// KubeadmControlPlaneEtcdClusterRemoteConnectionDownV1Beta2Reason surfaces that the remote connection is down.
+	// This is used when setting the EtcdClusterHealthy condition to `Unknown`
+	// when the connection is down and it hasn't been set yet.
+	KubeadmControlPlaneEtcdClusterRemoteConnectionDownV1Beta2Reason = clusterv1.RemoteConnectionDownV1Beta2Reason
+
 	// KubeadmControlPlaneEtcdClusterHealthyV1Beta2Reason surfaces when the etcd cluster hosted on KubeadmControlPlane
 	// machines is healthy.
 	KubeadmControlPlaneEtcdClusterHealthyV1Beta2Reason = "Healthy"
@@ -76,6 +86,16 @@ const (
 	// KubeadmControlPlaneControlPlaneComponentsInspectionFailedV1Beta2Reason documents a failure when inspecting the status of the
 	// control plane components hosted on KubeadmControlPlane controlled machines.
 	KubeadmControlPlaneControlPlaneComponentsInspectionFailedV1Beta2Reason = clusterv1.InspectionFailedV1Beta2Reason
+
+	// KubeadmControlPlaneControlPlaneComponentsRemoteConnectionFailedV1Beta2Reason surfaces that the remote connection failed.
+	// If the remote connection probe failed for longer than remote conditions grace period,
+	// this reason is used when setting the ControlPlaneComponentsHealthy condition to `Unknown`.
+	KubeadmControlPlaneControlPlaneComponentsRemoteConnectionFailedV1Beta2Reason = clusterv1.RemoteConnectionFailedV1Beta2Reason
+
+	// KubeadmControlPlaneControlPlaneComponentsRemoteConnectionDownV1Beta2Reason surfaces that the remote connection is down.
+	// This is used when setting the ControlPlaneComponentsHealthy condition to `Unknown`
+	// when the connection is down and it hasn't been set yet.
+	KubeadmControlPlaneControlPlaneComponentsRemoteConnectionDownV1Beta2Reason = clusterv1.RemoteConnectionDownV1Beta2Reason
 
 	// KubeadmControlPlaneControlPlaneComponentsHealthyV1Beta2Reason surfaces when the Kubernetes control plane components
 	// hosted on KubeadmControlPlane machines are healthy.
@@ -233,13 +253,20 @@ const (
 	// pod hosted on a KubeadmControlPlane controlled machine.
 	KubeadmControlPlaneMachinePodInspectionFailedV1Beta2Reason = clusterv1.InspectionFailedV1Beta2Reason
 
+	// KubeadmControlPlaneMachinePodRemoteConnectionFailedV1Beta2Reason surfaces that the remote connection failed.
+	// If the remote connection probe failed for longer than remote conditions grace period,
+	// this reason is used when setting the APIServerPodHealthy, ControllerManagerPodHealthy, SchedulerPodHealthy and
+	// EtcdPodHealthy conditions to `Unknown`.
+	KubeadmControlPlaneMachinePodRemoteConnectionFailedV1Beta2Reason = clusterv1.RemoteConnectionFailedV1Beta2Reason
+
+	// KubeadmControlPlaneMachinePodRemoteConnectionDownV1Beta2Reason surfaces that the remote connection is down.
+	// This is used when setting the APIServerPodHealthy, ControllerManagerPodHealthy, SchedulerPodHealthy and
+	// EtcdPodHealthy conditions to `Unknown` when the connection is down and they haven't been set yet.
+	KubeadmControlPlaneMachinePodRemoteConnectionDownV1Beta2Reason = clusterv1.RemoteConnectionDownV1Beta2Reason
+
 	// KubeadmControlPlaneMachinePodDeletingV1Beta2Reason surfaces when the machine hosting control plane components
 	// is being deleted.
 	KubeadmControlPlaneMachinePodDeletingV1Beta2Reason = "Deleting"
-
-	// KubeadmControlPlaneMachinePodInternalErrorV1Beta2Reason surfaces unexpected failures when reading pod hosted
-	// on a KubeadmControlPlane controlled machine.
-	KubeadmControlPlaneMachinePodInternalErrorV1Beta2Reason = clusterv1.InternalErrorV1Beta2Reason
 )
 
 // EtcdMemberHealthy condition and corresponding reasons that will be used for KubeadmControlPlane controlled machines in v1Beta2 API version.
@@ -256,6 +283,15 @@ const (
 	// KubeadmControlPlaneMachineEtcdMemberInspectionFailedV1Beta2Reason documents a failure when inspecting the status of an
 	// etcd member hosted on a KubeadmControlPlane controlled machine.
 	KubeadmControlPlaneMachineEtcdMemberInspectionFailedV1Beta2Reason = clusterv1.InspectionFailedV1Beta2Reason
+
+	// KubeadmControlPlaneMachineEtcdMemberRemoteConnectionFailedV1Beta2Reason surfaces that the remote connection failed.
+	// If the remote connection probe failed for longer than remote conditions grace period,
+	// this reason is used when setting the EtcdMemberHealthy condition to `Unknown`.
+	KubeadmControlPlaneMachineEtcdMemberRemoteConnectionFailedV1Beta2Reason = clusterv1.RemoteConnectionFailedV1Beta2Reason
+
+	// KubeadmControlPlaneMachineEtcdMemberRemoteConnectionDownV1Beta2Reason surfaces that the remote connection is down.
+	// This is used when setting the EtcdMemberHealthy condition to `Unknown` when the connection is down and it hasn't been set yet.
+	KubeadmControlPlaneMachineEtcdMemberRemoteConnectionDownV1Beta2Reason = clusterv1.RemoteConnectionDownV1Beta2Reason
 
 	// KubeadmControlPlaneMachineEtcdMemberDeletingV1Beta2Reason surfaces when the machine hosting an etcd member
 	// is being deleted.
