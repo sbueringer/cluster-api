@@ -1573,7 +1573,7 @@ kubernetesVersion: metav1.16.1`,
 		recorder:            record.NewFakeRecorder(32),
 		managementCluster: &fakeManagementCluster{
 			Management: &internal.Management{Client: env},
-			Workload: fakeWorkloadCluster{
+			Workload: &fakeWorkloadCluster{
 				Workload: &internal.Workload{
 					Client: env,
 				},
@@ -1582,7 +1582,7 @@ kubernetesVersion: metav1.16.1`,
 		},
 		managementClusterUncached: &fakeManagementCluster{
 			Management: &internal.Management{Client: env},
-			Workload: fakeWorkloadCluster{
+			Workload: &fakeWorkloadCluster{
 				Workload: &internal.Workload{
 					Client: env,
 				},

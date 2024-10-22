@@ -36,8 +36,6 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -120,12 +118,13 @@ func init() {
 
 // RunInput is the input for Run.
 type RunInput struct {
-	M                   *testing.M
-	ManagerUncachedObjs []client.Object
-	SetupIndexes        func(ctx context.Context, mgr ctrl.Manager)
-	SetupReconcilers    func(ctx context.Context, mgr ctrl.Manager)
-	SetupEnv            func(e *Environment)
-	MinK8sVersion       string
+	M                    *testing.M
+	ManagerUncachedObjs  []client.Object
+	CacheOptionsModifier func(*cache.Options)
+	SetupIndexes         func(ctx context.Context, mgr ctrl.Manager)
+	SetupReconcilers     func(ctx context.Context, mgr ctrl.Manager)
+	SetupEnv             func(e *Environment)
+	MinK8sVersion        string
 }
 
 // Run executes the tests of the given testing.M in a test environment.
@@ -147,7 +146,7 @@ func Run(ctx context.Context, input RunInput) int {
 	}
 
 	// Bootstrapping test environment
-	env := newEnvironment(input.ManagerUncachedObjs...)
+	env := newEnvironment(input.CacheOptionsModifier, input.ManagerUncachedObjs...)
 
 	if input.SetupIndexes != nil {
 		input.SetupIndexes(ctx, env.Manager)
@@ -231,7 +230,7 @@ type Environment struct {
 //
 // This function should be called only once for each package you're running tests within,
 // usually the environment is initialized in a suite_test.go file within a `BeforeSuite` ginkgo block.
-func newEnvironment(uncachedObjs ...client.Object) *Environment {
+func newEnvironment(cacheOptionsModifier func(*cache.Options), uncachedObjs ...client.Object) *Environment {
 	// Get the root of the current file to use in CRD paths.
 	_, filename, _, _ := goruntime.Caller(0) //nolint:dogsled
 	root := path.Join(path.Dir(filename), "..", "..", "..")
@@ -290,26 +289,10 @@ func newEnvironment(uncachedObjs ...client.Object) *Environment {
 		}
 	}
 
-	req, _ := labels.NewRequirement(clusterv1.ClusterNameLabel, selection.Exists, nil)
-	clusterSecretCacheSelector := labels.NewSelector().Add(*req)
-	syncPeriod := 10 * time.Minute
-
 	options := manager.Options{
 		Scheme: scheme.Scheme,
 		Metrics: metricsserver.Options{
 			BindAddress: "0",
-		},
-		Cache: cache.Options{
-			// Namespaces: watchNamespaces,
-			SyncPeriod: &syncPeriod,
-			ByObject: map[client.Object]cache.ByObject{
-				// Note: Only Secrets with the cluster name label are cached.
-				// The default client of the manager won't use the cache for secrets at all (see Client.Cache.DisableFor).
-				// The cached secrets will only be used by the secretCachingClient we create below.
-				&corev1.Secret{}: {
-					Label: clusterSecretCacheSelector,
-				},
-			},
 		},
 		Client: client.Options{
 			Cache: &client.CacheOptions{
@@ -325,6 +308,10 @@ func newEnvironment(uncachedObjs ...client.Object) *Environment {
 				Host:    host,
 			},
 		),
+	}
+
+	if cacheOptionsModifier != nil {
+		cacheOptionsModifier(&options.Cache)
 	}
 
 	mgr, err := ctrl.NewManager(env.Config, options)
