@@ -102,7 +102,7 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(ctx context.Context, mg
 		r.RemoteConditionsGracePeriod < 2*time.Minute {
 		return errors.New("Client, SecretCachingClient and ClusterCache must not be nil, " +
 			"EtcdDialTimeout and EtcdCallTimeout must not be 0, " +
-			"RemoteConditionsGracePeriod must not < 2m")
+			"RemoteConditionsGracePeriod must not be < 2m")
 	}
 
 	predicateLog := ctrl.LoggerFrom(ctx).WithValues("controller", "kubeadmcontrolplane")

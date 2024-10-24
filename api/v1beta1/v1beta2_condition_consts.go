@@ -106,8 +106,8 @@ const (
 	// set to false and with the OwnerRemediated condition set to false by the MachineHealthCheck controller.
 	RemediatingV1Beta2Reason = "Remediating"
 
-	// NotRemediatingV1Beta2Reason surfaces when an object does not own any machines marked as not healthy
-	// by the MachineHealthCheck controller.
+	// NotRemediatingV1Beta2Reason surfaces when an object does not own any machines with HealthCheckSucceeded
+	// set to false and with the OwnerRemediated condition set to false by the MachineHealthCheck controller.
 	NotRemediatingV1Beta2Reason = "NotRemediating"
 
 	// NoReplicasV1Beta2Reason surfaces when an object that manage replicas does not have any.
