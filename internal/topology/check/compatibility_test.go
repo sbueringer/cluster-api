@@ -210,7 +210,7 @@ func TestLocalObjectTemplatesAreCompatible(t *testing.T) {
 			APIVersion: "test.group.io/versiontwo",
 		},
 	}
-	incompatibleNamespaceChangeTemplate := clusterv1.LocalObjectTemplate{
+	compatibleNamespaceChangeTemplate := clusterv1.LocalObjectTemplate{
 		Ref: &corev1.ObjectReference{
 			Namespace:  "different",
 			Name:       "foo",
@@ -253,15 +253,15 @@ func TestLocalObjectTemplatesAreCompatible(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "Allow change to template namespace",
+			current: template,
+			desired: compatibleNamespaceChangeTemplate,
+			wantErr: false,
+		},
+		{
 			name:    "Block change to template API Group",
 			current: template,
 			desired: incompatibleAPIGroupChangeTemplate,
-			wantErr: true,
-		},
-		{
-			name:    "Block change to template namespace",
-			current: template,
-			desired: incompatibleNamespaceChangeTemplate,
 			wantErr: true,
 		},
 		{
@@ -407,13 +407,13 @@ func TestClusterClassesAreCompatible(t *testing.T) {
 		APIVersion: "group.test.io/foo",
 		Kind:       "another-barTemplate",
 		Name:       "baz",
-		Namespace:  "default",
+		Namespace:  "other",
 	}
 	compatibleRef := &corev1.ObjectReference{
 		APIVersion: "group.test.io/another-foo",
 		Kind:       "barTemplate",
 		Name:       "another-baz",
-		Namespace:  "default",
+		Namespace:  "other",
 	}
 
 	tests := []struct {
@@ -473,7 +473,7 @@ func TestClusterClassesAreCompatible(t *testing.T) {
 							builder.BootstrapTemplate(metav1.NamespaceDefault, "bootstrap1").Build()).
 						Build()).
 				Build(),
-			desired: builder.ClusterClass(metav1.NamespaceDefault, "class1").
+			desired: builder.ClusterClass("other", "class1").
 				WithInfrastructureClusterTemplate(
 					builder.InfrastructureClusterTemplate(metav1.NamespaceDefault, "infra1").Build()).
 				WithControlPlaneTemplate(
@@ -712,13 +712,13 @@ func TestMachineDeploymentClassesAreCompatible(t *testing.T) {
 		APIVersion: "group.test.io/another-foo",
 		Kind:       "barTemplate",
 		Name:       "another-baz",
-		Namespace:  "default",
+		Namespace:  "other",
 	}
 	incompatibleRef := &corev1.ObjectReference{
 		APIVersion: "group.test.io/foo",
 		Kind:       "another-barTemplate",
 		Name:       "baz",
-		Namespace:  "default",
+		Namespace:  "other",
 	}
 
 	tests := []struct {
@@ -858,13 +858,13 @@ func TestMachinePoolClassesAreCompatible(t *testing.T) {
 		APIVersion: "group.test.io/another-foo",
 		Kind:       "barTemplate",
 		Name:       "another-baz",
-		Namespace:  "default",
+		Namespace:  "other",
 	}
 	incompatibleRef := &corev1.ObjectReference{
 		APIVersion: "group.test.io/foo",
 		Kind:       "another-barTemplate",
 		Name:       "baz",
-		Namespace:  "default",
+		Namespace:  "other",
 	}
 
 	tests := []struct {
