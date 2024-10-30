@@ -30,6 +30,8 @@ import (
 const (
 	// ClusterClassNameField is used by the Cluster controller to index Clusters by ClusterClass name.
 	ClusterClassNameField = "spec.topology.class"
+	// ClusterClassNamespaceField is used by the Cluster controller to index Clusters by ClusterClass namespace.
+	ClusterClassNamespaceField = "spec.topology.classNamespace"
 )
 
 // ByClusterClassName adds the cluster class name  index to the
@@ -44,6 +46,18 @@ func ByClusterClassName(ctx context.Context, mgr ctrl.Manager) error {
 	return nil
 }
 
+// ByClusterClassNamespace adds the cluster class namespace index to the
+// managers cache.
+func ByClusterClassNamespace(ctx context.Context, mgr ctrl.Manager) error {
+	if err := mgr.GetCache().IndexField(ctx, &clusterv1.Cluster{},
+		ClusterClassNamespaceField,
+		ClusterByClusterClassNamespace,
+	); err != nil {
+		return errors.Wrap(err, "error setting index field")
+	}
+	return nil
+}
+
 // ClusterByClusterClassClassName contains the logic to index Clusters by ClusterClass name.
 func ClusterByClusterClassClassName(o client.Object) []string {
 	cluster, ok := o.(*clusterv1.Cluster)
@@ -52,6 +66,18 @@ func ClusterByClusterClassClassName(o client.Object) []string {
 	}
 	if cluster.Spec.Topology != nil {
 		return []string{cluster.GetClassKey().Name}
+	}
+	return nil
+}
+
+// ClusterByClusterClassNamespace contains the logic to index Clusters by ClusterClass namespace.
+func ClusterByClusterClassNamespace(o client.Object) []string {
+	cluster, ok := o.(*clusterv1.Cluster)
+	if !ok {
+		panic(fmt.Sprintf("Expected Cluster but got a %T", o))
+	}
+	if cluster.Spec.Topology != nil {
+		return []string{cluster.GetClassKey().Namespace}
 	}
 	return nil
 }
