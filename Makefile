@@ -458,8 +458,6 @@ generate-go-conversions-core-api: $(CONVERSION_GEN) ## Generate conversions go c
 generate-go-conversions-core-exp: $(CONVERSION_GEN) ## Generate conversions go code for core exp
 	$(MAKE) clean-generated-conversions SRC_DIRS="./internal/apis/core/exp/v1alpha3,./internal/apis/core/exp/addons/v1alpha3,./internal/apis/core/exp/v1alpha4,./internal/apis/core/exp/addons/v1alpha4"
 	$(CONVERSION_GEN) \
-		--extra-dirs=sigs.k8s.io/cluster-api/internal/apis/core/v1alpha3 \
-		--extra-dirs=sigs.k8s.io/cluster-api/internal/apis/core/v1alpha4 \
 		--output-file=zz_generated.conversion.go \
 		--go-header-file=./hack/boilerplate/boilerplate.generatego.txt \
 		./internal/apis/core/exp/v1alpha3 \
@@ -505,10 +503,6 @@ generate-go-conversions-kubeadm-bootstrap: $(CONVERSION_GEN) ## Generate convers
 generate-go-conversions-kubeadm-control-plane: $(CONVERSION_GEN) ## Generate conversions go code for kubeadm control plane
 	$(MAKE) clean-generated-conversions SRC_DIRS="./internal/apis/controlplane/kubeadm"
 	$(CONVERSION_GEN) \
-		--extra-dirs=sigs.k8s.io/cluster-api/internal/apis/core/v1alpha3 \
-		--extra-dirs=sigs.k8s.io/cluster-api/internal/apis/core/v1alpha4 \
-		--extra-dirs=sigs.k8s.io/cluster-api/internal/apis/bootstrap/kubeadm/v1alpha3 \
-		--extra-dirs=sigs.k8s.io/cluster-api/internal/apis/bootstrap/kubeadm/v1alpha4 \
 		--output-file=zz_generated.conversion.go \
 		--go-header-file=./hack/boilerplate/boilerplate.generatego.txt \
 		./internal/apis/controlplane/kubeadm/v1alpha3 \
