@@ -451,16 +451,17 @@ func extensionConfig(name, namespace, extensionServiceNamespace, extensionServic
 					Namespace: extensionServiceNamespace,
 				},
 			},
-			NamespaceSelector: &metav1.LabelSelector{
-				// Note: we are limiting the test extension to be used by the namespace where the test is run.
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "kubernetes.io/metadata.name",
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{namespace},
-					},
-				},
-			},
+			// FIXME: for scale test it has to match all namespaces
+			//NamespaceSelector: &metav1.LabelSelector{
+			//	// Note: we are limiting the test extension to be used by the namespace where the test is run.
+			//	MatchExpressions: []metav1.LabelSelectorRequirement{
+			//		{
+			//			Key:      "kubernetes.io/metadata.name",
+			//			Operator: metav1.LabelSelectorOpIn,
+			//			Values:   []string{namespace},
+			//		},
+			//	},
+			//},
 			Settings: map[string]string{
 				"defaultAllHandlersToBlocking": strconv.FormatBool(defaultAllHandlersToBlocking),
 			},

@@ -429,6 +429,7 @@ func ScaleSpec(ctx context.Context, inputGetter func() ScaleSpecInput) {
 		}
 
 		if input.SkipCleanup {
+			By("PASSED!")
 			return
 		}
 
@@ -650,7 +651,7 @@ func createClusterWorker(ctx context.Context, clusterProxy framework.ClusterProx
 				// * Adjust namespace in ClusterClass YAML.
 				// * Create new namespace.
 				if deployClusterInSeparateNamespaces {
-					log.Logf("Create namespace %", namespaceName)
+					log.Logf("Create namespace %s", namespaceName)
 					_ = framework.CreateNamespace(ctx, framework.CreateNamespaceInput{
 						Creator:             clusterProxy.GetClient(),
 						Name:                namespaceName,
