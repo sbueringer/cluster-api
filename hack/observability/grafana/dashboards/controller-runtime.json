@@ -5010,7 +5010,7 @@
         },
         "definition": "label_values(kube_pod_info{node=~\"^$Node$\"},pod)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Pod",
         "multi": true,
         "name": "Pod",
