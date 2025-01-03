@@ -2,8 +2,6 @@ module sigs.k8s.io/cluster-api
 
 go 1.23.0
 
-replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.19.1-0.20241227172013-a9b7c2dd8a97
-
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -50,7 +48,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
-	sigs.k8s.io/controller-runtime v0.19.3
+	sigs.k8s.io/controller-runtime v0.19.1-0.20250103111815-1ac370e560b1
 	sigs.k8s.io/yaml v1.4.0
 )
 

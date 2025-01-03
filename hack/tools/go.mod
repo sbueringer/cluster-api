@@ -2,8 +2,6 @@ module sigs.k8s.io/cluster-api/hack/tools
 
 go 1.23.0
 
-replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.19.1-0.20241227172013-a9b7c2dd8a97
-
 replace sigs.k8s.io/cluster-api => ../../
 
 replace sigs.k8s.io/cluster-api/test => ../../test
@@ -28,7 +26,7 @@ require (
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	sigs.k8s.io/cluster-api v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/cluster-api/test v0.0.0-00010101000000-000000000000
-	sigs.k8s.io/controller-runtime v0.19.3
+	sigs.k8s.io/controller-runtime v0.19.1-0.20250103111815-1ac370e560b1
 	sigs.k8s.io/controller-tools v0.17.0
 	sigs.k8s.io/kubebuilder/docs/book/utils v0.0.0-20211028165026-57688c578b5d
 	sigs.k8s.io/kustomize/api v0.17.3
