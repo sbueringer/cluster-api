@@ -27,6 +27,10 @@ GO_VERSION ?= 1.23.0
 GO_DIRECTIVE_VERSION ?= 1.23.0
 GO_CONTAINER_IMAGE ?= docker.io/library/golang:$(GO_VERSION)
 
+# Ensure correct toolchain is used
+GOTOOLCHAIN = go$(GO_VERSION)
+export GOTOOLCHAIN
+
 # Use GOPROXY environment variable if set
 GOPROXY := $(shell go env GOPROXY)
 ifeq ($(GOPROXY),)
@@ -182,7 +186,7 @@ TRIAGE_PARTY_VERSION ?= v1.6.0
 CONVERSION_VERIFIER_BIN := conversion-verifier
 CONVERSION_VERIFIER := $(abspath $(TOOLS_BIN_DIR)/$(CONVERSION_VERIFIER_BIN))
 
-OPENAPI_GEN_VER := dc4e619 # main branch as of 22.04.2024
+OPENAPI_GEN_VER := 2c72e55 # main branch as of 03.01.2025
 OPENAPI_GEN_BIN := openapi-gen
 # We are intentionally using the binary without version suffix, to avoid the version
 # in generated files.
@@ -527,7 +531,7 @@ generate-go-conversions-test-extension: $(CONVERSION_GEN) ## Generate conversion
 
 # The tmp/sigs.k8s.io/cluster-api symlink is a workaround to make this target run outside of GOPATH
 .PHONY: generate-go-openapi
-generate-go-openapi: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Generate openapi go code for runtime SDK
+generate-go-openapi: $(OPENAPI_GEN) ## Generate openapi go code for runtime SDK
 	@mkdir -p ./tmp/sigs.k8s.io; ln -s $(ROOT_DIR) ./tmp/sigs.k8s.io/; cd ./tmp; \
 	for pkg in "api/v1beta1" "$(EXP_DIR)/runtime/hooks/api/v1alpha1"; do \
 		(cd ../ && $(MAKE) clean-generated-openapi-definitions SRC_DIRS="./$${pkg}"); \
