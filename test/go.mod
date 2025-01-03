@@ -2,7 +2,7 @@ module sigs.k8s.io/cluster-api/test
 
 go 1.23.0
 
-replace sigs.k8s.io/controller-runtime => github.com/sbueringer/controller-runtime v0.2.0-beta.1.0.20250103170138-75fd8e74ad62
+replace sigs.k8s.io/controller-runtime => github.com/sbueringer/controller-runtime v0.2.0-beta.1.0.20250103175910-2c34bd617b5e
 
 replace sigs.k8s.io/cluster-api => ../
 
