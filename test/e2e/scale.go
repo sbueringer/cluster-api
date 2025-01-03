@@ -149,6 +149,16 @@ type ScaleSpecInput struct {
 	// If set to true, the test will create the workload clusters and immediately continue without waiting
 	// for the clusters to be fully provisioned.
 	SkipWaitForCreation bool
+
+	// FIXME: make extension optional (per default off)
+
+	// ExtensionServiceNamespace is the namespace where the service for the Runtime SDK is located
+	// and is used to configure in the test-namespace scoped ExtensionConfig.
+	ExtensionServiceNamespace string
+	// ExtensionServiceName is the name of the service to configure in the test-namespace scoped ExtensionConfig.
+	ExtensionServiceName string
+
+	AdditionalClusterClasses int
 }
 
 // ScaleSpec implements a scale test for clusters with MachineDeployments.
@@ -262,6 +272,20 @@ func ScaleSpec(ctx context.Context, inputGetter func() ScaleSpecInput) {
 
 		// TODO(ykakarap): Follow-up: Add support for legacy cluster templates.
 
+		// NOTE: test extension is already deployed in the management cluster. If for any reason in future we want
+		// to make this test more self-contained this test should be modified in order to create an additional
+		// management cluster; also the E2E test configuration should be modified introducing something like
+		// optional:true allowing to define which providers should not be installed by default in
+		// a management cluster.
+		By("Deploy Test Extension ExtensionConfig")
+
+		// In this test we are defaulting all handlers to non-blocking because we don't expect the handlers to block the
+		// cluster lifecycle by default. Setting defaultAllHandlersToBlocking to false enforces that the test-extension automatically creates the ConfigMap with non-blocking preloaded responses.
+		// FIXME: remove IgnoreAlreadyExists
+		Expect(client.IgnoreAlreadyExists(input.BootstrapClusterProxy.GetClient().Create(ctx,
+			extensionConfig(specName, namespace.Name, input.ExtensionServiceNamespace, input.ExtensionServiceName, false)))).
+			To(Succeed(), "Failed to create the extension config")
+
 		By("Create the ClusterClass to be used by all workload clusters")
 
 		// IMPORTANT: ConfigCluster function in the test framework is currently not concurrency safe.
@@ -341,7 +365,7 @@ func ScaleSpec(ctx context.Context, inputGetter func() ScaleSpecInput) {
 			Concurrency:  concurrency,
 			FailFast:     input.FailFast,
 			WorkerFunc: func(ctx context.Context, inputChan chan string, resultChan chan workResult, wg *sync.WaitGroup) {
-				createClusterWorker(ctx, input.BootstrapClusterProxy, inputChan, resultChan, wg, namespace.Name, input.DeployClusterInSeparateNamespaces, baseClusterClassYAML, baseClusterTemplateYAML, creator, input.PostScaleClusterNamespaceCreated)
+				createClusterWorker(ctx, input.BootstrapClusterProxy, inputChan, resultChan, wg, namespace.Name, input.DeployClusterInSeparateNamespaces, baseClusterClassYAML, baseClusterTemplateYAML, creator, input.PostScaleClusterNamespaceCreated, input.AdditionalClusterClasses)
 			},
 		})
 		if err != nil {
@@ -589,7 +613,7 @@ func getClusterCreateFn(clusterProxy framework.ClusterProxy) clusterCreator {
 
 type PostScaleClusterNamespaceCreated func(clusterProxy framework.ClusterProxy, clusterNamespace string, clusterName string, clusterClassYAML []byte, clusterTemplateYAML []byte) ([]byte, []byte)
 
-func createClusterWorker(ctx context.Context, clusterProxy framework.ClusterProxy, inputChan <-chan string, resultChan chan<- workResult, wg *sync.WaitGroup, defaultNamespace string, deployClusterInSeparateNamespaces bool, baseClusterClassYAML, baseClusterTemplateYAML []byte, create clusterCreator, postScaleClusterNamespaceCreated PostScaleClusterNamespaceCreated) {
+func createClusterWorker(ctx context.Context, clusterProxy framework.ClusterProxy, inputChan <-chan string, resultChan chan<- workResult, wg *sync.WaitGroup, defaultNamespace string, deployClusterInSeparateNamespaces bool, baseClusterClassYAML, baseClusterTemplateYAML []byte, create clusterCreator, postScaleClusterNamespaceCreated PostScaleClusterNamespaceCreated, additionalClusterClasses int) {
 	defer wg.Done()
 
 	for {
@@ -651,6 +675,15 @@ func createClusterWorker(ctx context.Context, clusterProxy framework.ClusterProx
 					Eventually(func() error {
 						return clusterProxy.CreateOrUpdate(ctx, clusterClassYAML)
 					}, 1*time.Minute).Should(Succeed())
+					// Create additional unused instances of the ClusterClass
+					for i := 0; i < additionalClusterClasses; i++ {
+						additionalName := fmt.Sprintf("in-memory-%d", i+1)
+						log.Logf("Apply additional ClusterClass %s/%s", namespaceName, additionalName)
+						additionalClassYAML := bytes.Replace(clusterClassYAML, []byte("in-memory"), []byte(additionalName), -1)
+						Eventually(func() error {
+							return clusterProxy.CreateOrUpdate(ctx, additionalClassYAML)
+						}, 1*time.Minute).Should(Succeed())
+					}
 				}
 
 				// Adjust namespace and name in Cluster YAML

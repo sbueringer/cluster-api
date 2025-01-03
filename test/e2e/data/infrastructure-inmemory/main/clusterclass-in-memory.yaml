@@ -50,6 +50,12 @@ spec:
             - type: Ready
               status: "False"
               timeout: 300s
+  patches:
+  - name: test-patch
+    external:
+      # FIXME(TBD): implement some actual patches for more realistic behavior? (currently re-using the ones from CAPD)
+      generateExtension: generate-patches.scale
+      discoverVariablesExtension: discover-variables.scale
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
 kind: InMemoryClusterTemplate
@@ -95,19 +101,19 @@ spec:
       behaviour:
         vm:
           provisioning:
-            startupDuration: "30s"
+            startupDuration: "10s"
             startupJitter: "0.2"
         node:
           provisioning:
-            startupDuration: "10s"
+            startupDuration: "2s"
             startupJitter: "0.2"
         apiServer:
           provisioning:
-            startupDuration: "10s"
+            startupDuration: "2s"
             startupJitter: "0.2"
         etcd:
           provisioning:
-            startupDuration: "10s"
+            startupDuration: "2s"
             startupJitter: "0.2"
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
@@ -120,19 +126,19 @@ spec:
       behaviour:
         vm:
           provisioning:
-            startupDuration: "30s"
+            startupDuration: "10s"
             startupJitter: "0.2"
         node:
           provisioning:
-            startupDuration: "10s"
+            startupDuration: "2s"
             startupJitter: "0.2"
         apiServer:
           provisioning:
-            startupDuration: "10s"
+            startupDuration: "2s"
             startupJitter: "0.2"
         etcd:
           provisioning:
-            startupDuration: "10s"
+            startupDuration: "2s"
             startupJitter: "0.2"
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1

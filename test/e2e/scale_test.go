@@ -33,13 +33,30 @@ var _ = Describe("When testing the machinery for scale testing using in-memory p
 			InfrastructureProvider:   ptr.To("in-memory"),
 			BootstrapClusterProxy:    bootstrapClusterProxy,
 			ArtifactFolder:           artifactFolder,
-			ClusterCount:             ptr.To[int64](10),
-			Concurrency:              ptr.To[int64](5),
+			ClusterCount:             ptr.To[int64](500),
+			Concurrency:              ptr.To[int64](50),
 			Flavor:                   ptr.To(""),
 			ControlPlaneMachineCount: ptr.To[int64](1),
 			MachineDeploymentCount:   ptr.To[int64](1),
 			WorkerMachineCount:       ptr.To[int64](3),
-			SkipCleanup:              skipCleanup,
+			// FIXME: cleanup below
+			// CAPI tests with v1.5
+			// 2000 Clusters with 1CP,   0MD,  0 workers each, concurrency 50
+			//  200 Clusters with 3CP,   1MD, 10 workers each, concurrency 20
+			//   40 Clusters with 3CP,   1MD, 50 workers each, concurrency 5
+			//    1 Clusters with 3CP, 500MD,  2 workers each, concurrency 1
+			//SkipCleanup:              skipCleanup,
+			//SkipWaitForCreation: true,
+			SkipUpgrade:                       true,
+			SkipCleanup:                       true,
+			DeployClusterInSeparateNamespaces: true,
+			AdditionalClusterClasses:          4,
+			// The runtime extension gets deployed to the test-extension-system namespace and is exposed
+			// by the test-extension-webhook-service.
+			// The below values are used when creating the cluster-wide ExtensionConfig to refer
+			// the actual service.
+			ExtensionServiceNamespace: "test-extension-system",
+			ExtensionServiceName:      "test-extension-webhook-service",
 		}
 	})
 })
