@@ -2,6 +2,8 @@ module sigs.k8s.io/cluster-api/hack/tools
 
 go 1.23.0
 
+replace sigs.k8s.io/controller-runtime => github.com/sbueringer/controller-runtime v0.2.0-beta.1.0.20250103170138-75fd8e74ad62
+
 replace sigs.k8s.io/cluster-api => ../../
 
 replace sigs.k8s.io/cluster-api/test => ../../test
