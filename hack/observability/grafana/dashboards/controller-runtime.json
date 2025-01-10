@@ -352,7 +352,7 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 12,
             "x": 0,
             "y": 6
@@ -360,8 +360,12 @@
           "id": 13,
           "options": {
             "legend": {
-              "calcs": [],
-              "displayMode": "list",
+              "calcs": [
+                "min",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
@@ -459,16 +463,20 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 6,
+            "h": 9,
             "w": 12,
             "x": 0,
-            "y": 7
+            "y": 15
           },
           "id": 6,
           "options": {
             "legend": {
-              "calcs": [],
-              "displayMode": "list",
+              "calcs": [
+                "min",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
@@ -552,16 +560,20 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 6,
+            "h": 9,
             "w": 12,
             "x": 12,
-            "y": 7
+            "y": 15
           },
           "id": 7,
           "options": {
             "legend": {
-              "calcs": [],
-              "displayMode": "list",
+              "calcs": [
+                "min",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
             },
@@ -5010,7 +5022,7 @@
         },
         "definition": "label_values(kube_pod_info{node=~\"^$Node$\"},pod)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Pod",
         "multi": true,
         "name": "Pod",
