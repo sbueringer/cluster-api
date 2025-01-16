@@ -407,9 +407,9 @@ func TestClusterClassesAreCompatible(t *testing.T) {
 		APIVersion: "group.test.io/foo",
 		Kind:       "another-barTemplate",
 		Name:       "baz",
-		Namespace:  "other",
+		Namespace:  "default",
 	}
-	compatibleRef := &corev1.ObjectReference{
+	compatibleRefOther := &corev1.ObjectReference{
 		APIVersion: "group.test.io/another-foo",
 		Kind:       "barTemplate",
 		Name:       "another-baz",
@@ -450,7 +450,7 @@ func TestClusterClassesAreCompatible(t *testing.T) {
 		},
 
 		{
-			name: "pass for compatible clusterClasses",
+			name: "pass for compatible clusterClasses (with different namespace)",
 			current: builder.ClusterClass(metav1.NamespaceDefault, "class1").
 				WithInfrastructureClusterTemplate(
 					builder.InfrastructureClusterTemplate(metav1.NamespaceDefault, "infra1").Build()).
@@ -475,24 +475,24 @@ func TestClusterClassesAreCompatible(t *testing.T) {
 				Build(),
 			desired: builder.ClusterClass("other", "class1").
 				WithInfrastructureClusterTemplate(
-					builder.InfrastructureClusterTemplate(metav1.NamespaceDefault, "infra1").Build()).
+					builder.InfrastructureClusterTemplate("other", "infra1").Build()).
 				WithControlPlaneTemplate(
-					refToUnstructured(compatibleRef)).
+					refToUnstructured(compatibleRefOther)).
 				WithControlPlaneInfrastructureMachineTemplate(
-					refToUnstructured(compatibleRef)).
+					refToUnstructured(compatibleRefOther)).
 				WithWorkerMachineDeploymentClasses(
 					*builder.MachineDeploymentClass("aa").
 						WithInfrastructureTemplate(
-							builder.InfrastructureMachineTemplate(metav1.NamespaceDefault, "infra1").Build()).
+							builder.InfrastructureMachineTemplate("other", "infra1").Build()).
 						WithBootstrapTemplate(
-							builder.BootstrapTemplate(metav1.NamespaceDefault, "bootstrap1").Build()).
+							builder.BootstrapTemplate("other", "bootstrap1").Build()).
 						Build()).
 				WithWorkerMachinePoolClasses(
 					*builder.MachinePoolClass("bb").
 						WithInfrastructureTemplate(
-							builder.InfrastructureMachinePoolTemplate(metav1.NamespaceDefault, "infra1").Build()).
+							builder.InfrastructureMachinePoolTemplate("other", "infra1").Build()).
 						WithBootstrapTemplate(
-							builder.BootstrapTemplate(metav1.NamespaceDefault, "bootstrap1").Build()).
+							builder.BootstrapTemplate("other", "bootstrap1").Build()).
 						Build()).
 				Build(),
 			wantErr: false,
@@ -712,13 +712,13 @@ func TestMachineDeploymentClassesAreCompatible(t *testing.T) {
 		APIVersion: "group.test.io/another-foo",
 		Kind:       "barTemplate",
 		Name:       "another-baz",
-		Namespace:  "other",
+		Namespace:  "default",
 	}
 	incompatibleRef := &corev1.ObjectReference{
 		APIVersion: "group.test.io/foo",
 		Kind:       "another-barTemplate",
 		Name:       "baz",
-		Namespace:  "other",
+		Namespace:  "default",
 	}
 
 	tests := []struct {
@@ -858,13 +858,13 @@ func TestMachinePoolClassesAreCompatible(t *testing.T) {
 		APIVersion: "group.test.io/another-foo",
 		Kind:       "barTemplate",
 		Name:       "another-baz",
-		Namespace:  "other",
+		Namespace:  "default",
 	}
 	incompatibleRef := &corev1.ObjectReference{
 		APIVersion: "group.test.io/foo",
 		Kind:       "another-barTemplate",
 		Name:       "baz",
-		Namespace:  "other",
+		Namespace:  "default",
 	}
 
 	tests := []struct {
