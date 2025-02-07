@@ -19,16 +19,46 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	. "github.com/onsi/gomega"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/internal/test"
 )
+
+func Test_CRDMigrator_MigrateManagedFields_Local(t *testing.T) {
+	g := NewWithT(t)
+	ctx := context.Background()
+
+	// Gets a restConfig e.g. from the KUBECONFIG env var
+	restConfig := ctrl.GetConfigOrDie()
+
+	c, err := client.New(restConfig, client.Options{})
+	g.Expect(err).ToNot(HaveOccurred())
+
+	migrator := crdMigrator{Client: c}
+
+	crds := &apiextensionsv1.CustomResourceDefinitionList{}
+	g.Expect(c.List(ctx, crds)).To(Succeed())
+	crdsToMigrate := []*apiextensionsv1.CustomResourceDefinition{}
+	for _, crd := range crds.Items {
+		if crd.Name == "clusters.cluster.x-k8s.io" {
+			// Remove old apiVersions
+			crd.Spec.Versions = slices.DeleteFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool {
+				return version.Name != "v1beta1"
+			})
+			crdsToMigrate = append(crdsToMigrate, &crd)
+		}
+	}
+
+	g.Expect(migrator.runCRDs(ctx, crdsToMigrate)).To(Succeed())
+}
 
 func Test_CRDMigrator(t *testing.T) {
 	tests := []struct {
@@ -211,15 +241,14 @@ func Test_CRDMigrator(t *testing.T) {
 				Client: countingClient,
 			}
 
-			isMigrated, err := m.run(context.Background(), tt.newCRD)
+			err = m.run(context.Background(), tt.newCRD)
 			if tt.wantErr {
 				g.Expect(err).To(HaveOccurred())
 			} else {
 				g.Expect(err).ToNot(HaveOccurred())
 			}
-			g.Expect(isMigrated).To(Equal(tt.wantIsMigrated))
 
-			if isMigrated {
+			if tt.wantIsMigrated {
 				storageVersion, err := storageVersionForCRD(tt.currentCRD)
 				g.Expect(err).ToNot(HaveOccurred())
 
@@ -231,6 +260,8 @@ func Test_CRDMigrator(t *testing.T) {
 				err = c.Get(context.Background(), client.ObjectKeyFromObject(tt.newCRD), currentCRD)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(currentCRD.Status.StoredVersions).To(Equal(tt.wantStoredVersions))
+			} else {
+				g.Expect(countingClient.count).To(HaveLen(0))
 			}
 		})
 	}

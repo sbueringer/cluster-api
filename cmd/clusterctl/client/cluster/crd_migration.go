@@ -18,15 +18,20 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -60,6 +65,8 @@ func NewCRDMigrator(client client.Client) CRDMigrator {
 // This is necessary when the new CRD drops a version which
 // was previously used as a storage version.
 func (m *crdMigrator) Run(ctx context.Context, objs []unstructured.Unstructured) error {
+	crds := []*apiextensionsv1.CustomResourceDefinition{}
+
 	for i := range objs {
 		obj := objs[i]
 
@@ -68,10 +75,20 @@ func (m *crdMigrator) Run(ctx context.Context, objs []unstructured.Unstructured)
 			if err := scheme.Scheme.Convert(&obj, crd, nil); err != nil {
 				return errors.Wrapf(err, "failed to convert CRD %q", obj.GetName())
 			}
+			crds = append(crds, crd)
+		}
+	}
 
-			if _, err := m.run(ctx, crd); err != nil {
-				return err
-			}
+	return m.runCRDs(ctx, crds)
+}
+
+// runCRDs migrates CRs to the storage version of new CRDs.
+// This is necessary when the new CRD drops a version which
+// was previously used as a storage version.
+func (m *crdMigrator) runCRDs(ctx context.Context, crds []*apiextensionsv1.CustomResourceDefinition) error {
+	for _, crd := range crds {
+		if err := m.run(ctx, crd); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -80,9 +97,7 @@ func (m *crdMigrator) Run(ctx context.Context, objs []unstructured.Unstructured)
 // run migrates CRs of a new CRD.
 // This is necessary when the new CRD drops or stops serving
 // a version which was previously used as a storage version.
-func (m *crdMigrator) run(ctx context.Context, newCRD *apiextensionsv1.CustomResourceDefinition) (bool, error) {
-	log := logf.Log
-
+func (m *crdMigrator) run(ctx context.Context, newCRD *apiextensionsv1.CustomResourceDefinition) error {
 	// Gets the list of version supported by the new CRD
 	newVersions := sets.Set[string]{}
 	for _, version := range newCRD.Spec.Versions {
@@ -96,21 +111,160 @@ func (m *crdMigrator) run(ctx context.Context, newCRD *apiextensionsv1.CustomRes
 	}); err != nil {
 		// Return if the CRD doesn't exist yet. We only have to migrate if the CRD exists already.
 		if apierrors.IsNotFound(err) {
-			return false, nil
+			return nil
 		}
-		return false, err
+		return err
 	}
 
 	// Get the storage version of the current CRD.
 	currentStorageVersion, err := storageVersionForCRD(currentCRD)
 	if err != nil {
-		return false, err
+		return err
+	}
+
+	// Gets the list of version supported by the current CRD
+	currentVersions := sets.Set[string]{}
+	for _, version := range newCRD.Spec.Versions {
+		currentVersions.Insert(version.Name)
 	}
 
 	// Return an error, if the current storage version has been dropped in the new CRD.
 	if !newVersions.Has(currentStorageVersion) {
-		return false, errors.Errorf("unable to upgrade CRD %q because the new CRD does not contain the storage version %q of the current CRD, thus not allowing CR migration", newCRD.Name, currentStorageVersion)
+		return errors.Errorf("unable to upgrade CRD %q because the new CRD does not contain the storage version %q of the current CRD, thus not allowing CR migration", newCRD.Name, currentStorageVersion)
 	}
+
+	if err := m.migrateCRD(ctx, currentCRD, newCRD, currentStorageVersion); err != nil {
+		return err
+	}
+
+	if err := m.migrateManagedFields(ctx, currentCRD, currentVersions, newVersions, currentStorageVersion); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *crdMigrator) migrateManagedFields(ctx context.Context, currentCRD *apiextensionsv1.CustomResourceDefinition, currentVersions, newVersions sets.Set[string], currentStorageVersion string) error {
+	log := logf.Log
+
+	removedVersions := currentVersions.Difference(newVersions)
+
+	if len(removedVersions) == 0 {
+		log.V(2).Info("ManagedFields migration check passed", "CustomResourceDefinition", klog.KObj(currentCRD))
+	}
+
+	log.Info("ManagedFields migration required", "kind", currentCRD.Spec.Names.Kind, "removedVersions", strings.Join(sets.List(removedVersions), ","))
+
+	return m.migrateManagedFieldsForCRD(ctx, currentCRD, removedVersions, currentStorageVersion)
+}
+
+func (m *crdMigrator) migrateManagedFieldsForCRD(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition, removedVersions sets.Set[string], currentStorageVersion string) error {
+	log := logf.Log.WithValues("CustomResourceDefinition", klog.KObj(crd))
+	log.Info("Migrating managedFields for CRs, this operation may take a while...")
+
+	removedGroupVersions := sets.Set[string]{}
+	for _, v := range removedVersions {
+		removedGroupVersions.Insert(fmt.Sprintf("%s/%s", crd.Spec.Group, v))
+	}
+
+	// FIXME: verify that we can actually get managedFields this way
+	list := &metav1.PartialObjectMetadataList{}
+	list.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   crd.Spec.Group,
+		Version: currentStorageVersion,
+		Kind:    crd.Spec.Names.ListKind,
+	})
+
+	var i int
+	for {
+		if err := retryWithExponentialBackoff(ctx, newCRDMigrationBackoff(), func(ctx context.Context) error {
+			return m.Client.List(ctx, list, client.Continue(list.GetContinue()))
+		}); err != nil {
+			return errors.Wrapf(err, "failed to list %q", crd.Spec.Names.Kind)
+		}
+
+		for i := range list.Items {
+			obj := list.Items[i]
+
+			log.V(5).Info("Migrating managedFields", obj.Kind, klog.KRef(obj.GetNamespace(), obj.GetName()))
+			if err := retryWithExponentialBackoff(ctx, newCRDMigrationBackoff(), func(ctx context.Context) error {
+
+				managedFields, removed := removeManagedFieldsWithRemovedGroupVersions(obj, removedGroupVersions)
+
+				if !removed {
+					return nil
+				}
+
+				// Create a patch with a diff between old and new objects.
+				// Just include all managed fields since that is only thing that will change
+				//
+				// Also include test for RV to avoid race condition
+				jsonPatch := []map[string]interface{}{
+					{
+						"op":    "replace",
+						"path":  "/metadata/managedFields",
+						"value": managedFields,
+					},
+					{
+						// Use "replace" instead of "test" operation so that etcd rejects with
+						// 409 conflict instead of apiserver with an invalid request
+						"op":    "replace",
+						"path":  "/metadata/resourceVersion",
+						"value": obj.ResourceVersion,
+					},
+				}
+				patch, err := json.Marshal(jsonPatch)
+				if err != nil {
+					return err
+				}
+
+				err = m.Client.Patch(ctx, &obj, client.RawPatch(types.JSONPatchType, patch))
+				// If the resource no longer exists, the managedFields don't have to be cleaned up anymore.
+				if err == nil || apierrors.IsNotFound(err) {
+					return nil
+				}
+
+				if apierrors.IsConflict(err) {
+					getErr := m.Client.Get(ctx, client.ObjectKey{Namespace: obj.Namespace, Name: obj.Name}, &obj)
+					return kerrors.NewAggregate([]error{err, getErr})
+				}
+				return err
+			}); err != nil {
+				return errors.Wrapf(err, "failed to migrate managedFields of %s/%s", obj.GetNamespace(), obj.GetName())
+			}
+
+			// Add some random delays to avoid pressure on the API server.
+			i++
+			if i%10 == 0 {
+				log.V(2).Info(fmt.Sprintf("%d objects migrated", i))
+				time.Sleep(time.Duration(rand.IntnRange(50*int(time.Millisecond), 250*int(time.Millisecond))))
+			}
+		}
+
+		if list.GetContinue() == "" {
+			break
+		}
+	}
+
+	log.V(2).Info(fmt.Sprintf("CR managedField migration completed: migrated %d objects", i))
+	return nil
+}
+
+func removeManagedFieldsWithRemovedGroupVersions(obj metav1.PartialObjectMetadata, removedGroupVersions sets.Set[string]) ([]metav1.ManagedFieldsEntry, bool) {
+	hasRemovedGroupVersion := func(entry metav1.ManagedFieldsEntry) bool {
+		return removedGroupVersions.Has(entry.APIVersion)
+	}
+
+	if !slices.ContainsFunc(obj.ManagedFields, hasRemovedGroupVersion) {
+		return nil, false
+	}
+
+	fixedManagedFields := slices.DeleteFunc(obj.ManagedFields, hasRemovedGroupVersion)
+	return fixedManagedFields, true
+}
+
+func (m *crdMigrator) migrateCRD(ctx context.Context, currentCRD, newCRD *apiextensionsv1.CustomResourceDefinition, currentStorageVersion string) error {
+	log := logf.Log
 
 	currentStatusStoredVersions := sets.Set[string]{}.Insert(currentCRD.Status.StoredVersions...)
 	// If the old CRD only contains its current storageVersion as storedVersion,
@@ -119,7 +273,7 @@ func (m *crdMigrator) run(ctx context.Context, newCRD *apiextensionsv1.CustomRes
 	// to prevent unnecessary conversion webhook calls.
 	if currentStatusStoredVersions.Len() == 1 && currentCRD.Status.StoredVersions[0] == currentStorageVersion {
 		log.V(2).Info("CRD migration check passed", "CustomResourceDefinition", klog.KObj(newCRD))
-		return false, nil
+		return nil
 	}
 
 	// Note: We are simply migrating all CR objects independent of the version in which they are actually stored in etcd.
@@ -131,14 +285,14 @@ func (m *crdMigrator) run(ctx context.Context, newCRD *apiextensionsv1.CustomRes
 	log.Info("CR migration required", "kind", newCRD.Spec.Names.Kind, "storedVersionsToDelete", strings.Join(sets.List(storedVersionsToDelete), ","), "storedVersionToPreserve", currentStorageVersion)
 
 	if err := m.migrateResourcesForCRD(ctx, currentCRD, currentStorageVersion); err != nil {
-		return false, err
+		return err
 	}
 
 	if err := m.patchCRDStoredVersions(ctx, currentCRD, currentStorageVersion); err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 func (m *crdMigrator) migrateResourcesForCRD(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition, currentStorageVersion string) error {

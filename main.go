@@ -56,6 +56,7 @@ import (
 	"sigs.k8s.io/cluster-api/api/v1beta1/index"
 	"sigs.k8s.io/cluster-api/controllers"
 	"sigs.k8s.io/cluster-api/controllers/clustercache"
+	"sigs.k8s.io/cluster-api/controllers/crdmigrator"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	addonsv1 "sigs.k8s.io/cluster-api/exp/addons/api/v1beta1"
 	addonscontrollers "sigs.k8s.io/cluster-api/exp/addons/controllers"
@@ -460,6 +461,17 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager, watchNamespaces map
 	}, concurrency(clusterCacheConcurrency))
 	if err != nil {
 		setupLog.Error(err, "Unable to create ClusterCache")
+		os.Exit(1)
+	}
+
+	if err := (&crdmigrator.CRDMigrator{
+		Client:    mgr.GetClient(),
+		APIReader: mgr.GetAPIReader(),
+		Migrate: map[client.Object]crdmigrator.MigrationConfig{
+			&clusterv1.Machine{}: {},
+		},
+	}).SetupWithManager(ctx, mgr, concurrency(1)); err != nil {
+		setupLog.Error(err, "Unable to create controller", "controller", "CRDMigrator")
 		os.Exit(1)
 	}
 

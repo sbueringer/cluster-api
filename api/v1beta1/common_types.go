@@ -197,6 +197,10 @@ const (
 	// VariableDefinitionFromInline indicates a patch or variable was defined in the `.spec` of a ClusterClass
 	// rather than from an external patch extension.
 	VariableDefinitionFromInline = "inline"
+
+	// CRDMigrationManagedFieldsCleanupCompletedAnnotation indicates on a CRD for which unserved versions
+	// the managedFields of all CRs already have been cleaned up.
+	CRDMigrationManagedFieldsCleanupCompletedAnnotation = "crd-migration.cluster.x-k8s.io/managed-fields-cleanup-completed"
 )
 
 // MachineSetPreflightCheck defines a valid MachineSet preflight check.
