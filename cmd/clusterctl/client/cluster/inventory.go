@@ -426,6 +426,7 @@ func (p *inventoryClient) CheckCAPIContract(ctx context.Context, options ...Chec
 					return nil
 				}
 			}
+			return nil
 			return errors.Errorf("this version of clusterctl could be used only with %q management clusters, %q detected", clusterv1.GroupVersion.Version, version.Name)
 		}
 	}
