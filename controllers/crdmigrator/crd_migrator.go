@@ -282,6 +282,20 @@ func (r *CRDMigrator) listCustomResources(ctx context.Context, crd *apiextension
 		Kind:    crd.Spec.Names.ListKind,
 	}
 
+	pl := &metav1.PartialObjectMetadataList{}
+	pl.SetGroupVersionKind(listGVK)
+	err := r.APIReader.List(ctx, pl)
+	fmt.Println(err)
+
+	ul := &unstructured.UnstructuredList{}
+	ul.SetGroupVersionKind(listGVK)
+	err = r.APIReader.List(ctx, ul)
+	fmt.Println(err)
+
+	cl := &clusterv1.ClusterList{}
+	err = r.APIReader.List(ctx, cl)
+	fmt.Println(err)
+
 	if migrationConfig.UseCache {
 		// Note: We should only use the cached client with a typed object list.
 		// Otherwise we would create an additional informer for an UnstructuredList/PartialObjectMetadataList.
@@ -338,7 +352,7 @@ func listObjectsFromAPIReader(ctx context.Context, c client.Reader, objectList c
 	for {
 		listOpts := []client.ListOption{
 			client.Continue(objectList.GetContinue()),
-			client.Limit(500),
+			//client.Limit(500), FIXME: not setting limit to actually use watchList
 		}
 		if err := c.List(ctx, objectList, listOpts...); err != nil {
 			return nil, err
