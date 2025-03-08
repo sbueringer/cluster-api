@@ -19,7 +19,6 @@ package conversion
 
 import (
 	"context"
-	"math/rand"
 	"sort"
 	"strings"
 	"testing"
@@ -155,11 +154,12 @@ func GetFuzzer(scheme *runtime.Scheme, funcs ...fuzzer.FuzzerFuncs) *fuzz.Fuzzer
 			}
 		},
 	}, funcs...)
-	return fuzzer.FuzzerFor(
-		fuzzer.MergeFuzzerFuncs(funcs...),
-		rand.NewSource(rand.Int63()), //nolint:gosec
-		runtimeserializer.NewCodecFactory(scheme),
-	)
+	return nil
+	//return fuzzer.FuzzerFor(
+	//	fuzzer.MergeFuzzerFuncs(funcs...),
+	//	rand.NewSource(rand.Int63()), //nolint:gosec
+	//	runtimeserializer.NewCodecFactory(scheme),
+	//)
 }
 
 // FuzzTestFuncInput contains input parameters
