@@ -56,6 +56,7 @@ import (
 	addonsv1 "sigs.k8s.io/cluster-api/api/addons/v1beta1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/api/v1beta1/index"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers"
 	"sigs.k8s.io/cluster-api/controllers/clustercache"
 	"sigs.k8s.io/cluster-api/controllers/crdmigrator"
@@ -140,6 +141,7 @@ func init() {
 	_ = clusterv1alpha3.AddToScheme(scheme)
 	_ = clusterv1alpha4.AddToScheme(scheme)
 	_ = clusterv1.AddToScheme(scheme)
+	_ = clusterv1beta2.AddToScheme(scheme)
 
 	_ = addonsv1alpha3.AddToScheme(scheme)
 	_ = addonsv1alpha4.AddToScheme(scheme)
