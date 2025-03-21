@@ -17,6 +17,7 @@ server:
   - "web.enable-lifecycle"
   # Used by tempo to write traces.
   - "web.enable-remote-write-receiver"
+  - "enable-feature=native-histograms"
   persistentVolume:
     # Give Prometheus more space to store metrics.
     size: 20Gi
