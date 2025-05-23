@@ -75,7 +75,6 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
 	}
 
 	kubeadmCMMutators := make([]func(*bootstrapv1.ClusterConfiguration), 0)
-	kubeadmCMMutators = append(kubeadmCMMutators, workloadCluster.UpdateKubernetesVersionInKubeadmConfigMap(parsedVersion))
 
 	if controlPlane.KCP.Spec.KubeadmConfigSpec.ClusterConfiguration != nil {
 		// We intentionally only parse major/minor/patch so that the subsequent code

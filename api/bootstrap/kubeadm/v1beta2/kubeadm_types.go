@@ -131,13 +131,6 @@ type ClusterConfiguration struct {
 	// +optional
 	Networking Networking `json:"networking,omitempty"`
 
-	// kubernetesVersion is the target version of the control plane.
-	// NB: This value defaults to the Machine object spec.version
-	// +optional
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=256
-	KubernetesVersion string `json:"kubernetesVersion,omitempty"`
-
 	// controlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
 	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
 	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort

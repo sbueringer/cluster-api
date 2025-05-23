@@ -1846,8 +1846,7 @@ func TestKubeadmConfigReconciler_Reconcile_DynamicDefaultsForClusterConfiguratio
 			config: &bootstrapv1.KubeadmConfig{
 				Spec: bootstrapv1.KubeadmConfigSpec{
 					ClusterConfiguration: &bootstrapv1.ClusterConfiguration{
-						ClusterName:       "mycluster",
-						KubernetesVersion: "myversion",
+						ClusterName: "mycluster",
 						Networking: bootstrapv1.Networking{
 							PodSubnet:     "myPodSubnet",
 							ServiceSubnet: "myServiceSubnet",
@@ -1915,7 +1914,6 @@ func TestKubeadmConfigReconciler_Reconcile_DynamicDefaultsForClusterConfiguratio
 			g.Expect(tc.config.Spec.ClusterConfiguration.Networking.PodSubnet).To(Equal("myPodSubnet"))
 			g.Expect(tc.config.Spec.ClusterConfiguration.Networking.ServiceSubnet).To(Equal("myServiceSubnet"))
 			g.Expect(tc.config.Spec.ClusterConfiguration.Networking.DNSDomain).To(Equal("myDNSDomain"))
-			g.Expect(tc.config.Spec.ClusterConfiguration.KubernetesVersion).To(Equal("myversion"))
 		})
 	}
 }

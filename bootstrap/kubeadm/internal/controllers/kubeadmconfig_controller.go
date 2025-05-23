@@ -1365,12 +1365,6 @@ func (r *KubeadmConfigReconciler) reconcileTopLevelObjectSettings(ctx context.Co
 			log.V(3).Info("Altering ClusterConfiguration.Networking.PodSubnet", "podSubnet", config.Spec.ClusterConfiguration.Networking.PodSubnet)
 		}
 	}
-
-	// If there are no KubernetesVersion settings defined in ClusterConfiguration, use Version from machine, if defined
-	if config.Spec.ClusterConfiguration.KubernetesVersion == "" && machine.Spec.Version != nil {
-		config.Spec.ClusterConfiguration.KubernetesVersion = *machine.Spec.Version
-		log.V(3).Info("Altering ClusterConfiguration.KubernetesVersion", "kubernetesVersion", config.Spec.ClusterConfiguration.KubernetesVersion)
-	}
 }
 
 // storeBootstrapData creates a new secret with the data passed in as input,

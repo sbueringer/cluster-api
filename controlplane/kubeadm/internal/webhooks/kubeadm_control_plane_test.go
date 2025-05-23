@@ -482,9 +482,6 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 	networking := before.DeepCopy()
 	networking.Spec.KubeadmConfigSpec.ClusterConfiguration.Networking.DNSDomain = "some dns domain"
 
-	kubernetesVersion := before.DeepCopy()
-	kubernetesVersion.Spec.KubeadmConfigSpec.ClusterConfiguration.KubernetesVersion = "some kubernetes version"
-
 	controlPlaneEndpoint := before.DeepCopy()
 	controlPlaneEndpoint.Spec.KubeadmConfigSpec.ClusterConfiguration.ControlPlaneEndpoint = "some control plane endpoint"
 
@@ -808,12 +805,6 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 			expectErr: true,
 			before:    before,
 			kcp:       networking,
-		},
-		{
-			name:      "should fail when making a change to the cluster config's kubernetes version",
-			expectErr: true,
-			before:    before,
-			kcp:       kubernetesVersion,
 		},
 		{
 			name:      "should fail when making a change to the cluster config's controlPlaneEndpoint",

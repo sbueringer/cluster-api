@@ -480,12 +480,12 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
 					clusterConfigurationKey: utilyaml.Raw(`
 						apiVersion: kubeadm.k8s.io/v1beta2
 						kind: ClusterConfiguration
-						kubernetesVersion: v1.16.1
+						imageRepository: foo
 						`),
 				},
 			}},
 			mutator: func(c *bootstrapv1.ClusterConfiguration) {
-				c.KubernetesVersion = "v1.17.2"
+				c.ImageRepository = "bar"
 			},
 			wantConfigMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
@@ -500,7 +500,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
 						dns: {}
 						etcd: {}
 						kind: ClusterConfiguration
-						kubernetesVersion: v1.17.2
+						imageRepository: bar
 						networking: {}
 						scheduler: {}
 						`),
@@ -519,12 +519,12 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
 					clusterConfigurationKey: utilyaml.Raw(`
 						apiVersion: kubeadm.k8s.io/v1beta2
 						kind: ClusterConfiguration
-						kubernetesVersion: v1.16.1
+						imageRepository: foo
 						`),
 				},
 			}},
 			mutator: func(c *bootstrapv1.ClusterConfiguration) {
-				c.KubernetesVersion = "v1.28.0"
+				c.ImageRepository = "bar"
 			},
 			wantConfigMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
@@ -539,7 +539,7 @@ func TestUpdateUpdateClusterConfigurationInKubeadmConfigMap(t *testing.T) {
 						dns: {}
 						etcd: {}
 						kind: ClusterConfiguration
-						kubernetesVersion: v1.28.0
+						imageRepository: bar
 						networking: {}
 						scheduler: {}
 						`),

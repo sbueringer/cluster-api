@@ -386,7 +386,7 @@ func autoConvert_upstreamv1beta1_ClusterConfiguration_To_v1beta2_ClusterConfigur
 	if err := Convert_upstreamv1beta1_Networking_To_v1beta2_Networking(&in.Networking, &out.Networking, s); err != nil {
 		return err
 	}
-	out.KubernetesVersion = in.KubernetesVersion
+	// WARNING: in.KubernetesVersion requires manual conversion: does not exist in peer-type
 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	if err := Convert_upstreamv1beta1_APIServer_To_v1beta2_APIServer(&in.APIServer, &out.APIServer, s); err != nil {
 		return err
@@ -415,7 +415,6 @@ func autoConvert_v1beta2_ClusterConfiguration_To_upstreamv1beta1_ClusterConfigur
 	if err := Convert_v1beta2_Networking_To_upstreamv1beta1_Networking(&in.Networking, &out.Networking, s); err != nil {
 		return err
 	}
-	out.KubernetesVersion = in.KubernetesVersion
 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	if err := Convert_v1beta2_APIServer_To_upstreamv1beta1_APIServer(&in.APIServer, &out.APIServer, s); err != nil {
 		return err
