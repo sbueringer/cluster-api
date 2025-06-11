@@ -48,7 +48,6 @@ import (
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
 	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
 	"sigs.k8s.io/cluster-api/feature"
-	"sigs.k8s.io/cluster-api/internal/contract"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/cache"
@@ -66,6 +65,7 @@ import (
 
 const (
 	kcpManagerName          = "capi-kubeadmcontrolplane"
+	kcpManagerName2         = "capi-kubeadmcontrolplane-2"
 	kubeadmControlPlaneKind = "KubeadmControlPlane"
 )
 
@@ -475,10 +475,25 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
 		return result, err
 	}
 
+	if machines := controlPlane.MachineToCompleteTriggerInPlaceUpdate(controlPlane.Machines); len(machines) > 0 {
+		_, machinesUpToDateResults := controlPlane.NotUpToDateMachines()
+		for _, m := range machines {
+			if err := r.completeTriggerInPlaceUpdate(ctx, machinesUpToDateResults[m.Name]); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil // Note: Changes to Machines trigger another reconcile.
+		}
+	}
+
 	// Reconcile unhealthy machines by triggering deletion and requeue if it is considered safe to remediate,
 	// otherwise continue with the other KCP operations.
 	if result, err := r.reconcileUnhealthyMachines(ctx, controlPlane); err != nil || !result.IsZero() {
 		return result, err
+	}
+
+	if inPlaceUpdatingMachines := controlPlane.MachineWithPendingUpdateMachineHook(controlPlane.Machines); inPlaceUpdatingMachines.Len() > 0 { // Note: We have to wait here even if there are no more Machines that need rollout (in-place update in progress is not counted as needs rollout)
+		log.Info("Waiting for in-place update to complete", "machines", strings.Join(inPlaceUpdatingMachines.Names(), ", "))
+		return ctrl.Result{}, nil // Note: Changes to Machines trigger another reconcile.
 	}
 
 	// Control plane machines rollout due to configuration changes (e.g. upgrades) takes precedence over other operations.
@@ -842,10 +857,10 @@ func (r *KubeadmControlPlaneReconciler) syncMachines(ctx context.Context, contro
 		}
 		patchHelpers[machineName] = patchHelper
 
-		labelsAndAnnotationsManagedFieldPaths := []contract.Path{
-			{"f:metadata", "f:annotations"},
-			{"f:metadata", "f:labels"},
-		}
+		//labelsAndAnnotationsManagedFieldPaths := []contract.Path{
+		//	{"f:metadata", "f:annotations"},
+		//	{"f:metadata", "f:labels"},
+		//}
 		infraMachine, infraMachineFound := controlPlane.InfraResources[machineName]
 		// Only update the InfraMachine if it is already found, otherwise just skip it.
 		// This could happen e.g. if the cache is not up-to-date yet.
@@ -854,9 +869,10 @@ func (r *KubeadmControlPlaneReconciler) syncMachines(ctx context.Context, contro
 			// from "manager". We do this so that InfrastructureMachines that are created using the Create method
 			// can also work with SSA. Otherwise, labels and annotations would be co-owned by our "old" "manager"
 			// and "capi-kubeadmcontrolplane" and then we would not be able to e.g. drop labels and annotations.
-			if err := ssa.DropManagedFields(ctx, r.Client, infraMachine, kcpManagerName, labelsAndAnnotationsManagedFieldPaths); err != nil {
-				return errors.Wrapf(err, "failed to clean up managedFields of InfrastructureMachine %s", klog.KObj(infraMachine))
-			}
+			// TODO(managedFields): we need different cleanup logic now, and only for objects created with CAPI < v1.12.
+			//if err := ssa.DropManagedFields(ctx, r.Client, infraMachine, kcpManagerName, labelsAndAnnotationsManagedFieldPaths); err != nil {
+			//	return errors.Wrapf(err, "failed to clean up managedFields of InfrastructureMachine %s", klog.KObj(infraMachine))
+			//}
 			// Update in-place mutating fields on InfrastructureMachine.
 			if err := r.updateExternalObject(ctx, infraMachine, infraMachine.GroupVersionKind(), controlPlane.KCP, controlPlane.Cluster); err != nil {
 				return errors.Wrapf(err, "failed to update InfrastructureMachine %s", klog.KObj(infraMachine))
@@ -871,9 +887,10 @@ func (r *KubeadmControlPlaneReconciler) syncMachines(ctx context.Context, contro
 			// from "manager". We do this so that KubeadmConfigs that are created using the Create method
 			// can also work with SSA. Otherwise, labels and annotations would be co-owned by our "old" "manager"
 			// and "capi-kubeadmcontrolplane" and then we would not be able to e.g. drop labels and annotations.
-			if err := ssa.DropManagedFields(ctx, r.Client, kubeadmConfig, kcpManagerName, labelsAndAnnotationsManagedFieldPaths); err != nil {
-				return errors.Wrapf(err, "failed to clean up managedFields of KubeadmConfig %s", klog.KObj(kubeadmConfig))
-			}
+			// TODO(managedFields): we need different cleanup logic now, and only for objects created with CAPI < v1.12.
+			//if err := ssa.DropManagedFields(ctx, r.Client, kubeadmConfig, kcpManagerName, labelsAndAnnotationsManagedFieldPaths); err != nil {
+			//	return errors.Wrapf(err, "failed to clean up managedFields of KubeadmConfig %s", klog.KObj(kubeadmConfig))
+			//}
 			// Update in-place mutating fields on BootstrapConfig.
 			if err := r.updateExternalObject(ctx, kubeadmConfig, bootstrapv1.GroupVersion.WithKind("KubeadmConfig"), controlPlane.KCP, controlPlane.Cluster); err != nil {
 				return errors.Wrapf(err, "failed to update KubeadmConfig %s", klog.KObj(kubeadmConfig))
@@ -1017,9 +1034,17 @@ func reconcileMachineUpToDateCondition(_ context.Context, controlPlane *internal
 				Reason:  clusterv1.MachineNotUpToDateReason,
 				Message: message,
 			})
-
 			continue
 		}
+		if _, ok := machine.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok { // FIXME: This should probably *also* use the Updating condition (but also already set condition to false if only this annotation is set)
+			conditions.Set(machine, metav1.Condition{
+				Type:   clusterv1.MachineUpToDateCondition,
+				Status: metav1.ConditionFalse,
+				Reason: clusterv1.MachineUpToDateUpdatingReason,
+			})
+			continue
+		}
+
 		conditions.Set(machine, metav1.Condition{
 			Type:   clusterv1.MachineUpToDateCondition,
 			Status: metav1.ConditionTrue,

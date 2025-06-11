@@ -18,12 +18,19 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
+	"sigs.k8s.io/cluster-api/internal/hooks"
+	"sigs.k8s.io/cluster-api/internal/util/ssa"
 )
 
 func (r *KubeadmControlPlaneReconciler) tryInPlaceUpdate(
@@ -56,6 +63,92 @@ func (r *KubeadmControlPlaneReconciler) tryInPlaceUpdate(
 		return true, ctrl.Result{}, nil
 	}
 
-	// Always fallback to scale down until triggering in-place updates is implemented.
-	return true, ctrl.Result{}, nil
+	// Mark Machine for in-place update
+	// Note: Once we reach this point and write MachineInPlaceUpdateInProgressAnnotation we will always continue with the in-place update.
+	// Note: Intentionally using client.Patch instead of SSA. Otherwise we would have race-conditions when the Machine controller
+	// tries to remove the annotation and KCP adds it back.
+	if _, ok := machineToInPlaceUpdate.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; !ok {
+		orig := machineToInPlaceUpdate.DeepCopy()
+		machineToInPlaceUpdate.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation] = ""
+		if err := r.Client.Patch(ctx, machineToInPlaceUpdate, client.MergeFrom(orig)); err != nil {
+			return false, ctrl.Result{}, err
+		}
+		// Wait until the cache observed the change to ensure subsequent reconciles will observe it as well.
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+			m := &clusterv1.Machine{}
+			if err := r.Client.Get(ctx, client.ObjectKeyFromObject(machineToInPlaceUpdate), m); err != nil {
+				return false, err
+			}
+			_, annotationSet := m.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]
+			return annotationSet, nil
+		}); err != nil {
+			return false, ctrl.Result{}, errors.Wrapf(err, "failed waiting for Machine %s to be updated in the cache after setting the %s annotation", klog.KObj(machineToInPlaceUpdate), clusterv1.MachineInPlaceUpdateInProgressAnnotation)
+		}
+	}
+
+	return false, ctrl.Result{}, r.completeTriggerInPlaceUpdate(ctx, machineUpToDateResult)
+}
+
+func (r *KubeadmControlPlaneReconciler) completeTriggerInPlaceUpdate(ctx context.Context, machinesNeedingRolloutResult internal.UpToDateResult) error {
+	// TODO: If this func fails "in the middle" we are going to reconcile again, if KCP changed in the mean time
+	// desired objects might change and then we would use different desired objects for UpdateMachine compared to
+	// what we used in CanUpdateMachine.
+	// If we want to account for that we could consider writing desired InfraMachine/KubeadmConfig/Machine with the in-progress annotation
+	// on the Machine and use it if necessary (and clean it up if necessary when we set the pending annotation).
+
+	// Machine cannot be updated in-place if the UpToDate func was not able to provide all objects,
+	// e.g. if the InfraMachine or KubeadmConfig was deleted.
+	if machinesNeedingRolloutResult.DesiredInfraMachine == nil {
+		return errors.Errorf("failed to complete triggering in-place update, could not compute desired InfraMachine")
+	}
+	if machinesNeedingRolloutResult.DesiredKubeadmConfig == nil {
+		return errors.Errorf("failed to complete triggering in-place update, could not compute desired KubeadmConfig")
+	}
+
+	// Write InfraMachine without the labels & annotations that are written continuously by applyExternalObjectLabelsAnnotations.
+	// Note: Let's update InfraMachine first because that is the call that is most likely to fail.
+	machinesNeedingRolloutResult.DesiredInfraMachine.SetLabels(nil)
+	machinesNeedingRolloutResult.DesiredInfraMachine.SetAnnotations(map[string]string{
+		// ClonedFrom annotations are written by createInfraMachine so we have to send them here again to not unset them.
+		// They also have to be updated here if the InfraMachineTemplate was rotated.
+		clusterv1.TemplateClonedFromNameAnnotation:         machinesNeedingRolloutResult.DesiredInfraMachine.GetAnnotations()[clusterv1.TemplateClonedFromNameAnnotation],
+		clusterv1.TemplateClonedFromGroupKindAnnotation:    machinesNeedingRolloutResult.DesiredInfraMachine.GetAnnotations()[clusterv1.TemplateClonedFromGroupKindAnnotation],
+		clusterv1.MachineInPlaceUpdateInProgressAnnotation: "",
+	})
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, machinesNeedingRolloutResult.DesiredInfraMachine); err != nil {
+		return errors.Wrapf(err, "failed to apply %s", machinesNeedingRolloutResult.DesiredInfraMachine.GetKind())
+	}
+
+	// Write KubeadmConfig without labels & annotations.
+	machinesNeedingRolloutResult.DesiredKubeadmConfig.Labels = nil
+	machinesNeedingRolloutResult.DesiredKubeadmConfig.Annotations = map[string]string{
+		clusterv1.MachineInPlaceUpdateInProgressAnnotation: "",
+	}
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, machinesNeedingRolloutResult.DesiredKubeadmConfig); err != nil {
+		return errors.Wrapf(err, "failed to apply KubeadmConfig")
+	}
+
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName, machinesNeedingRolloutResult.DesiredMachine); err != nil {
+		return errors.Wrap(err, "failed to apply Machine")
+	}
+
+	// Note: We set this annotation intentionally in a separate call with the "manager" fieldManager.
+	// If we combine it with the SSA call above we would have to preserve it in ComputeDesiredMachine.
+	// If we do that we can encounter race conditions where the Machine controller removes the pending annotation
+	// and KCP that is running concurrently is re-adding it.
+	if err := hooks.MarkAsPending(ctx, r.Client, machinesNeedingRolloutResult.DesiredMachine, runtimehooksv1.UpdateMachine); err != nil {
+		return errors.Wrap(err, "failed to apply Machine: mark Machine as pending update")
+	}
+	// Wait until the cache observed the change to ensure subsequent reconciles will observe it as well.
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		m := &clusterv1.Machine{}
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(machinesNeedingRolloutResult.DesiredMachine), m); err != nil {
+			return false, err
+		}
+		return hooks.IsPending(runtimehooksv1.UpdateMachine, m), nil
+	}); err != nil {
+		return errors.Wrapf(err, "failed waiting for Machine %s to be updated in the cache after marking the UpdateMachine hook as pending", klog.KObj(machinesNeedingRolloutResult.DesiredInfraMachine))
+	}
+
+	return nil
 }
