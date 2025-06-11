@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
@@ -30,10 +31,11 @@ import (
 	"sigs.k8s.io/cluster-api/util/collections"
 )
 
-func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
+func (r *KubeadmControlPlaneReconciler) updateControlPlane(
 	ctx context.Context,
 	controlPlane *internal.ControlPlane,
-	machinesRequireUpgrade collections.Machines,
+	machinesNeedingRollout collections.Machines,
+	machinesNeedingRolloutResults map[string]internal.NotUpToDateResult,
 ) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -86,16 +88,75 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
 
 	switch controlPlane.KCP.Spec.Rollout.Strategy.Type {
 	case controlplanev1.RollingUpdateStrategyType:
-		// RolloutStrategy is currently defaulted and validated to be RollingUpdate
-		// We can ignore MaxUnavailable because we are enforcing health checks before we get here.
-		maxNodes := *controlPlane.KCP.Spec.Replicas + int32(controlPlane.KCP.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntValue())
-		if int32(controlPlane.Machines.Len()) < maxNodes {
-			// scaleUp ensures that we don't continue scaling up while waiting for Machines to have NodeRefs
-			return r.scaleUpControlPlane(ctx, controlPlane)
-		}
-		return r.scaleDownControlPlane(ctx, controlPlane, machinesRequireUpgrade)
+		// RolloutStrategy is currently defaulted and validated to always be RollingUpdate.
+		return r.rollingUpdate(ctx, controlPlane, machinesNeedingRollout, machinesNeedingRolloutResults)
 	default:
 		log.Info("RolloutStrategy type is not set to RollingUpdate, unable to determine the strategy for rolling out machines")
+		return ctrl.Result{}, nil
+	}
+}
+
+func (r *KubeadmControlPlaneReconciler) rollingUpdate(
+	ctx context.Context,
+	controlPlane *internal.ControlPlane,
+	machinesNeedingRollout collections.Machines,
+	machinesNeedingRolloutResults map[string]internal.NotUpToDateResult,
+) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	maxSurge := int32(controlPlane.KCP.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntValue())
+	var maxUnavailable int32 // maxUnavailable is a bit too confusing here as KCP doesn't have the same concept here as MD
+	switch {
+	case maxSurge == 0:
+		maxUnavailable = 1
+	case maxSurge == 1:
+		maxUnavailable = 0
+	}
+
+	// We don't have to consider Available replicas because we are enforcing health checks before we get here.
+	currentReplicas := int32(controlPlane.Machines.Len())
+	currentUpToDateReplicas := int32(len(controlPlane.UpToDateMachines()))
+	desiredReplicas := *controlPlane.KCP.Spec.Replicas
+	desiredMaxReplicas := desiredReplicas + maxSurge
+	desiredMinReplicas := desiredReplicas - maxUnavailable
+
+	// Depending on maxSurge/maxUnavailable the [desiredMinReplicas, desiredMaxReplicas] interval will be:
+	// * maxSurge: 1 (maxUnavailable: 0) =>     [desiredReplicas   , desiredReplicas+1]
+	// * maxSurge: 0 (maxUnavailable: 1) =>     [desiredReplicas-1 , desiredReplicas  ]
+	switch {
+	case desiredMinReplicas < currentReplicas:
+		// Pick the Machine that we should in-place update or scale down.
+		// TODO: Handle DeleteMachineAnnotation correctly, especially if this returns a Machine which does not need rollout.
+		machineToInPlaceUpdateOrScaleDown, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, machinesNeedingRollout)
+		if err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "failed to select machine for scale down")
+		}
+		machinesNeedingRolloutResult, ok := machinesNeedingRolloutResults[machineToInPlaceUpdateOrScaleDown.Name]
+		if !ok {
+			return ctrl.Result{}, errors.Errorf("failed to get results of upToDate check for Machine %s", machineToInPlaceUpdateOrScaleDown.Name)
+		}
+
+		if machinesNeedingRolloutResult.EligibleForInPlaceUpdate && currentUpToDateReplicas < desiredReplicas {
+			// If we need more upToDate replicas, try in-place
+			fallbackToScaleDown, res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, machinesNeedingRolloutResult)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if !res.IsZero() {
+				return res, nil
+			}
+			if fallbackToScaleDown {
+				return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown)
+			}
+			// In-place update triggered
+			return ctrl.Result{}, nil // Note: Changes to Machines trigger another reconcile.
+		}
+		return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown)
+	case currentReplicas < desiredMaxReplicas:
+		// scaleUp ensures that we don't continue scale up while waiting for Machines to have NodeRefs
+		return r.scaleUpControlPlane(ctx, controlPlane)
+	default:
+		log.Info(fmt.Sprintf("Cannot proceed with rollout: unexpected state: current replicas: %d, min replicas: %d, max replicas: %d", currentReplicas, desiredMinReplicas, desiredMaxReplicas))
 		return ctrl.Result{}, nil
 	}
 }

@@ -25,17 +25,23 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	runtimehooksv1 "sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	capierrors "sigs.k8s.io/cluster-api/errors"
+	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/contract"
+	"sigs.k8s.io/cluster-api/internal/hooks"
 	"sigs.k8s.io/cluster-api/util"
 	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -446,4 +452,183 @@ func getControlPlaneGKForMachine(cluster *clusterv1.Cluster, machine *clusterv1.
 		}
 	}
 	return nil
+}
+
+// reconcileInPlaceUpdate handles in-place updates for machines when the feature is enabled.
+// The decision to use in-place updates should have already been made by the CP/MD controllers
+// using the CanUpdateMachine/CanUpdateMachineSet hooks. This function only executes the UpdateMachine hooks.
+func (r *Reconciler) reconcileInPlaceUpdate(ctx context.Context, s *scope) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
+	m := s.machine
+
+	if !feature.Gates.Enabled(feature.InPlaceUpdates) {
+		return ctrl.Result{}, nil
+	}
+
+	if !hooks.IsPending(runtimehooksv1.UpdateMachine, m) {
+		// Note: We intentionally don't log here as this would be extremely verbose (every Machine on every reconcile).
+		return ctrl.Result{}, nil
+	}
+
+	if _, ok := s.machine.GetAnnotations()[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; !ok {
+		// Note: This only happens if in-place update is completed and we weren't able to successfully remove all annotations from all objects.
+		return ctrl.Result{}, completeFinishInPlaceUpdate(ctx, r.Client, s)
+	}
+
+	if !ptr.Deref(m.Status.Initialization.InfrastructureProvisioned, false) {
+		log.V(5).Info("Infrastructure not yet provisioned, skipping in-place update")
+		return ctrl.Result{}, nil
+	}
+
+	if !ptr.Deref(m.Status.Initialization.BootstrapDataSecretCreated, false) {
+		log.V(5).Info("Bootstrap data secret not yet created, skipping in-place update")
+		return ctrl.Result{}, nil
+	}
+
+	if s.infraMachine == nil {
+		s.updatingReason = clusterv1.MachineUpdatingReason
+		s.updatingMessage = "In-place update not possible: InfraMachine not found"
+		return ctrl.Result{}, errors.Errorf("in-place update failed: InfraMachine not found")
+	}
+
+	if _, ok := s.infraMachine.GetAnnotations()[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; !ok {
+		log.V(5).Info("InfraMachine not marked for in-place update yet, skipping in-place update")
+		return ctrl.Result{}, nil
+	}
+	if s.bootstrapConfig != nil {
+		if _, ok := s.bootstrapConfig.GetAnnotations()[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; !ok {
+			log.V(5).Info("BootstrapConfig not marked for in-place update yet, skipping in-place update")
+			return ctrl.Result{}, nil
+		}
+	}
+
+	// Note: UpToDate condition is managed entirely by the owner controller (KCP/MD).
+	// This controller only handles the UpdateMachine hook execution and the Updating condition.
+
+	if result, err := r.callUpdateMachineHooks(ctx, s); err != nil {
+		return ctrl.Result{}, err
+	} else if !result.IsZero() {
+		return result, nil
+	}
+
+	// In-place update is done, let's remove all in-place update in progress annotations
+	// If the removal of the in-progress annotation fails, this entire func will be re-run
+	// Once the in-progress annotation has been removed from the Machine a branch above
+	// will ensure the remaining annotations are removed as well.
+	if err := removeInProgressAnnotation(ctx, r.Client, s.machine); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, completeFinishInPlaceUpdate(ctx, r.Client, s)
+}
+
+// callUpdateMachineHooks calls all UpdateMachine hooks.
+func (r *Reconciler) callUpdateMachineHooks(ctx context.Context, s *scope) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("Executing in-place update")
+
+	hookRequest := &runtimehooksv1.UpdateMachineRequest{
+		Desired: runtimehooksv1.UpdateMachineRequestObjects{
+			Machine:               *cleanupMachine(s.machine),
+			InfrastructureMachine: runtime.RawExtension{Object: cleanupUnstructured(s.infraMachine)},
+		},
+	}
+	if s.bootstrapConfig != nil {
+		hookRequest.Desired.BootstrapConfig = runtime.RawExtension{Object: cleanupUnstructured(s.bootstrapConfig)}
+	}
+	hookResponse := &runtimehooksv1.UpdateMachineResponse{}
+	if err := r.RuntimeClient.CallAllExtensions(ctx, runtimehooksv1.UpdateMachine, s.machine, hookRequest, hookResponse); err != nil {
+		s.updatingReason = clusterv1.MachineUpdatingReason
+		s.updatingMessage = "Failed to call UpdateMachine hooks, please check controller logs for errors"
+		return ctrl.Result{}, errors.Wrap(err, "failed to call UpdateMachine hooks")
+	}
+
+	switch hookResponse.GetStatus() {
+	case runtimehooksv1.ResponseStatusSuccess:
+		if hookResponse.GetRetryAfterSeconds() > 0 {
+			requeueAfter := time.Duration(hookResponse.GetRetryAfterSeconds()) * time.Second
+			s.updatingReason = clusterv1.MachineUpdatingReason
+			s.updatingMessage = hookResponse.Message
+			log.Info("In-place update still in progress, requeuing", "retryAfterSeconds", hookResponse.GetRetryAfterSeconds())
+			return ctrl.Result{RequeueAfter: requeueAfter}, nil
+		}
+		log.Info("In-place update completed successfully")
+		return ctrl.Result{}, nil
+
+	// Note: ResponseStatusFailure does not have to be handled here. If ResponseStatusFailure is returned by the hook
+	// CallAllExtensions will return an error.
+
+	default:
+		s.updatingReason = clusterv1.MachineUpdatingReason
+		s.updatingMessage = "Failed to call UpdateMachine hooks, please check controller logs for errors"
+		return ctrl.Result{}, errors.Errorf("failed to call UpdateMachine hooks, UpdateMachine hooks returned unknown status: %s (message: %s)", hookResponse.GetStatus(), hookResponse.GetMessage())
+	}
+}
+
+func completeFinishInPlaceUpdate(ctx context.Context, c client.Client, s *scope) error {
+	if s.infraMachine != nil {
+		if err := removeInProgressAnnotation(ctx, c, s.infraMachine); err != nil {
+			return err
+		}
+	}
+	if s.bootstrapConfig != nil {
+		if err := removeInProgressAnnotation(ctx, c, s.bootstrapConfig); err != nil {
+			return err
+		}
+	}
+	if err := hooks.MarkAsDone(ctx, c, s.machine, runtimehooksv1.UpdateMachine); err != nil {
+		return err
+	}
+	return nil
+}
+
+func removeInProgressAnnotation(ctx context.Context, c client.Client, obj client.Object) error {
+	if _, ok := obj.GetAnnotations()[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; !ok {
+		return nil
+	}
+
+	gvk, err := apiutil.GVKForObject(obj, c.Scheme())
+	if err != nil {
+		return errors.Wrapf(err, "failed to remove %s annotation from object %s", clusterv1.MachineInPlaceUpdateInProgressAnnotation, klog.KObj(obj))
+	}
+
+	orig := obj.DeepCopyObject().(client.Object)
+	annotations := obj.GetAnnotations()
+	delete(annotations, clusterv1.MachineInPlaceUpdateInProgressAnnotation)
+	obj.SetAnnotations(annotations)
+	if err := c.Patch(ctx, obj, client.MergeFrom(orig)); err != nil {
+		return errors.Wrapf(err, "failed to remove %s annotation from %s %s", clusterv1.MachineInPlaceUpdateInProgressAnnotation, gvk.Kind, klog.KObj(obj))
+	}
+	return nil
+}
+
+func cleanupMachine(machine *clusterv1.Machine) *clusterv1.Machine {
+	return &clusterv1.Machine{
+		// Set GVK because object is later marshalled with json.Marshal when the hook request is sent.
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Machine",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        machine.Name,
+			Namespace:   machine.Namespace,
+			Labels:      machine.Labels,
+			Annotations: machine.Annotations,
+		},
+		Spec: *machine.Spec.DeepCopy(),
+	}
+}
+
+func cleanupUnstructured(u *unstructured.Unstructured) *unstructured.Unstructured {
+	cleanedUpU := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": u.GetAPIVersion(),
+			"kind":       u.GetKind(),
+			"spec":       u.Object["spec"],
+		},
+	}
+	cleanedUpU.SetName(u.GetName())
+	cleanedUpU.SetNamespace(u.GetNamespace())
+	cleanedUpU.SetLabels(u.GetLabels())
+	cleanedUpU.SetAnnotations(u.GetAnnotations())
+	return cleanedUpU
 }

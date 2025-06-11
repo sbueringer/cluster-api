@@ -151,6 +151,10 @@ const (
 
 	// MachineNotUpToDateReason surface when a Machine spec does not match the spec of the Machine's owner resource, e.g. KubeadmControlPlane or MachineDeployment.
 	MachineNotUpToDateReason = "NotUpToDate"
+
+	// MachineUpToDateUpdatingReason surface when a Machine spec matches the spec of the Machine's owner resource,
+	// but the Machine is still updating.
+	MachineUpToDateUpdatingReason = "Updating"
 )
 
 // Machine's BootstrapConfigReady condition and corresponding reasons.
@@ -375,6 +379,20 @@ const (
 	MachineDeletingDeletionCompletedReason = DeletionCompletedReason
 )
 
+
+// Machine's Deleting condition and corresponding reasons.
+const (
+	// MachineUpdatingCondition surfaces details about progress in the update workflow.
+	MachineUpdatingCondition = "Updating"
+
+	// MachineNotUpdatingReason surfaces when the Machine is not updating.
+	MachineNotUpdatingReason = "NotUpdating"
+
+	// MachineUpdatingReason surfaces when the Machine is updating.
+	// This reason is used if none of the more specific reasons apply.
+	MachineUpdatingReason = "Updating"
+)
+
 // MachineSpec defines the desired state of Machine.
 type MachineSpec struct {
 	// clusterName is the name of the Cluster this object belongs to.
@@ -537,7 +555,7 @@ type MachineStatus struct {
 
 	// phase represents the current phase of machine actuation.
 	// +optional
-	// +kubebuilder:validation:Enum=Pending;Provisioning;Provisioned;Running;Deleting;Deleted;Failed;Unknown
+	// +kubebuilder:validation:Enum=Pending;Provisioning;Provisioned;Running;Updating;Deleting;Deleted;Failed;Unknown
 	Phase string `json:"phase,omitempty"`
 
 	// certificatesExpiryDate is the expiry date of the machine certificates.
@@ -695,6 +713,7 @@ func (m *MachineStatus) GetTypedPhase() MachinePhase {
 		MachinePhaseProvisioning,
 		MachinePhaseProvisioned,
 		MachinePhaseRunning,
+		MachinePhaseUpdating,
 		MachinePhaseDeleting,
 		MachinePhaseDeleted,
 		MachinePhaseFailed:

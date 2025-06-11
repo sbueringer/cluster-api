@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internal
+package desiredstate
 
 import (
 	controlplanev1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
@@ -38,4 +38,17 @@ func ControlPlaneMachineLabelsForCluster(kcp *controlplanev1.KubeadmControlPlane
 	// Note: MustFormatValue is used here as the label value can be a hash if the control plane name is longer than 63 characters.
 	labels[clusterv1.MachineControlPlaneNameLabel] = format.MustFormatValue(kcp.Name)
 	return labels
+}
+
+// ControlPlaneMachineAnnotationsForCluster returns a set of annotations to add to a control plane machine for this specific cluster.
+func ControlPlaneMachineAnnotationsForCluster(kcp *controlplanev1.KubeadmControlPlane) map[string]string {
+	annotations := map[string]string{}
+
+	// Add the annotations from the MachineTemplate.
+	// Note: we intentionally don't use the map directly to ensure we don't modify the map in KCP.
+	for k, v := range kcp.Spec.MachineTemplate.ObjectMeta.Annotations {
+		annotations[k] = v
+	}
+
+	return annotations
 }
