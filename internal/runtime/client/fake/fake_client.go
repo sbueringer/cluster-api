@@ -108,6 +108,10 @@ type RuntimeClient struct {
 	callAllTracker map[string]int
 }
 
+func (fc *RuntimeClient) GetAllExtensions(ctx context.Context, hook runtimecatalog.Hook, forObject metav1.Object) ([]string, error) {
+	panic("implement me")
+}
+
 // CallAllExtensions implements Client.
 func (fc *RuntimeClient) CallAllExtensions(ctx context.Context, hook runtimecatalog.Hook, _ metav1.Object, req runtimehooksv1.RequestObject, response runtimehooksv1.ResponseObject) error {
 	defer func() {

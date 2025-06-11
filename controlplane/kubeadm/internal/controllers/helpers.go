@@ -234,7 +234,18 @@ func (r *KubeadmControlPlaneReconciler) createInfraMachine(ctx context.Context, 
 		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create InfraMachine")
 	}
 
-	if err := r.Client.Create(ctx, infraMachine); err != nil {
+	// Write InfraMachine without the labels & annotations that are written continuously by applyExternalObjectLabelsAnnotations.
+	// TODO: Find a better way to remove labels & annotations that are written continuously by applyExternalObjectLabelsAnnotations so we don't miss anything.
+	infraMachine.SetLabels(nil)
+	infraMachine.SetAnnotations(map[string]string{
+		clusterv1.TemplateClonedFromNameAnnotation:      infraMachine.GetAnnotations()[clusterv1.TemplateClonedFromNameAnnotation],
+		clusterv1.TemplateClonedFromGroupKindAnnotation: infraMachine.GetAnnotations()[clusterv1.TemplateClonedFromGroupKindAnnotation],
+	})
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, infraMachine); err != nil {
+		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create %s", infraMachine.GetKind())
+	}
+
+	if err := r.updateExternalObject(ctx, infraMachine, infraMachine.GroupVersionKind(), kcp, cluster); err != nil {
 		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create InfraMachine")
 	}
 
@@ -251,7 +262,14 @@ func (r *KubeadmControlPlaneReconciler) createKubeadmConfig(ctx context.Context,
 		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create KubeadmConfig")
 	}
 
-	if err := r.Client.Create(ctx, kubeadmConfig); err != nil {
+	// Write KubeadmConfig without labels & annotations.
+	kubeadmConfig.Labels = nil
+	kubeadmConfig.Annotations = nil
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, kubeadmConfig); err != nil {
+		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create KubeadmConfig")
+	}
+
+	if err := r.updateExternalObject(ctx, kubeadmConfig, bootstrapv1.GroupVersion.WithKind("KubeadmConfig"), kcp, cluster); err != nil {
 		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create KubeadmConfig")
 	}
 
