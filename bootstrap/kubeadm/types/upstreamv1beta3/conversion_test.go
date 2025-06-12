@@ -236,6 +236,6 @@ func hubBootstrapTokenDiscoveryFuzzer(obj *bootstrapv1.BootstrapTokenDiscovery, 
 func hubClusterConfigurationFuzzer(obj *bootstrapv1.ClusterConfiguration, c randfill.Continue) {
 	c.FillNoCustom(obj)
 
-	obj.CertificateValidityPeriodSeconds = nil
-	obj.CACertificateValidityPeriodSeconds = nil
+	obj.CertificateValidityPeriodDays = nil
+	obj.CACertificateValidityPeriodDays = nil
 }
