@@ -104,6 +104,14 @@ type TestResourceSpec struct {
 	DurationToPtrInt32 metav1.Duration `json:"durationToPtrInt32,omitempty"`
 
 	// +optional
+	BoolRemoved bool `json:"boolRemoved,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=512
+	StringToOptionalOmitEmpty string `json:"stringToOptionalOmitEmpty,omitempty"`
+
+	// +optional
 	StructWithOnlyOptionalFields StructWithOnlyOptionalFields `json:"structWithOnlyOptionalFields,omitempty"`
 }
 

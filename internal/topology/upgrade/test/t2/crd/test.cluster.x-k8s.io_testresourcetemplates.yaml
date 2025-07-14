@@ -46,6 +46,8 @@ spec:
                   spec:
                     description: TestResourceSpec defines the resource spec.
                     properties:
+                      boolRemoved:
+                        type: boolean
                       boolToPtrBool:
                         type: boolean
                       durationToPtrInt32:
@@ -125,6 +127,10 @@ spec:
                       replicas:
                         format: int32
                         type: integer
+                      stringToOptionalOmitEmpty:
+                        maxLength: 512
+                        minLength: 1
+                        type: string
                       structWithOnlyOptionalFields:
                         description: StructWithOnlyOptionalFields is a struct with
                           only optional fields, where the zero value (empty struct)
@@ -266,6 +272,10 @@ spec:
                       replicas:
                         format: int32
                         type: integer
+                      stringToOptionalOmitEmpty:
+                        maxLength: 512
+                        minLength: 1
+                        type: string
                       structWithOnlyOptionalFields:
                         description: StructWithOnlyOptionalFields is a struct with
                           only optional fields, where the zero value (empty struct)

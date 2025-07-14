@@ -109,6 +109,11 @@ type TestResourceSpec struct {
 	DurationToPtrInt32 metav1.Duration `json:"durationToPtrInt32,omitempty"`
 
 	// +optional
+	BoolRemoved bool `json:"boolRemoved,omitempty"`
+
+	StringToOptionalOmitEmpty string `json:"stringToOptionalOmitEmpty"`
+
+	// +optional
 	StructWithOnlyOptionalFields StructWithOnlyOptionalFields `json:"structWithOnlyOptionalFields,omitempty"`
 }
 
