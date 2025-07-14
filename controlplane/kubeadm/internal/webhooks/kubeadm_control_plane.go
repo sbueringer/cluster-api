@@ -44,6 +44,8 @@ import (
 	"sigs.k8s.io/cluster-api/util/version"
 )
 
+const defaultCACertificatesExpiryDays = 3650
+
 func (webhook *KubeadmControlPlane) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&controlplanev1.KubeadmControlPlane{}).
@@ -297,6 +299,27 @@ func validateKubeadmControlPlaneSpec(s controlplanev1.KubeadmControlPlaneSpec, p
 	if s.KubeadmConfigSpec.ClusterConfiguration != nil {
 		if s.KubeadmConfigSpec.ClusterConfiguration.Etcd.External != nil {
 			externalEtcd = true
+		}
+		path := field.NewPath("spec", "kubeadmConfigSpec", "clusterConfiguration")
+		if s.KubeadmConfigSpec.ClusterConfiguration.CertificateValidityPeriodDays > s.KubeadmConfigSpec.ClusterConfiguration.CACertificateValidityPeriodDays {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					path.Child("certificateValidityPeriodDays"),
+					s.KubeadmConfigSpec.ClusterConfiguration.CertificateValidityPeriodDays,
+					fmt.Sprintf("must be less than or equal to caCertificateValidityPeriodDays %v", s.KubeadmConfigSpec.ClusterConfiguration.CACertificateValidityPeriodDays),
+				),
+			)
+		}
+		if s.KubeadmConfigSpec.ClusterConfiguration.CACertificateValidityPeriodDays == 0 && s.KubeadmConfigSpec.ClusterConfiguration.CertificateValidityPeriodDays > defaultCACertificatesExpiryDays {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					path.Child("certificateValidityPeriodDays"),
+					s.KubeadmConfigSpec.ClusterConfiguration.CertificateValidityPeriodDays,
+					fmt.Sprintf("must be less than or equal to default value of caCertificateValidityPeriodDays %v", defaultCACertificatesExpiryDays),
+				),
+			)
 		}
 	}
 
