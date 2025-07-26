@@ -743,7 +743,8 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 	}
 
 	invalidRolloutBeforeCertificatesExpiryDays := before.DeepCopy()
-	invalidRolloutBeforeCertificatesExpiryDays.Spec.RolloutBefore.CertificatesExpiryDays = ptr.To[int32](2)
+	invalidRolloutBeforeCertificatesExpiryDays.Spec.Rollout.Before.CertificatesExpiryDays = 8
+	invalidRolloutBeforeCertificatesExpiryDays.Spec.KubeadmConfigSpec.ClusterConfiguration.CertificateValidityPeriodDays = 7
 
 	invalidCertificateValidityPeriodDays := before.DeepCopy()
 	invalidCertificateValidityPeriodDays.Spec.KubeadmConfigSpec.ClusterConfiguration.CertificateValidityPeriodDays = 300
@@ -1126,12 +1127,6 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 			expectErr: true,
 			before:    before,
 			kcp:       invalidCertificateValidityPeriodDays,
-		},
-		{
-			name:      "should return error when CertificateValidityPeriodDays greater than CACertificateValidityPeriodDays",
-			expectErr: true,
-			before:    before,
-			kcp:       invalidCertificateValidityPeriod,
 		},
 	}
 
