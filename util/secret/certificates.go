@@ -47,6 +47,9 @@ const (
 
 	// DefaultCertificatesDir is the default directory where Kubernetes stores its PKI information.
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
+
+	// DefaultCACertificatesExpiryDays is the default expiry for CA certificates (10 years).
+	DefaultCACertificatesExpiryDays = 3650
 )
 
 var (
@@ -518,7 +521,7 @@ func newSelfSignedCACert(key *rsa.PrivateKey, validityPeriodDays int32) (*x509.C
 	}
 
 	now := time.Now().UTC()
-	notAfter := now.Add(time.Hour * 24 * 365 * 10) // 10 years
+	notAfter := now.Add(DefaultCACertificatesExpiryDays * time.Hour * 24)
 	if validityPeriodDays != 0 {
 		notAfter = now.Add(time.Duration(validityPeriodDays) * time.Hour * 24)
 	}
