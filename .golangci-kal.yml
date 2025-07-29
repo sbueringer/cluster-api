@@ -162,47 +162,6 @@ linters:
       text: "optionalfields: field ExtraEnvs is optional and does not allow the zero value. The field does not need to be a pointer."
       linters:
         - kubeapilinter
-    # KAL does not handle omitzero correctly yet: https://github.com/kubernetes-sigs/kube-api-linter/pull/115
-    - path: "api/.*"
-      text: "optionalfields: field (Status|Initialization) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/.*"
-      text: "optionalfields: field (LastAppliedTime|Expires|After|LastUpdated|CertificatesExpiryDate|NodeDrainStartTime|WaitForNodeVolumeDetachStartTime) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/bootstrap/kubeadm/v1beta2"
-      text: "optionalfields: field (Spec|NodeRegistration|LocalAPIEndpoint|Etcd|APIServer|ControllerManager|Scheduler|DNS|Discovery|ObjectMeta) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/controlplane/kubeadm/v1beta2"
-      text: "optionalfields: field (Spec|ObjectMeta|KubeadmConfigSpec|Remediation|Rollout|Before|Strategy|RollingUpdate|MachineTemplate) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/core/v1beta2/cluster_types.go"
-      text: "optionalfields: field (ClusterNetwork|Services|Pods|ControlPlaneEndpoint|ControlPlane|Workers|Metadata|Variables|Strategy|Rollout|RollingUpdate) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/core/v1beta2/clusterclass_types.go"
-      text: "optionalfields: field (Workers|Metadata|ControlPlane|Strategy|Infrastructure|DeprecatedV1Beta1Metadata|Rollout|RollingUpdate) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/core/v1beta2/(cluster_types.go|clusterclass_types.go|machinehealthcheck_types.go)"
-      text: "optionalfields: field (Checks|Remediation|TriggerIf) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/core/v1beta2/machinedeployment_types.go"
-      text: "optionalfields: field (Strategy|Rollout|RollingUpdate|Remediation) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/ipam/v1beta2/ipaddressclaim_types.go"
-      text: "optionalfields: field AddressRef is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
-    - path: "api/core/v1beta2/*|api/controlplane/kubeadm/v1beta2/*"
-      text: "optionalfields: field (Naming|HealthCheck|MachineNaming|Deletion) is optional and should (be a pointer|have the omitempty tag)"
-      linters:
-        - kubeapilinter
     # FIXME: requiredfields linter broken for the moment
     - path: "api/.*"
       text: "requiredfields: .*"

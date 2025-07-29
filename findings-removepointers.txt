@@ -1,0 +1,117 @@
+/Users/buringerst/code/src/sigs.k8s.io/cluster-api/hack/tools/bin/golangci-lint-kube-api-linter run -v --config /Users/buringerst/code/src/sigs.k8s.io/cluster-api/.golangci-kal.yml 
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:115:2: optionalfields: field Patches is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Patches *Patches `json:"patches,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:119:2: optionalfields: field Timeouts is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:455:2: optionalfields: field Local is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Local *LocalEtcd `json:"local,omitempty"` // FIXME: maybe to another manual verification that we can unset
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:460:2: optionalfields: field External is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	External *ExternalEtcd `json:"external,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:592:2: optionalfields: field Patches is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Patches *Patches `json:"patches,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:596:2: optionalfields: field Timeouts is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:612:2: optionalfields: field BootstrapToken is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	BootstrapToken *BootstrapTokenDiscovery `json:"bootstrapToken,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:617:2: optionalfields: field File is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	File *FileDiscovery `json:"file,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:682:2: optionalfields: field KubeConfig is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	KubeConfig *FileDiscoveryKubeConfig `json:"kubeConfig,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:693:2: optionalfields: field Cluster is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Cluster *KubeConfigCluster `json:"cluster,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:760:2: optionalfields: field AuthProvider is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	AuthProvider *KubeConfigAuthProvider `json:"authProvider,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:764:2: optionalfields: field Exec is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Exec *KubeConfigAuthExec `json:"exec,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:57:2: optionalfields: field ClusterConfiguration is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	ClusterConfiguration *ClusterConfiguration `json:"clusterConfiguration,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:61:2: optionalfields: field InitConfiguration is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	InitConfiguration *InitConfiguration `json:"initConfiguration,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:65:2: optionalfields: field JoinConfiguration is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	JoinConfiguration *JoinConfiguration `json:"joinConfiguration,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:76:2: optionalfields: field DiskSetup is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	DiskSetup *DiskSetup `json:"diskSetup,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:127:2: optionalfields: field NTP is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	NTP *NTP `json:"ntp,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:141:2: optionalfields: field Ignition is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Ignition *IgnitionSpec `json:"ignition,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:424:2: optionalfields: field ContainerLinuxConfig is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	ContainerLinuxConfig *ContainerLinuxConfig `json:"containerLinuxConfig,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:644:2: optionalfields: field ContentFrom is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	ContentFrom *FileSource `json:"contentFrom,omitempty"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:745:2: optionalfields: field PasswdFrom is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	PasswdFrom *PasswdSource `json:"passwdFrom,omitempty"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go:718:2: optionalfields: field LastRemediation is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	LastRemediation *LastRemediationStatus `json:"lastRemediation,omitempty"`
+	^
+api/core/v1beta2/cluster_types.go:478:2: optionalfields: field ControlPlaneRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	ControlPlaneRef *ContractVersionedObjectReference `json:"controlPlaneRef,omitempty"`
+	^
+api/core/v1beta2/cluster_types.go:483:2: optionalfields: field InfrastructureRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	InfrastructureRef *ContractVersionedObjectReference `json:"infrastructureRef,omitempty"`
+	^
+api/core/v1beta2/cluster_types.go:490:2: optionalfields: field Topology is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Topology *Topology `json:"topology,omitempty"` // FIXME: add isDefined
+	^
+api/core/v1beta2/cluster_types.go:740:2: optionalfields: field TemplateRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	TemplateRef *MachineHealthCheckRemediationTemplateReference `json:"templateRef,omitempty"`
+	^
+api/core/v1beta2/cluster_types.go:1007:2: optionalfields: field TemplateRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	TemplateRef *MachineHealthCheckRemediationTemplateReference `json:"templateRef,omitempty"`
+	^
+api/core/v1beta2/clusterclass_types.go:174:2: optionalfields: field MachineInfrastructure is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	MachineInfrastructure *ControlPlaneClassMachineInfrastructureTemplate `json:"machineInfrastructure,omitempty"`
+	^
+api/core/v1beta2/clusterclass_types.go:285:2: optionalfields: field TemplateRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	TemplateRef *MachineHealthCheckRemediationTemplateReference `json:"templateRef,omitempty"`
+	^
+api/core/v1beta2/clusterclass_types.go:564:2: optionalfields: field TemplateRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	TemplateRef *MachineHealthCheckRemediationTemplateReference `json:"templateRef,omitempty"`
+	^
+api/core/v1beta2/clusterclass_types.go:895:2: optionalfields: field AdditionalProperties is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	AdditionalProperties *JSONSchemaProps `json:"additionalProperties,omitempty"` // FIXME: let's exclude JSONSchemaProps fields
+	^
+api/core/v1beta2/clusterclass_types.go:924:2: optionalfields: field Items is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Items *JSONSchemaProps `json:"items,omitempty"`
+	^
+api/core/v1beta2/clusterclass_types.go:1020:2: optionalfields: field XMetadata is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	XMetadata *VariableSchemaMetadata `json:"x-metadata,omitempty"`
+	^
+api/core/v1beta2/clusterclass_types.go:1068:2: optionalfields: field Not is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Not *JSONSchemaProps `json:"not,omitempty"`
+	^
+api/core/v1beta2/machine_types.go:522:2: optionalfields: field NodeRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	NodeRef *MachineNodeReference `json:"nodeRef,omitempty"`
+	^
+api/core/v1beta2/machine_types.go:706:2: optionalfields: field ConfigRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	ConfigRef *ContractVersionedObjectReference `json:"configRef,omitempty"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:131:2: optionalfields: field TemplateRef is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	TemplateRef *MachineHealthCheckRemediationTemplateReference `json:"templateRef,omitempty"`
+	^
+api/runtime/v1beta2/extensionconfig_types.go:75:2: optionalfields: field Service is optional and does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Service *ServiceReference `json:"service,omitempty"`
+	^
+38 issues:
+* kubeapilinter: 38

@@ -1288,6 +1288,7 @@ type NetworkRanges struct {
 	// cidrBlocks is a list of CIDR blocks.
 	// +required
 	// +listType=atomic
+	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=100
 	// +kubebuilder:validation:items:MinLength=1
 	// +kubebuilder:validation:items:MaxLength=43
