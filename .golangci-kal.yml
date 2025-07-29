@@ -203,6 +203,9 @@ linters:
       text: "optionalfields: field (Naming|HealthCheck|MachineNaming|Deletion) is optional and should (be a pointer|have the omitempty tag)"
       linters:
         - kubeapilinter
+    # FIXME: requiredfields linter broken for the moment
+    - path: "api/.*"
+      text: "requiredfields: .*"
 
 issues:
   max-same-issues: 0
