@@ -99,7 +99,7 @@ linters:
     ## Excludes for current clusterctl v1alpha3 and Runtime Hooks v1alpha1 apiVersions (can be fixed once we bump their apiVersion).
     # Note: The types in api/runtime/hooks/v1alpha1 are not CRDs, so e.g. SSA markers don't make sense there.
     - path: "cmd/clusterctl/api/v1alpha3|api/runtime/hooks/v1alpha1"
-      text: "optionalfields|maxlength|ssatags"
+      text: "optionalfields|requiredfields|maxlength|ssatags"
       linters:
         - kubeapilinter
 
@@ -152,20 +152,21 @@ linters:
         - kubeapilinter
 
     # TODO: Excludes that should be removed once the corresponding issues in KAL are fixed
-    # KAL incorrectly reports that the Taints field doesn't have to be a pointer (it has to be to preserve []).
+    # KAL incorrectly reports that the Taints field doesn't have to¹ be a pointer (it has to be to preserve []).
     # See: https://github.com/kubernetes-sigs/kube-api-linter/issues/116
     - path: "api/bootstrap/kubeadm/v1beta2/kubeadm_types.go"
-      text: "optionalfields: field Taints is optional but the underlying type does not need to be a pointer. The pointer should be removed."
+      text: "optionalfields: field Taints underlying type does not need to be a pointer. The pointer should be removed."
       linters:
         - kubeapilinter
     - path: "api/bootstrap/kubeadm/v1beta2/kubeadm_types.go"
-      text: "optionalfields: field ExtraEnvs is optional and does not allow the zero value. The field does not need to be a pointer."
+      text: "optionalfields: field ExtraEnvs does not allow the zero value. The field does not need to be a pointer."
       linters:
         - kubeapilinter
     # FIXME: requiredfields linter broken for the moment
+#    - path: "api/.*"
+#      text: "requiredfields: .*"
     - path: "api/.*"
-      text: "requiredfields: .*"
-
+      text: "optionalfields: .*"
 issues:
   max-same-issues: 0
   max-issues-per-linter: 0

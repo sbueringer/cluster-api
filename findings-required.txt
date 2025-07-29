@@ -1,0 +1,411 @@
+/Users/buringerst/code/src/sigs.k8s.io/cluster-api/hack/tools/bin/golangci-lint-kube-api-linter run -v --config /Users/buringerst/code/src/sigs.k8s.io/cluster-api/.golangci-kal.yml 
+api/addons/v1beta2/clusterresourceset_types.go:61:2: requiredfields: field ClusterSelector should have the omitempty tag. (kubeapilinter)
+	ClusterSelector metav1.LabelSelector `json:"clusterSelector"`
+	^
+api/addons/v1beta2/clusterresourceset_types.go:68:2: requiredfields: field Resources should have the omitempty tag. (kubeapilinter)
+	Resources []ResourceRef `json:"resources"`
+	^
+api/addons/v1beta2/clusterresourceset_types.go:91:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/addons/v1beta2/clusterresourceset_types.go:96:2: requiredfields: field Kind should have the omitempty tag. (kubeapilinter)
+	Kind string `json:"kind"`
+	^
+api/addons/v1beta2/clusterresourcesetbinding_types.go:43:2: requiredfields: field Applied has a valid zero value (false) and should be a pointer. (kubeapilinter)
+	Applied bool `json:"applied"`
+	^
+api/addons/v1beta2/clusterresourcesetbinding_types.go:52:2: requiredfields: field ClusterResourceSetName should have the omitempty tag. (kubeapilinter)
+	ClusterResourceSetName string `json:"clusterResourceSetName"`
+	^
+api/addons/v1beta2/clusterresourcesetbinding_types.go:143:2: requiredfields: field ClusterName should have the omitempty tag. (kubeapilinter)
+	ClusterName string `json:"clusterName"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:407:2: requiredfields: field Token should have the omitempty tag. (kubeapilinter)
+	Token *BootstrapTokenString `json:"token"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:525:2: requiredfields: field Endpoints should have the omitempty tag. (kubeapilinter)
+	Endpoints []string `json:"endpoints"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:532:2: requiredfields: field CAFile should have the omitempty tag. (kubeapilinter)
+	CAFile string `json:"caFile"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:539:2: requiredfields: field CertFile should have the omitempty tag. (kubeapilinter)
+	CertFile string `json:"certFile"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:546:2: requiredfields: field KeyFile should have the omitempty tag. (kubeapilinter)
+	KeyFile string `json:"keyFile"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:672:2: requiredfields: field KubeConfigPath should have the omitempty tag. (kubeapilinter)
+	KubeConfigPath string `json:"kubeConfigPath"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:697:2: requiredfields: field User does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	User KubeConfigUser `json:"user"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:772:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:789:2: requiredfields: field Command should have the omitempty tag. (kubeapilinter)
+	Command string `json:"command"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:833:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:838:2: requiredfields: field Value should have the omitempty tag. (kubeapilinter)
+	Value string `json:"value"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:848:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:854:2: requiredfields: field HostPath should have the omitempty tag. (kubeapilinter)
+	HostPath string `json:"hostPath"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:859:2: requiredfields: field MountPath should have the omitempty tag. (kubeapilinter)
+	MountPath string `json:"mountPath"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:950:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadm_types.go:956:2: requiredfields: field Value has a valid zero value ("") and should be a pointer. (kubeapilinter)
+	Value string `json:"value"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:614:2: requiredfields: field Path should have the omitempty tag. (kubeapilinter)
+	Path string `json:"path"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:653:2: requiredfields: field Secret does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Secret SecretFileSource `json:"secret"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:665:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:671:2: requiredfields: field Key should have the omitempty tag. (kubeapilinter)
+	Key string `json:"key"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:680:2: requiredfields: field Secret does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Secret SecretPasswdSource `json:"secret"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:692:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:698:2: requiredfields: field Key should have the omitempty tag. (kubeapilinter)
+	Key string `json:"key"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:707:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:810:2: requiredfields: field Device should have the omitempty tag. (kubeapilinter)
+	Device string `json:"device"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:815:2: requiredfields: field Layout has a valid zero value (false) and should be a pointer. (kubeapilinter)
+	Layout bool `json:"layout"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:834:2: requiredfields: field Device should have the omitempty tag. (kubeapilinter)
+	Device string `json:"device"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfig_types.go:840:2: requiredfields: field Filesystem should have the omitempty tag. (kubeapilinter)
+	Filesystem string `json:"filesystem"`
+	^
+api/bootstrap/kubeadm/v1beta2/kubeadmconfigtemplate_types.go:29:2: requiredfields: field Template does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Template KubeadmConfigTemplateResource `json:"template"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go:435:2: requiredfields: field Version should have the omitempty tag. (kubeapilinter)
+	Version string `json:"version"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go:440:2: requiredfields: field MachineTemplate does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	MachineTemplate KubeadmControlPlaneMachineTemplate `json:"machineTemplate"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go:483:2: requiredfields: field InfrastructureRef should have the omitempty tag. (kubeapilinter)
+	InfrastructureRef clusterv1.ContractVersionedObjectReference `json:"infrastructureRef"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go:572:2: requiredfields: field Type should have the omitempty tag. (kubeapilinter)
+	Type KubeadmControlPlaneRolloutStrategyType `json:"type"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go:808:2: requiredfields: field Machine should have the omitempty tag. (kubeapilinter)
+	Machine string `json:"machine"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go:812:2: requiredfields: field Time should have the omitempty tag. (kubeapilinter)
+	Time metav1.Time `json:"time"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadm_control_plane_types.go:817:2: requiredfields: field RetryCount has a valid zero value (0), but the validation is not complete (e.g. minimum/maximum). The field should be a pointer to allow the zero value to be set. If the zero value is not a valid use case, complete the validation and remove the pointer. (kubeapilinter)
+	RetryCount int32 `json:"retryCount"`
+	^
+api/controlplane/kubeadm/v1beta2/kubeadmcontrolplanetemplate_types.go:30:2: requiredfields: field Template does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Template KubeadmControlPlaneTemplateResource `json:"template"`
+	^
+api/core/v1beta2/cluster_types.go:528:2: requiredfields: field ConditionType should have the omitempty tag. (kubeapilinter)
+	ConditionType string `json:"conditionType"`
+	^
+api/core/v1beta2/cluster_types.go:543:2: requiredfields: field ClassRef does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	ClassRef ClusterClassRef `json:"classRef"`
+	^
+api/core/v1beta2/cluster_types.go:549:2: requiredfields: field Version should have the omitempty tag. (kubeapilinter)
+	Version string `json:"version"`
+	^
+api/core/v1beta2/cluster_types.go:581:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/cluster_types.go:825:2: requiredfields: field Class should have the omitempty tag. (kubeapilinter)
+	Class string `json:"class"`
+	^
+api/core/v1beta2/cluster_types.go:834:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/cluster_types.go:1078:2: requiredfields: field Type should have the omitempty tag. (kubeapilinter)
+	Type MachineDeploymentRolloutStrategyType `json:"type"`
+	^
+api/core/v1beta2/cluster_types.go:1135:2: requiredfields: field Class should have the omitempty tag. (kubeapilinter)
+	Class string `json:"class"`
+	^
+api/core/v1beta2/cluster_types.go:1144:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/cluster_types.go:1211:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/cluster_types.go:1221:2: requiredfields: field Value should have the omitempty tag. (kubeapilinter)
+	Value apiextensionsv1.JSON `json:"value"`
+	^
+api/core/v1beta2/cluster_types.go:1295:2: requiredfields: field CIDRBlocks should have the omitempty tag. (kubeapilinter)
+	CIDRBlocks []string `json:"cidrBlocks"`
+	^
+api/core/v1beta2/cluster_types.go:1612:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/clusterclass_types.go:407:2: requiredfields: field Class should have the omitempty tag. (kubeapilinter)
+	Class string `json:"class"`
+	^
+api/core/v1beta2/clusterclass_types.go:412:2: requiredfields: field Bootstrap does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Bootstrap MachineDeploymentClassBootstrapTemplate `json:"bootstrap"`
+	^
+api/core/v1beta2/clusterclass_types.go:417:2: requiredfields: field Infrastructure does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Infrastructure MachineDeploymentClassInfrastructureTemplate `json:"infrastructure"`
+	^
+api/core/v1beta2/clusterclass_types.go:655:2: requiredfields: field Type should have the omitempty tag. (kubeapilinter)
+	Type MachineDeploymentRolloutStrategyType `json:"type"`
+	^
+api/core/v1beta2/clusterclass_types.go:712:2: requiredfields: field Class should have the omitempty tag. (kubeapilinter)
+	Class string `json:"class"`
+	^
+api/core/v1beta2/clusterclass_types.go:717:2: requiredfields: field Bootstrap does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Bootstrap MachinePoolClassBootstrapTemplate `json:"bootstrap"`
+	^
+api/core/v1beta2/clusterclass_types.go:722:2: requiredfields: field Infrastructure does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Infrastructure MachinePoolClassInfrastructureTemplate `json:"infrastructure"`
+	^
+api/core/v1beta2/clusterclass_types.go:803:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/clusterclass_types.go:810:2: requiredfields: field Required has a valid zero value (false) and should be a pointer. (kubeapilinter)
+	Required bool `json:"required"`
+	^
+api/core/v1beta2/clusterclass_types.go:823:2: requiredfields: field Schema does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Schema VariableSchema `json:"schema"`
+	^
+api/core/v1beta2/clusterclass_types.go:851:2: requiredfields: field OpenAPIV3Schema does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	OpenAPIV3Schema JSONSchemaProps `json:"openAPIV3Schema"`
+	^
+api/core/v1beta2/clusterclass_types.go:1140:2: requiredfields: field Rule should have the omitempty tag. (kubeapilinter)
+	Rule string `json:"rule"`
+	^
+api/core/v1beta2/clusterclass_types.go:1211:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/clusterclass_types.go:1247:2: requiredfields: field Selector does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Selector PatchSelector `json:"selector"`
+	^
+api/core/v1beta2/clusterclass_types.go:1255:2: requiredfields: field JSONPatches should have the omitempty tag. (kubeapilinter)
+	JSONPatches []JSONPatch `json:"jsonPatches"`
+	^
+api/core/v1beta2/clusterclass_types.go:1270:2: requiredfields: field APIVersion should have the omitempty tag. (kubeapilinter)
+	APIVersion string `json:"apiVersion"`
+	^
+api/core/v1beta2/clusterclass_types.go:1278:2: requiredfields: field Kind should have the omitempty tag. (kubeapilinter)
+	Kind string `json:"kind"`
+	^
+api/core/v1beta2/clusterclass_types.go:1282:2: requiredfields: field MatchResources has a valid zero value ({}), but the validation is not complete (e.g. min properties/adding required fields). The field should be a pointer to allow the zero value to be set. If the zero value is not a valid use case, complete the validation and remove the pointer. (kubeapilinter)
+	MatchResources PatchSelectorMatch `json:"matchResources"`
+	^
+api/core/v1beta2/clusterclass_types.go:1340:2: requiredfields: field Op should have the omitempty tag. (kubeapilinter)
+	Op string `json:"op"`
+	^
+api/core/v1beta2/clusterclass_types.go:1350:2: requiredfields: field Path should have the omitempty tag. (kubeapilinter)
+	Path string `json:"path"`
+	^
+api/core/v1beta2/clusterclass_types.go:1459:2: requiredfields: field Kind should have the omitempty tag. (kubeapilinter)
+	Kind string `json:"kind"`
+	^
+api/core/v1beta2/clusterclass_types.go:1467:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/clusterclass_types.go:1475:2: requiredfields: field APIVersion should have the omitempty tag. (kubeapilinter)
+	APIVersion string `json:"apiVersion"`
+	^
+api/core/v1beta2/clusterclass_types.go:1548:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/clusterclass_types.go:1558:2: requiredfields: field Definitions should have the omitempty tag. (kubeapilinter)
+	Definitions []ClusterClassStatusVariableDefinition `json:"definitions"`
+	^
+api/core/v1beta2/clusterclass_types.go:1569:2: requiredfields: field From should have the omitempty tag. (kubeapilinter)
+	From string `json:"from"`
+	^
+api/core/v1beta2/clusterclass_types.go:1576:2: requiredfields: field Required has a valid zero value (false) and should be a pointer. (kubeapilinter)
+	Required bool `json:"required"`
+	^
+api/core/v1beta2/clusterclass_types.go:1589:2: requiredfields: field Schema does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Schema VariableSchema `json:"schema"`
+	^
+api/core/v1beta2/common_types.go:295:2: requiredfields: field Type should have the omitempty tag. (kubeapilinter)
+	Type MachineAddressType `json:"type"`
+	^
+api/core/v1beta2/common_types.go:301:2: requiredfields: field Address should have the omitempty tag. (kubeapilinter)
+	Address string `json:"address"`
+	^
+api/core/v1beta2/common_types.go:368:2: requiredfields: field Kind should have the omitempty tag. (kubeapilinter)
+	Kind string `json:"kind"`
+	^
+api/core/v1beta2/common_types.go:376:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/common_types.go:386:2: requiredfields: field APIGroup should have the omitempty tag. (kubeapilinter)
+	APIGroup string `json:"apiGroup"`
+	^
+api/core/v1beta2/condition_types.go:53:2: requiredfields: field Type should have the omitempty tag. (kubeapilinter)
+	Type ConditionType `json:"type"`
+	^
+api/core/v1beta2/condition_types.go:57:2: requiredfields: field Status should have the omitempty tag. (kubeapilinter)
+	Status corev1.ConditionStatus `json:"status"`
+	^
+api/core/v1beta2/condition_types.go:69:2: requiredfields: field LastTransitionTime should have the omitempty tag. (kubeapilinter)
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+	^
+api/core/v1beta2/machine_types.go:384:2: requiredfields: field ClusterName should have the omitempty tag. (kubeapilinter)
+	ClusterName string `json:"clusterName"`
+	^
+api/core/v1beta2/machine_types.go:389:2: requiredfields: field Bootstrap has a valid zero value ({}), but the validation is not complete (e.g. min properties/adding required fields). The field should be a pointer to allow the zero value to be set. If the zero value is not a valid use case, complete the validation and remove the pointer. (kubeapilinter)
+	Bootstrap Bootstrap `json:"bootstrap,omitempty,omitzero"`
+	^
+api/core/v1beta2/machine_types.go:394:2: requiredfields: field InfrastructureRef does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	InfrastructureRef ContractVersionedObjectReference `json:"infrastructureRef"`
+	^
+api/core/v1beta2/machine_types.go:489:2: requiredfields: field ConditionType should have the omitempty tag. (kubeapilinter)
+	ConditionType string `json:"conditionType"`
+	^
+api/core/v1beta2/machine_types.go:571:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/machinedeployment_types.go:241:2: requiredfields: field ClusterName should have the omitempty tag. (kubeapilinter)
+	ClusterName string `json:"clusterName"`
+	^
+api/core/v1beta2/machinedeployment_types.go:273:2: requiredfields: field Selector should have the omitempty tag. (kubeapilinter)
+	Selector metav1.LabelSelector `json:"selector"`
+	^
+api/core/v1beta2/machinedeployment_types.go:277:2: requiredfields: field Template does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Template MachineTemplateSpec `json:"template"`
+	^
+api/core/v1beta2/machinedeployment_types.go:321:2: requiredfields: field Type should have the omitempty tag. (kubeapilinter)
+	Type MachineDeploymentRolloutStrategyType `json:"type"`
+	^
+api/core/v1beta2/machinedrainrules_types.go:50:2: requiredfields: field Drain does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Drain MachineDrainRuleDrainConfig `json:"drain"`
+	^
+api/core/v1beta2/machinedrainrules_types.go:132:2: requiredfields: field Behavior should have the omitempty tag. (kubeapilinter)
+	Behavior MachineDrainRuleDrainBehavior `json:"behavior"`
+	^
+api/core/v1beta2/machinedrainrules_types.go:215:2: requiredfields: field Spec does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Spec MachineDrainRuleSpec `json:"spec"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:55:2: requiredfields: field ClusterName should have the omitempty tag. (kubeapilinter)
+	ClusterName string `json:"clusterName"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:59:2: requiredfields: field Selector should have the omitempty tag. (kubeapilinter)
+	Selector metav1.LabelSelector `json:"selector"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:166:2: requiredfields: field Kind should have the omitempty tag. (kubeapilinter)
+	Kind string `json:"kind"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:174:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:183:2: requiredfields: field APIVersion should have the omitempty tag. (kubeapilinter)
+	APIVersion string `json:"apiVersion"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:212:2: requiredfields: field Type should have the omitempty tag. (kubeapilinter)
+	Type corev1.NodeConditionType `json:"type"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:218:2: requiredfields: field Status should have the omitempty tag. (kubeapilinter)
+	Status corev1.ConditionStatus `json:"status"`
+	^
+api/core/v1beta2/machinehealthcheck_types.go:226:2: requiredfields: field TimeoutSeconds has a valid zero value (0) and should be a pointer. (kubeapilinter)
+	TimeoutSeconds int32 `json:"timeoutSeconds"`
+	^
+api/core/v1beta2/machinepool_types.go:73:2: requiredfields: field ClusterName should have the omitempty tag. (kubeapilinter)
+	ClusterName string `json:"clusterName"`
+	^
+api/core/v1beta2/machinepool_types.go:82:2: requiredfields: field Template does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Template MachineTemplateSpec `json:"template"`
+	^
+api/core/v1beta2/machineset_types.go:44:2: requiredfields: field ClusterName should have the omitempty tag. (kubeapilinter)
+	ClusterName string `json:"clusterName"`
+	^
+api/core/v1beta2/machineset_types.go:71:2: requiredfields: field Selector should have the omitempty tag. (kubeapilinter)
+	Selector metav1.LabelSelector `json:"selector"`
+	^
+api/core/v1beta2/machineset_types.go:77:2: requiredfields: field Template does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Template MachineTemplateSpec `json:"template"`
+	^
+api/core/v1beta2/machineset_types.go:246:2: requiredfields: field Spec does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	Spec MachineSpec `json:"spec"`
+	^
+api/ipam/v1beta2/ipaddress_types.go:27:2: requiredfields: field ClaimRef does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	ClaimRef IPAddressClaimReference `json:"claimRef"`
+	^
+api/ipam/v1beta2/ipaddress_types.go:31:2: requiredfields: field PoolRef does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	PoolRef IPPoolReference `json:"poolRef"`
+	^
+api/ipam/v1beta2/ipaddress_types.go:37:2: requiredfields: field Address should have the omitempty tag. (kubeapilinter)
+	Address string `json:"address"`
+	^
+api/ipam/v1beta2/ipaddress_types.go:41:2: requiredfields: field Prefix has a valid zero value (0), but the validation is not complete (e.g. minimum/maximum). The field should be a pointer to allow the zero value to be set. If the zero value is not a valid use case, complete the validation and remove the pointer. (kubeapilinter)
+	Prefix int32 `json:"prefix"`
+	^
+api/ipam/v1beta2/ipaddress_types.go:58:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/ipam/v1beta2/ipaddress_types.go:69:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/ipam/v1beta2/ipaddress_types.go:77:2: requiredfields: field Kind should have the omitempty tag. (kubeapilinter)
+	Kind string `json:"kind"`
+	^
+api/ipam/v1beta2/ipaddress_types.go:85:2: requiredfields: field APIGroup should have the omitempty tag. (kubeapilinter)
+	APIGroup string `json:"apiGroup"`
+	^
+api/ipam/v1beta2/ipaddressclaim_types.go:53:2: requiredfields: field PoolRef does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	PoolRef IPPoolReference `json:"poolRef"`
+	^
+api/ipam/v1beta2/ipaddressclaim_types.go:84:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/runtime/v1beta2/extensionconfig_types.go:29:2: requiredfields: field ClientConfig does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	ClientConfig ClientConfig `json:"clientConfig"`
+	^
+api/runtime/v1beta2/extensionconfig_types.go:90:2: requiredfields: field Namespace should have the omitempty tag. (kubeapilinter)
+	Namespace string `json:"namespace"`
+	^
+api/runtime/v1beta2/extensionconfig_types.go:96:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/runtime/v1beta2/extensionconfig_types.go:162:2: requiredfields: field Name should have the omitempty tag. (kubeapilinter)
+	Name string `json:"name"`
+	^
+api/runtime/v1beta2/extensionconfig_types.go:166:2: requiredfields: field RequestHook does not allow the zero value. It must have the omitzero tag. (kubeapilinter)
+	RequestHook GroupVersionHook `json:"requestHook"`
+	^
+api/runtime/v1beta2/extensionconfig_types.go:186:2: requiredfields: field APIVersion should have the omitempty tag. (kubeapilinter)
+	APIVersion string `json:"apiVersion"`
+	^
+api/runtime/v1beta2/extensionconfig_types.go:192:2: requiredfields: field Hook should have the omitempty tag. (kubeapilinter)
+	Hook string `json:"hook"`
+	^
+136 issues:
+* kubeapilinter: 136
