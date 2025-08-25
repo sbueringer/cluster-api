@@ -225,7 +225,7 @@ func ClusterctlUpgradeSpec(ctx context.Context, inputGetter func() ClusterctlUpg
 				scheme := apiruntime.NewScheme()
 				framework.TryAddDefaultSchemes(scheme)
 				_ = clusterv1beta1.AddToScheme(scheme)
-				return framework.NewClusterProxy(name, kubeconfigPath, scheme)
+				return framework.NewClusterProxy(name, kubeconfigPath, scheme, framework.WithMachineLogCollector(framework.DockerLogCollector{}))
 			}
 		}
 
@@ -779,7 +779,13 @@ func ClusterctlUpgradeSpec(ctx context.Context, inputGetter func() ClusterctlUpg
 	AfterEach(func() {
 		if testNamespace != nil {
 			// Dump all the logs from the workload cluster before deleting them.
-			framework.DumpAllResourcesAndLogs(ctx, managementClusterProxy, input.ClusterctlConfigPath, input.ArtifactFolder, testNamespace, managementClusterResources.Cluster)
+			framework.DumpAllResourcesAndLogs(ctx, managementClusterProxy, input.ClusterctlConfigPath, input.ArtifactFolder, testNamespace, &clusterv1.Cluster{
+				// DumpAllResourcesAndLogs only uses Namespace + Name from the Cluster object.
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace.Name,
+					Name:      workloadClusterName,
+				},
+			})
 
 			if !input.SkipCleanup {
 				Byf("Deleting all clusters in namespace %s in management cluster %s", testNamespace.Name, managementClusterName)
@@ -811,6 +817,8 @@ func ClusterctlUpgradeSpec(ctx context.Context, inputGetter func() ClusterctlUpg
 
 		// Dumps all the resources in the spec namespace, then cleanups the cluster object and the spec namespace itself.
 		if input.UseKindForManagementCluster {
+			dumpKindClusterLogs(ctx, input.ArtifactFolder, managementClusterProxy)
+
 			if !input.SkipCleanup {
 				managementClusterProxy.Dispose(ctx)
 				managementClusterProvider.Dispose(ctx)
