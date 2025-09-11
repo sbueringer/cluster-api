@@ -171,6 +171,16 @@ func patchKubeadmControlPlaneTemplate(ctx context.Context, kcpTemplate *controlp
 	if err != nil {
 		return err
 	}
+	if kcpTemplate.Spec.Template.Spec.KubeadmConfigSpec.ClusterConfiguration == nil {
+		kcpTemplate.Spec.Template.Spec.KubeadmConfigSpec.ClusterConfiguration = &bootstrapv1.ClusterConfiguration{}
+	}
+	if kcpTemplate.Spec.Template.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer.ExtraArgs == nil {
+		kcpTemplate.Spec.Template.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer.ExtraArgs = map[string]string{}
+	}
+	kcpTemplate.Spec.Template.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer.ExtraArgs["v"] = "4"
+	if version.Compare(controlPlaneVersion, semver.MustParse("1.33.0")) < 0 {
+		kcpTemplate.Spec.Template.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer.ExtraArgs["cloud-provider"] = "external"
+	}
 	if version.Compare(controlPlaneVersion, cgroupDriverPatchVersionCeiling) == -1 {
 		log.Info(fmt.Sprintf("Setting KubeadmControlPlaneTemplate cgroup-driver to %q", cgroupDriverCgroupfs))
 		// Set the cgroupDriver in the InitConfiguration.
