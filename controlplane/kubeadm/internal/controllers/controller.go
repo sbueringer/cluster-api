@@ -95,6 +95,11 @@ type KubeadmControlPlaneReconciler struct {
 	managementCluster         internal.ManagementCluster
 	managementClusterUncached internal.ManagementCluster
 	ssaCache                  ssa.Cache
+
+	// Only used for testing
+	overrideTryInPlaceFunc            func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error)
+	overrideScaleUpControlPlaneFunc   func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error)
+	overrideScaleDownControlPlaneFunc func(ctx context.Context, controlPlane *internal.ControlPlane, machineToDelete *clusterv1.Machine) (ctrl.Result, error)
 }
 
 func (r *KubeadmControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -506,7 +511,12 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
 	case numMachines > desiredReplicas:
 		log.Info("Scaling down control plane", "desired", desiredReplicas, "existing", numMachines)
 		// The last parameter (i.e. machines needing to be rolled out) should always be empty here.
-		return r.scaleDownControlPlane(ctx, controlPlane, collections.Machines{})
+		// Pick the Machine that we should scale down.
+		machineToDelete, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, collections.Machines{})
+		if err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "failed to select machine for scale down")
+		}
+		return r.scaleDownControlPlane(ctx, controlPlane, machineToDelete)
 	}
 
 	// Get the workload cluster client.

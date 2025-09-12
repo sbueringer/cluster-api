@@ -71,12 +71,37 @@ func (r *KubeadmControlPlaneReconciler) initializeControlPlane(ctx context.Conte
 	return ctrl.Result{Requeue: true}, nil
 }
 
+func (r *KubeadmControlPlaneReconciler) tryInPlaceUpdate(ctx context.Context, controlPlane *internal.ControlPlane, machineToInPlaceUpdate *clusterv1.Machine) (res ctrl.Result, err error) {
+	if r.overrideTryInPlaceFunc != nil {
+		return r.overrideTryInPlaceFunc(ctx, controlPlane)
+	}
+	// Run preflight checks to ensure that the control plane is stable before proceeding with in-place update operation.
+	if resultForAllMachines := r.preflightChecks(ctx, controlPlane); !resultForAllMachines.IsZero() {
+		// FIXME(in-place): figure out the details here:
+		// * We also shouldn't block a scale down of unhealthy Machines that would otherwise work
+		if result := r.preflightChecks(ctx, controlPlane, machineToInPlaceUpdate); result.IsZero() {
+			// Fallback to scale down.
+			return ctrl.Result{}, nil
+		}
+
+		return resultForAllMachines, err
+	}
+
+	// CanUpdateMachine ..
+
+	return ctrl.Result{}, nil
+}
+
 func (r *KubeadmControlPlaneReconciler) scaleUpControlPlane(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error) {
+	if r.overrideScaleUpControlPlaneFunc != nil {
+		return r.overrideScaleUpControlPlaneFunc(ctx, controlPlane)
+	}
+
 	logger := ctrl.LoggerFrom(ctx)
 
 	// Run preflight checks to ensure that the control plane is stable before proceeding with a scale up/scale down operation; if not, wait.
-	if result, err := r.preflightChecks(ctx, controlPlane); err != nil || !result.IsZero() {
-		return result, err
+	if result := r.preflightChecks(ctx, controlPlane); !result.IsZero() {
+		return result, nil
 	}
 
 	// Create the bootstrap configuration
@@ -113,20 +138,18 @@ func (r *KubeadmControlPlaneReconciler) scaleUpControlPlane(ctx context.Context,
 func (r *KubeadmControlPlaneReconciler) scaleDownControlPlane(
 	ctx context.Context,
 	controlPlane *internal.ControlPlane,
-	outdatedMachines collections.Machines,
+	machineToDelete *clusterv1.Machine,
 ) (ctrl.Result, error) {
-	logger := ctrl.LoggerFrom(ctx)
-
-	// Pick the Machine that we should scale down.
-	machineToDelete, err := selectMachineForScaleDown(ctx, controlPlane, outdatedMachines)
-	if err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "failed to select machine for scale down")
+	if r.overrideScaleDownControlPlaneFunc != nil {
+		return r.overrideScaleDownControlPlaneFunc(ctx, controlPlane, machineToDelete)
 	}
+
+	logger := ctrl.LoggerFrom(ctx)
 
 	// Run preflight checks ensuring the control plane is stable before proceeding with a scale up/scale down operation; if not, wait.
 	// Given that we're scaling down, we can exclude the machineToDelete from the preflight checks.
-	if result, err := r.preflightChecks(ctx, controlPlane, machineToDelete); err != nil || !result.IsZero() {
-		return result, err
+	if result := r.preflightChecks(ctx, controlPlane, machineToDelete); !result.IsZero() {
+		return result, nil
 	}
 
 	workloadCluster, err := controlPlane.GetWorkloadCluster(ctx)
@@ -174,13 +197,13 @@ func (r *KubeadmControlPlaneReconciler) scaleDownControlPlane(
 // If the control plane is not passing preflight checks, it requeue.
 //
 // NOTE: this func uses KCP conditions, it is required to call reconcileControlPlaneAndMachinesConditions before this.
-func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, controlPlane *internal.ControlPlane, excludeFor ...*clusterv1.Machine) (ctrl.Result, error) { //nolint:unparam
+func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, controlPlane *internal.ControlPlane, excludeFor ...*clusterv1.Machine) ctrl.Result { //nolint:unparam
 	logger := ctrl.LoggerFrom(ctx)
 
 	// If there is no KCP-owned control-plane machines, then control-plane has not been initialized yet,
 	// so it is considered ok to proceed.
 	if controlPlane.Machines.Len() == 0 {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}
 	}
 
 	if feature.Gates.Enabled(feature.ClusterTopology) {
@@ -198,7 +221,7 @@ func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, con
 			}
 			logger.Info(fmt.Sprintf("Waiting for a version upgrade to %s to be propagated", v))
 			controlPlane.PreflightCheckResults.TopologyVersionMismatch = true
-			return ctrl.Result{RequeueAfter: preflightFailedRequeueAfter}, nil
+			return ctrl.Result{RequeueAfter: preflightFailedRequeueAfter}
 		}
 	}
 
@@ -206,7 +229,7 @@ func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, con
 	if controlPlane.HasDeletingMachine() {
 		controlPlane.PreflightCheckResults.HasDeletingMachine = true
 		logger.Info("Waiting for machines to be deleted", "machines", strings.Join(controlPlane.Machines.Filter(collections.HasDeletionTimestamp).Names(), ", "))
-		return ctrl.Result{RequeueAfter: deleteRequeueAfter}, nil
+		return ctrl.Result{RequeueAfter: deleteRequeueAfter}
 	}
 
 	// Check machine health conditions; if there are conditions with False or Unknown, then wait.
@@ -263,10 +286,10 @@ loopmachines:
 			"Waiting for control plane to pass preflight checks to continue reconciliation: %v", aggregatedError)
 		logger.Info("Waiting for control plane to pass preflight checks", "failures", aggregatedError.Error())
 
-		return ctrl.Result{RequeueAfter: preflightFailedRequeueAfter}, nil
+		return ctrl.Result{RequeueAfter: preflightFailedRequeueAfter}
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}
 }
 
 func preflightCheckCondition(kind string, obj *clusterv1.Machine, conditionType string) error {
@@ -283,7 +306,7 @@ func preflightCheckCondition(kind string, obj *clusterv1.Machine, conditionType 
 	return nil
 }
 
-// selectMachineForScaleDown select a machine candidate for scaling down. The selection is a two phase process:
+// selectMachineForInPlaceUpdateOrScaleDown select a machine candidate for scaling down. The selection is a two phase process:
 //
 // In the first phase it selects a subset of machines eligible for deletion:
 // - if there are outdated machines with the delete machine annotation, use them as eligible subset (priority to user requests, part 1)
@@ -294,7 +317,7 @@ func preflightCheckCondition(kind string, obj *clusterv1.Machine, conditionType 
 //
 // Once the subset of machines eligible for deletion is identified, one machine is picked out of this subset by
 // selecting the machine in the failure domain with most machines (including both eligible and not eligible machines).
-func selectMachineForScaleDown(ctx context.Context, controlPlane *internal.ControlPlane, outdatedMachines collections.Machines) (*clusterv1.Machine, error) {
+func selectMachineForInPlaceUpdateOrScaleDown(ctx context.Context, controlPlane *internal.ControlPlane, outdatedMachines collections.Machines) (*clusterv1.Machine, error) {
 	// Select the subset of machines eligible for scale down.
 	eligibleMachines := controlPlane.Machines
 	switch {

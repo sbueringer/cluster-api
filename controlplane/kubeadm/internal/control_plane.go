@@ -50,8 +50,8 @@ type ControlPlane struct {
 	Machines             collections.Machines
 	machinesPatchHelpers map[string]*patch.Helper
 
-	machinesNotUptoDate                  collections.Machines
-	machinesNotUptoDateLogMessages       map[string][]string
+	MachinesNotUptoDate            collections.Machines
+	machinesNotUptoDateLogMessages map[string][]string
 	machinesNotUptoDateConditionMessages map[string][]string
 
 	// reconciliationTime is the time of the current reconciliation, and should be used for all "now" calculations
@@ -137,7 +137,7 @@ func NewControlPlane(ctx context.Context, managementCluster ManagementCluster, c
 		Cluster:                              cluster,
 		Machines:                             ownedMachines,
 		machinesPatchHelpers:                 patchHelpers,
-		machinesNotUptoDate:                  machinesNotUptoDate,
+		MachinesNotUptoDate:                  machinesNotUptoDate,
 		machinesNotUptoDateLogMessages:       machinesNotUptoDateLogMessages,
 		machinesNotUptoDateConditionMessages: machinesNotUptoDateConditionMessages,
 		KubeadmConfigs:                       kubeadmConfigs,
@@ -258,19 +258,19 @@ func (c *ControlPlane) GetKubeadmConfig(machineName string) (*bootstrapv1.Kubead
 // MachinesNeedingRollout return a list of machines that need to be rolled out.
 func (c *ControlPlane) MachinesNeedingRollout() (collections.Machines, map[string][]string) {
 	// Note: Machines already deleted are dropped because they will be replaced by new machines after deletion completes.
-	return c.machinesNotUptoDate.Filter(collections.Not(collections.HasDeletionTimestamp)), c.machinesNotUptoDateLogMessages
+	return c.MachinesNotUptoDate.Filter(collections.Not(collections.HasDeletionTimestamp)), c.machinesNotUptoDateLogMessages
 }
 
 // NotUpToDateMachines return a list of machines that are not up to date with the control
 // plane's configuration.
 func (c *ControlPlane) NotUpToDateMachines() (collections.Machines, map[string][]string) {
-	return c.machinesNotUptoDate, c.machinesNotUptoDateConditionMessages
+	return c.MachinesNotUptoDate, c.machinesNotUptoDateConditionMessages
 }
 
 // UpToDateMachines returns the machines that are up to date with the control
 // plane's configuration.
 func (c *ControlPlane) UpToDateMachines() collections.Machines {
-	return c.Machines.Difference(c.machinesNotUptoDate)
+	return c.Machines.Difference(c.MachinesNotUptoDate)
 }
 
 // getInfraResources fetches the external infrastructure resource for each machine in the collection and returns a map of machine.Name -> infraResource.
