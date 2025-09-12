@@ -283,7 +283,9 @@ func TestKubeadmControlPlaneReconciler_scaleDownControlPlane_NoError(t *testing.
 		}
 		controlPlane.InjectTestManagementCluster(r.managementCluster)
 
-		result, err := r.scaleDownControlPlane(context.Background(), controlPlane, controlPlane.Machines)
+		machineToDelete, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, controlPlane.Machines)
+		g.Expect(err).ToNot(HaveOccurred())
+		result, err := r.scaleDownControlPlane(context.Background(), controlPlane, machineToDelete)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(result).To(BeComparableTo(ctrl.Result{Requeue: true}))
 
@@ -325,7 +327,9 @@ func TestKubeadmControlPlaneReconciler_scaleDownControlPlane_NoError(t *testing.
 		}
 		controlPlane.InjectTestManagementCluster(r.managementCluster)
 
-		result, err := r.scaleDownControlPlane(context.Background(), controlPlane, controlPlane.Machines)
+		machineToDelete, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, controlPlane.Machines)
+		g.Expect(err).ToNot(HaveOccurred())
+		result, err := r.scaleDownControlPlane(context.Background(), controlPlane, machineToDelete)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(result).To(BeComparableTo(ctrl.Result{Requeue: true}))
 
@@ -363,7 +367,9 @@ func TestKubeadmControlPlaneReconciler_scaleDownControlPlane_NoError(t *testing.
 		}
 		controlPlane.InjectTestManagementCluster(r.managementCluster)
 
-		result, err := r.scaleDownControlPlane(context.Background(), controlPlane, controlPlane.Machines)
+		machineToDelete, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, controlPlane.Machines)
+		g.Expect(err).ToNot(HaveOccurred())
+		result, err := r.scaleDownControlPlane(context.Background(), controlPlane, machineToDelete)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(result).To(BeComparableTo(ctrl.Result{RequeueAfter: preflightFailedRequeueAfter}))
 
@@ -502,7 +508,7 @@ func TestSelectMachineForScaleDown(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			selectedMachine, err := selectMachineForScaleDown(ctx, tc.cp, tc.outDatedMachines)
+			selectedMachine, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, tc.cp, tc.outDatedMachines)
 
 			if tc.expectErr {
 				g.Expect(err).To(HaveOccurred())
@@ -785,8 +791,7 @@ func TestPreflightChecks(t *testing.T) {
 				KCP:      tt.kcp,
 				Machines: collections.FromMachines(tt.machines...),
 			}
-			result, err := r.preflightChecks(context.TODO(), controlPlane)
-			g.Expect(err).ToNot(HaveOccurred())
+			result := r.preflightChecks(context.TODO(), controlPlane)
 			g.Expect(result).To(BeComparableTo(tt.expectResult))
 			g.Expect(controlPlane.PreflightCheckResults).To(Equal(tt.expectPreflight))
 		})

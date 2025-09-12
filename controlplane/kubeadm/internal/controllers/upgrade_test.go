@@ -26,12 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	bootstrapv1 "sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2"
+	controlplanev1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
@@ -266,6 +268,151 @@ func TestKubeadmControlPlaneReconciler_RolloutStrategy_ScaleDown(t *testing.T) {
 	remainingMachines := &clusterv1.MachineList{}
 	g.Expect(fakeClient.List(ctx, remainingMachines, client.InNamespace(cluster.Namespace))).To(Succeed())
 	g.Expect(remainingMachines.Items).To(HaveLen(2))
+}
+
+func Test_rollingUpdate(t *testing.T) {
+	tests := []struct {
+		name                    string
+		maxSurge                int32
+		currentReplicas         int32
+		currentUpToDateReplicas int32
+		desiredReplicas         int32
+		canUpdateMachine        bool
+		wantInPlaceUpdateCalled bool
+		wantScaleDownCalled     bool
+		wantScaleUpCalled       bool
+		wantError               bool
+		wantErrorMessage        string
+		wantRes                 ctrl.Result
+	}{
+		// maxSurge: 1
+		{
+			name:                    "maxSurge 1: scale up",
+			maxSurge:                1,
+			currentReplicas:         3,
+			currentUpToDateReplicas: 0,
+			desiredReplicas:         3,
+			wantScaleUpCalled:       true,
+		},
+		{
+			name:                    "maxSurge 1: successful in-place update",
+			maxSurge:                1,
+			currentReplicas:         4,
+			currentUpToDateReplicas: 0,
+			desiredReplicas:         3,
+			canUpdateMachine:        true,
+			wantInPlaceUpdateCalled: true,
+			wantScaleDownCalled:     false,
+			wantRes:                 ctrl.Result{Requeue: true},
+		},
+		{
+			name:                    "maxSurge 1: failed in-place, fallback to scale down",
+			maxSurge:                1,
+			currentReplicas:         4,
+			currentUpToDateReplicas: 0,
+			desiredReplicas:         3,
+			canUpdateMachine:        false,
+			wantInPlaceUpdateCalled: true,
+			wantScaleDownCalled:     true,
+		},
+		// maxSurge: 0
+		{
+			name:                    "maxSurge 0: scale up",
+			maxSurge:                0,
+			currentReplicas:         2,
+			currentUpToDateReplicas: 0,
+			desiredReplicas:         3,
+			wantScaleUpCalled:       true,
+		},
+		{
+			name:                    "maxSurge 0: successful in-place update",
+			maxSurge:                0,
+			currentReplicas:         3,
+			currentUpToDateReplicas: 0,
+			desiredReplicas:         3,
+			canUpdateMachine:        true,
+			wantInPlaceUpdateCalled: true,
+			wantScaleDownCalled:     false,
+			wantRes:                 ctrl.Result{Requeue: true},
+		},
+		{
+			name:                    "maxSurge 0: failed in-place, fallback to scale down",
+			maxSurge:                0,
+			currentReplicas:         3,
+			currentUpToDateReplicas: 0,
+			desiredReplicas:         3,
+			canUpdateMachine:        false,
+			wantInPlaceUpdateCalled: true,
+			wantScaleDownCalled:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			var inPlaceUpdateCalled bool
+			var scaleDownCalled bool
+			var scaleUpCalled bool
+			r := &KubeadmControlPlaneReconciler{
+				overrideTryInPlaceFunc: func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error) {
+					inPlaceUpdateCalled = true
+					if !tt.canUpdateMachine {
+						return ctrl.Result{}, nil
+					}
+					return ctrl.Result{Requeue: true}, nil
+				},
+				overrideScaleDownControlPlaneFunc: func(ctx context.Context, controlPlane *internal.ControlPlane, machineToDelete *clusterv1.Machine) (ctrl.Result, error) {
+					scaleDownCalled = true
+					return ctrl.Result{}, nil
+				},
+				overrideScaleUpControlPlaneFunc: func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error) {
+					scaleUpCalled = true
+					return ctrl.Result{}, nil
+				},
+			}
+
+			machines := collections.Machines{}
+			for i := range tt.currentReplicas {
+				machines[fmt.Sprintf("machine-%d", i)] = machine(fmt.Sprintf("machine-%d", i))
+			}
+			machinesUpToDate := collections.Machines{}
+			for i := range tt.currentUpToDateReplicas {
+				machines[fmt.Sprintf("machine-%d", i)] = machine(fmt.Sprintf("machine-%d", i))
+			}
+
+			controlPlane := &internal.ControlPlane{
+				KCP: &controlplanev1.KubeadmControlPlane{
+					Spec: controlplanev1.KubeadmControlPlaneSpec{
+						Replicas: ptr.To(tt.desiredReplicas),
+						Rollout: controlplanev1.KubeadmControlPlaneRolloutSpec{
+							Strategy: controlplanev1.KubeadmControlPlaneRolloutStrategy{
+								RollingUpdate: controlplanev1.KubeadmControlPlaneRolloutStrategyRollingUpdate{
+									MaxSurge: ptr.To(intstr.FromInt32(tt.maxSurge)),
+								},
+							},
+						},
+					},
+				},
+				Cluster:             &clusterv1.Cluster{},
+				Machines:            machines,
+				MachinesNotUptoDate: machines.Difference(machinesUpToDate),
+			}
+			machinesNeedingRollout, _ := controlPlane.MachinesNeedingRollout()
+
+			res, err := r.rollingUpdate(ctx, controlPlane, machinesNeedingRollout)
+			if tt.wantError {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err.Error()).To(Equal(tt.wantErrorMessage))
+			} else {
+				g.Expect(err).ToNot(HaveOccurred())
+			}
+			g.Expect(res).To(Equal(tt.wantRes))
+
+			g.Expect(inPlaceUpdateCalled).To(Equal(tt.wantInPlaceUpdateCalled), "inPlaceUpdateCalled: actual: %t expected: %t", inPlaceUpdateCalled, tt.wantInPlaceUpdateCalled)
+			g.Expect(scaleDownCalled).To(Equal(tt.wantScaleDownCalled), "scaleDownCalled: actual: %t expected: %t", scaleDownCalled, tt.wantScaleDownCalled)
+			g.Expect(scaleUpCalled).To(Equal(tt.wantScaleUpCalled), "scaleUpCalled: actual: %t expected: %t", scaleUpCalled, tt.wantScaleUpCalled)
+		})
+	}
 }
 
 type machineOpt func(*clusterv1.Machine)
