@@ -47,7 +47,6 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/clustercache"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
 	"sigs.k8s.io/cluster-api/feature"
-	"sigs.k8s.io/cluster-api/internal/contract"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/collections"
@@ -64,6 +63,7 @@ import (
 
 const (
 	kcpManagerName          = "capi-kubeadmcontrolplane"
+	kcpManagerName2         = "capi-kubeadmcontrolplane-2"
 	kubeadmControlPlaneKind = "KubeadmControlPlane"
 )
 
@@ -95,6 +95,11 @@ type KubeadmControlPlaneReconciler struct {
 	managementCluster         internal.ManagementCluster
 	managementClusterUncached internal.ManagementCluster
 	ssaCache                  ssa.Cache
+
+	// Only used for testing
+	overrideTryInPlaceFunc            func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error)
+	overrideScaleUpControlPlaneFunc   func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error)
+	overrideScaleDownControlPlaneFunc func(ctx context.Context, controlPlane *internal.ControlPlane, machineToDelete *clusterv1.Machine) (ctrl.Result, error)
 }
 
 func (r *KubeadmControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -476,7 +481,7 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
 		}
 		log.Info(fmt.Sprintf("Rolling out Control Plane machines: %s", strings.Join(allMessages, ",")), "machinesNeedingRollout", machinesNeedingRollout.Names())
 		v1beta1conditions.MarkFalse(controlPlane.KCP, controlplanev1.MachinesSpecUpToDateV1Beta1Condition, controlplanev1.RollingUpdateInProgressV1Beta1Reason, clusterv1.ConditionSeverityWarning, "Rolling %d replicas with outdated spec (%d replicas up to date)", len(machinesNeedingRollout), len(controlPlane.Machines)-len(machinesNeedingRollout))
-		return r.upgradeControlPlane(ctx, controlPlane, machinesNeedingRollout)
+		return r.updateControlPlane(ctx, controlPlane, machinesNeedingRollout, machinesNeedingRolloutResults)
 	default:
 		// make sure last upgrade operation is marked as completed.
 		// NOTE: we are checking the condition already exists in order to avoid to set this condition at the first
@@ -506,7 +511,12 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
 	case numMachines > desiredReplicas:
 		log.Info("Scaling down control plane", "desired", desiredReplicas, "existing", numMachines)
 		// The last parameter (i.e. machines needing to be rolled out) should always be empty here.
-		return r.scaleDownControlPlane(ctx, controlPlane, collections.Machines{})
+		// Pick the Machine that we should scale down.
+		machineToDelete, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, collections.Machines{})
+		if err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "failed to select machine for scale down")
+		}
+		return r.scaleDownControlPlane(ctx, controlPlane, machineToDelete)
 	}
 
 	// Get the workload cluster client.
@@ -817,10 +827,10 @@ func (r *KubeadmControlPlaneReconciler) syncMachines(ctx context.Context, contro
 		}
 		patchHelpers[machineName] = patchHelper
 
-		labelsAndAnnotationsManagedFieldPaths := []contract.Path{
-			{"f:metadata", "f:annotations"},
-			{"f:metadata", "f:labels"},
-		}
+		//labelsAndAnnotationsManagedFieldPaths := []contract.Path{
+		//	{"f:metadata", "f:annotations"},
+		//	{"f:metadata", "f:labels"},
+		//}
 		infraMachine, infraMachineFound := controlPlane.InfraResources[machineName]
 		// Only update the InfraMachine if it is already found, otherwise just skip it.
 		// This could happen e.g. if the cache is not up-to-date yet.
@@ -829,9 +839,10 @@ func (r *KubeadmControlPlaneReconciler) syncMachines(ctx context.Context, contro
 			// from "manager". We do this so that InfrastructureMachines that are created using the Create method
 			// can also work with SSA. Otherwise, labels and annotations would be co-owned by our "old" "manager"
 			// and "capi-kubeadmcontrolplane" and then we would not be able to e.g. drop labels and annotations.
-			if err := ssa.DropManagedFields(ctx, r.Client, infraMachine, kcpManagerName, labelsAndAnnotationsManagedFieldPaths); err != nil {
-				return errors.Wrapf(err, "failed to clean up managedFields of InfrastructureMachine %s", klog.KObj(infraMachine))
-			}
+			// FIXME(low-priority): we need different cleanup logic now, and only for objects created with CAPI < v1.12.
+			//if err := ssa.DropManagedFields(ctx, r.Client, infraMachine, kcpManagerName, labelsAndAnnotationsManagedFieldPaths); err != nil {
+			//	return errors.Wrapf(err, "failed to clean up managedFields of InfrastructureMachine %s", klog.KObj(infraMachine))
+			//}
 			// Update in-place mutating fields on InfrastructureMachine.
 			if err := r.updateExternalObject(ctx, infraMachine, infraMachine.GroupVersionKind(), controlPlane.KCP, controlPlane.Cluster); err != nil {
 				return errors.Wrapf(err, "failed to update InfrastructureMachine %s", klog.KObj(infraMachine))
@@ -846,9 +857,10 @@ func (r *KubeadmControlPlaneReconciler) syncMachines(ctx context.Context, contro
 			// from "manager". We do this so that KubeadmConfigs that are created using the Create method
 			// can also work with SSA. Otherwise, labels and annotations would be co-owned by our "old" "manager"
 			// and "capi-kubeadmcontrolplane" and then we would not be able to e.g. drop labels and annotations.
-			if err := ssa.DropManagedFields(ctx, r.Client, kubeadmConfig, kcpManagerName, labelsAndAnnotationsManagedFieldPaths); err != nil {
-				return errors.Wrapf(err, "failed to clean up managedFields of KubeadmConfig %s", klog.KObj(kubeadmConfig))
-			}
+			// FIXME(low-priority): we need different cleanup logic now, and only for objects created with CAPI < v1.12.
+			//if err := ssa.DropManagedFields(ctx, r.Client, kubeadmConfig, kcpManagerName, labelsAndAnnotationsManagedFieldPaths); err != nil {
+			//	return errors.Wrapf(err, "failed to clean up managedFields of KubeadmConfig %s", klog.KObj(kubeadmConfig))
+			//}
 			// Update in-place mutating fields on BootstrapConfig.
 			if err := r.updateExternalObject(ctx, kubeadmConfig, bootstrapv1.GroupVersion.WithKind("KubeadmConfig"), controlPlane.KCP, controlPlane.Cluster); err != nil {
 				return errors.Wrapf(err, "failed to update KubeadmConfig %s", klog.KObj(kubeadmConfig))

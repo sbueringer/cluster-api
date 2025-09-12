@@ -329,7 +329,7 @@ func TestCleanupConfigFields(t *testing.T) {
 				},
 			},
 		}
-		cleanupConfigFields(kcpConfig, machineConfig)
+		PrepareKubeadmConfigsForDiff(kcpConfig, machineConfig)
 		g.Expect(kcpConfig.ClusterConfiguration.IsDefined()).To(BeFalse())
 		g.Expect(machineConfig.Spec.ClusterConfiguration.IsDefined()).To(BeFalse())
 	})
@@ -347,7 +347,7 @@ func TestCleanupConfigFields(t *testing.T) {
 				},
 			},
 		}
-		cleanupConfigFields(kcpConfig, machineConfig)
+		PrepareKubeadmConfigsForDiff(kcpConfig, machineConfig)
 		g.Expect(kcpConfig.JoinConfiguration.Discovery).To(BeComparableTo(bootstrapv1.Discovery{}))
 		g.Expect(machineConfig.Spec.JoinConfiguration.Discovery).To(BeComparableTo(bootstrapv1.Discovery{}))
 	})
@@ -365,7 +365,7 @@ func TestCleanupConfigFields(t *testing.T) {
 				},
 			},
 		}
-		cleanupConfigFields(kcpConfig, machineConfig)
+		PrepareKubeadmConfigsForDiff(kcpConfig, machineConfig)
 		g.Expect(kcpConfig.JoinConfiguration).ToNot(BeNil())
 		g.Expect(machineConfig.Spec.JoinConfiguration.ControlPlane).To(BeNil())
 	})
@@ -388,7 +388,7 @@ func TestCleanupConfigFields(t *testing.T) {
 				},
 			},
 		}
-		cleanupConfigFields(kcpConfig, machineConfig)
+		PrepareKubeadmConfigsForDiff(kcpConfig, machineConfig)
 		g.Expect(kcpConfig.JoinConfiguration).ToNot(BeNil())
 		g.Expect(machineConfig.Spec.JoinConfiguration.ControlPlane).ToNot(BeNil())
 	})
@@ -410,7 +410,7 @@ func TestCleanupConfigFields(t *testing.T) {
 				},
 			},
 		}
-		cleanupConfigFields(kcpConfig, machineConfig)
+		PrepareKubeadmConfigsForDiff(kcpConfig, machineConfig)
 		g.Expect(kcpConfig.JoinConfiguration.NodeRegistration.KubeletExtraArgs).To(BeNil())
 		g.Expect(machineConfig.Spec.JoinConfiguration.NodeRegistration.KubeletExtraArgs).To(BeNil())
 	})
@@ -420,7 +420,7 @@ func TestMatchInitOrJoinConfiguration(t *testing.T) {
 	t.Run("returns true if the machine does not have a bootstrap config", func(t *testing.T) {
 		g := NewWithT(t)
 		kcp := &controlplanev1.KubeadmControlPlane{}
-		match, diff, err := matchInitOrJoinConfiguration(nil, kcp)
+		match, diff, err := diffKubeadmConfig(nil, kcp)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(match).To(BeTrue())
 		g.Expect(diff).To(BeEmpty())
@@ -443,7 +443,7 @@ func TestMatchInitOrJoinConfiguration(t *testing.T) {
 				Format: "",
 			},
 		}
-		match, diff, err := matchInitOrJoinConfiguration(machineConfig, kcp)
+		match, diff, err := diffKubeadmConfig(machineConfig, kcp)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(match).To(BeTrue())
 		g.Expect(diff).To(BeEmpty())
@@ -468,7 +468,7 @@ func TestMatchInitOrJoinConfiguration(t *testing.T) {
 				InitConfiguration: bootstrapv1.InitConfiguration{},
 			},
 		}
-		match, diff, err := matchInitOrJoinConfiguration(machineConfig, kcp)
+		match, diff, err := diffKubeadmConfig(machineConfig, kcp)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(match).To(BeTrue())
 		g.Expect(diff).To(BeEmpty())
@@ -501,7 +501,7 @@ func TestMatchInitOrJoinConfiguration(t *testing.T) {
 				},
 			},
 		}
-		match, diff, err := matchInitOrJoinConfiguration(machineConfig, kcp)
+		match, diff, err := diffKubeadmConfig(machineConfig, kcp)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(match).To(BeFalse())
 		g.Expect(diff).To(BeComparableTo(`&v1beta2.KubeadmConfigSpec{
@@ -544,7 +544,7 @@ func TestMatchInitOrJoinConfiguration(t *testing.T) {
 				JoinConfiguration: bootstrapv1.JoinConfiguration{},
 			},
 		}
-		match, diff, err := matchInitOrJoinConfiguration(machineConfig, kcp)
+		match, diff, err := diffKubeadmConfig(machineConfig, kcp)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(match).To(BeTrue())
 		g.Expect(diff).To(BeEmpty())
@@ -577,7 +577,7 @@ func TestMatchInitOrJoinConfiguration(t *testing.T) {
 				},
 			},
 		}
-		match, diff, err := matchInitOrJoinConfiguration(machineConfig, kcp)
+		match, diff, err := diffKubeadmConfig(machineConfig, kcp)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(match).To(BeFalse())
 		g.Expect(diff).To(BeComparableTo(`&v1beta2.KubeadmConfigSpec{
@@ -668,7 +668,7 @@ func TestMatchInitOrJoinConfiguration(t *testing.T) {
 				InitConfiguration: bootstrapv1.InitConfiguration{},
 			},
 		}
-		match, diff, err := matchInitOrJoinConfiguration(machineConfig, kcp)
+		match, diff, err := diffKubeadmConfig(machineConfig, kcp)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(match).To(BeTrue())
 		g.Expect(diff).To(BeEmpty())
@@ -694,7 +694,7 @@ func TestMatchInitOrJoinConfiguration(t *testing.T) {
 				InitConfiguration: bootstrapv1.InitConfiguration{},
 			},
 		}
-		match, diff, err := matchInitOrJoinConfiguration(machineConfig, kcp)
+		match, diff, err := diffKubeadmConfig(machineConfig, kcp)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(match).To(BeFalse())
 		g.Expect(diff).To(BeComparableTo(`&v1beta2.KubeadmConfigSpec{
