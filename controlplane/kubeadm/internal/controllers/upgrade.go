@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
@@ -34,6 +35,7 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
 	ctx context.Context,
 	controlPlane *internal.ControlPlane,
 	machinesRequireUpgrade collections.Machines,
+	machinesUpToDateResults map[string]internal.UpToDateResult,
 ) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -87,17 +89,22 @@ func (r *KubeadmControlPlaneReconciler) upgradeControlPlane(
 	switch controlPlane.KCP.Spec.Rollout.Strategy.Type {
 	case controlplanev1.RollingUpdateStrategyType:
 		// RolloutStrategy is currently defaulted and validated to always be RollingUpdate.
-		return r.rollingUpdate(ctx, controlPlane, machinesRequireUpgrade)
+		return r.rollingUpdate(ctx, controlPlane, machinesRequireUpgrade, machinesUpToDateResults)
 	default:
 		log.Info("RolloutStrategy type is not set to RollingUpdate, unable to determine the strategy for rolling out machines")
 		return ctrl.Result{}, nil
 	}
 }
 
-func (r *KubeadmControlPlaneReconciler) rollingUpdate(ctx context.Context, controlPlane *internal.ControlPlane, machinesNeedingRollout collections.Machines) (ctrl.Result, error) {
+func (r *KubeadmControlPlaneReconciler) rollingUpdate(
+	ctx context.Context,
+	controlPlane *internal.ControlPlane,
+	machinesNeedingRollout collections.Machines,
+	machinesUpToDateResults map[string]internal.UpToDateResult,
+) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	// FIXME(in-place): if in place in progress => return (ensure that while an in-place update is ongoing we wait for it to complete)
+	// FIXME(low-priority): if in place in progress => return (ensure that while an in-place update is ongoing we wait for it to complete) // FIXME(trigger)
 	// Alternative: modify preflightChecks to add controlPlane.HasInPlaceUpdatingMachine
 
 	maxSurge := int32(controlPlane.KCP.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntValue())
@@ -126,10 +133,14 @@ func (r *KubeadmControlPlaneReconciler) rollingUpdate(ctx context.Context, contr
 		if err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "failed to select machine for scale down")
 		}
+		upToDateResult, ok := machinesUpToDateResults[machineToInPlaceUpdateOrScaleDown.Name]
+		if !ok {
+			return ctrl.Result{}, errors.Errorf("failed to get results of upToDate check for Machine %s", machineToInPlaceUpdateOrScaleDown.Name)
+		}
 
-		if currentUpToDateReplicas < desiredReplicas {
-			// If we need more upToDate replicas, try in-place
-			res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown)
+		if upToDateResult.EligibleForInPlaceUpdate && currentUpToDateReplicas < desiredReplicas {
+			// If we need more upToDate replicas, try in-place // FIXME(low-priority) make fallthrough more explicit
+			res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, upToDateResult)
 			if err != nil {
 				// If error => return
 				return ctrl.Result{}, err
@@ -147,7 +158,7 @@ func (r *KubeadmControlPlaneReconciler) rollingUpdate(ctx context.Context, contr
 		// scaleUp ensures that we don't continue scale up while waiting for Machines to have NodeRefs
 		return r.scaleUpControlPlane(ctx, controlPlane)
 	default:
-		log.Info("FIXME: should never happen")
+		log.Info(fmt.Sprintf("Cannot proceed with rollout: unexpected state: current replicas: %d, min replicas: %d, max replicas: %d", currentReplicas, desiredMinReplicas, desiredMaxReplicas))
 		return ctrl.Result{}, nil
 	}
 }

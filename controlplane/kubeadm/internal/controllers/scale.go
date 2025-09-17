@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,20 +40,12 @@ import (
 func (r *KubeadmControlPlaneReconciler) initializeControlPlane(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error) {
 	logger := ctrl.LoggerFrom(ctx)
 
-	bootstrapSpec := controlPlane.InitialControlPlaneConfig()
-
-	parsedVersion, err := semver.ParseTolerant(controlPlane.KCP.Spec.Version)
-	if err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to parse kubernetes version %q", controlPlane.KCP.Spec.Version)
-	}
-	internal.DefaultFeatureGates(bootstrapSpec, parsedVersion)
-
 	fd, err := controlPlane.NextFailureDomainForScaleUp(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	newMachine, err := r.cloneConfigsAndGenerateMachine(ctx, controlPlane.Cluster, controlPlane.KCP, bootstrapSpec, fd)
+	newMachine, err := r.cloneConfigsAndGenerateMachine(ctx, controlPlane.Cluster, controlPlane.KCP, false, fd)
 	if err != nil {
 		logger.Error(err, "Failed to create initial control plane Machine")
 		r.recorder.Eventf(controlPlane.KCP, corev1.EventTypeWarning, "FailedInitialization", "Failed to create initial control plane Machine for cluster %s control plane: %v", klog.KObj(controlPlane.Cluster), err)
@@ -71,27 +62,6 @@ func (r *KubeadmControlPlaneReconciler) initializeControlPlane(ctx context.Conte
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func (r *KubeadmControlPlaneReconciler) tryInPlaceUpdate(ctx context.Context, controlPlane *internal.ControlPlane, machineToInPlaceUpdate *clusterv1.Machine) (res ctrl.Result, err error) {
-	if r.overrideTryInPlaceFunc != nil {
-		return r.overrideTryInPlaceFunc(ctx, controlPlane)
-	}
-	// Run preflight checks to ensure that the control plane is stable before proceeding with in-place update operation.
-	if resultForAllMachines := r.preflightChecks(ctx, controlPlane); !resultForAllMachines.IsZero() {
-		// FIXME(in-place): figure out the details here:
-		// * We also shouldn't block a scale down of unhealthy Machines that would otherwise work
-		if result := r.preflightChecks(ctx, controlPlane, machineToInPlaceUpdate); result.IsZero() {
-			// Fallback to scale down.
-			return ctrl.Result{}, nil
-		}
-
-		return resultForAllMachines, err
-	}
-
-	// CanUpdateMachine ..
-
-	return ctrl.Result{}, nil
-}
-
 func (r *KubeadmControlPlaneReconciler) scaleUpControlPlane(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error) {
 	if r.overrideScaleUpControlPlaneFunc != nil {
 		return r.overrideScaleUpControlPlaneFunc(ctx, controlPlane)
@@ -104,21 +74,12 @@ func (r *KubeadmControlPlaneReconciler) scaleUpControlPlane(ctx context.Context,
 		return result, nil
 	}
 
-	// Create the bootstrap configuration
-	bootstrapSpec := controlPlane.JoinControlPlaneConfig()
-
-	parsedVersion, err := semver.ParseTolerant(controlPlane.KCP.Spec.Version)
-	if err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to parse kubernetes version %q", controlPlane.KCP.Spec.Version)
-	}
-	internal.DefaultFeatureGates(bootstrapSpec, parsedVersion)
-
 	fd, err := controlPlane.NextFailureDomainForScaleUp(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	newMachine, err := r.cloneConfigsAndGenerateMachine(ctx, controlPlane.Cluster, controlPlane.KCP, bootstrapSpec, fd)
+	newMachine, err := r.cloneConfigsAndGenerateMachine(ctx, controlPlane.Cluster, controlPlane.KCP, true, fd)
 	if err != nil {
 		logger.Error(err, "Failed to create additional control plane Machine")
 		r.recorder.Eventf(controlPlane.KCP, corev1.EventTypeWarning, "FailedScaleUp", "Failed to create additional control plane Machine for cluster % control plane: %v", klog.KObj(controlPlane.Cluster), err)
