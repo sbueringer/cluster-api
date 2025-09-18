@@ -282,6 +282,8 @@ func selectMachineForInPlaceUpdateOrScaleDown(ctx context.Context, controlPlane 
 	// Select the subset of machines eligible for scale down.
 	eligibleMachines := controlPlane.Machines
 	switch {
+	case controlPlane.MachineWithInPlaceCandidateAnnotation(outdatedMachines).Len() > 0:
+		eligibleMachines = controlPlane.MachineWithInPlaceCandidateAnnotation(outdatedMachines)
 	case controlPlane.MachineWithDeleteAnnotation(outdatedMachines).Len() > 0:
 		eligibleMachines = controlPlane.MachineWithDeleteAnnotation(outdatedMachines)
 	case controlPlane.MachineWithDeleteAnnotation(eligibleMachines).Len() > 0:

@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -228,10 +229,10 @@ func (r *KubeadmControlPlaneReconciler) cleanupFromGeneration(ctx context.Contex
 	return kerrors.NewAggregate(errs)
 }
 
-// updateExternalObject updates the external object with the labels and annotations from KCP.
-func (r *KubeadmControlPlaneReconciler) updateExternalObject(ctx context.Context, obj client.Object, kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster) error {
+// applyExternalObjectLabelsAnnotations updates the external object with the labels and annotations from KCP.
+func (r *KubeadmControlPlaneReconciler) applyExternalObjectLabelsAnnotations(ctx context.Context, obj client.Object, objGVK schema.GroupVersionKind, kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster) error {
 	updatedObject := &unstructured.Unstructured{}
-	updatedObject.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
+	updatedObject.SetGroupVersionKind(objGVK)
 	updatedObject.SetNamespace(obj.GetNamespace())
 	updatedObject.SetName(obj.GetName())
 	// Set the UID to ensure that Server-Side-Apply only performs an update
@@ -241,10 +242,10 @@ func (r *KubeadmControlPlaneReconciler) updateExternalObject(ctx context.Context
 	// Update labels
 	updatedObject.SetLabels(desiredstate.ControlPlaneMachineLabelsForCluster(kcp, cluster.Name))
 	// Update annotations
-	updatedObject.SetAnnotations(kcp.Spec.MachineTemplate.ObjectMeta.Annotations)
+	updatedObject.SetAnnotations(desiredstate.ControlPlaneMachineAnnotationsForCluster(kcp))
 
 	if err := ssa.Patch(ctx, r.Client, kcpManagerName, updatedObject, ssa.WithCachingProxy{Cache: r.ssaCache, Original: obj}); err != nil {
-		return errors.Wrapf(err, "failed to update %s", obj.GetObjectKind().GroupVersionKind().Kind)
+		return errors.Wrapf(err, "failed to apply labels and annotations of %s", obj.GetObjectKind().GroupVersionKind().Kind)
 	}
 	return nil
 }
@@ -255,8 +256,16 @@ func (r *KubeadmControlPlaneReconciler) createKubeadmConfig(ctx context.Context,
 		return nil, clusterv1.ContractVersionedObjectReference{}, err
 	}
 
-	if err := c.Create(ctx, kubeadmConfig); err != nil {
-		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrap(err, "failed to create KubeadmConfig")
+	// Write KubeadmConfig without labels & annotations.
+	kubeadmConfig.Labels = nil
+	kubeadmConfig.Annotations = nil
+	// FIXME(low-priority): figure out if the cache still works
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, kubeadmConfig, ssa.WithCachingProxy{Cache: r.ssaCache, Original: kubeadmConfig}); err != nil {
+		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create KubeadmConfig")
+	}
+
+	if err := r.applyExternalObjectLabelsAnnotations(ctx, kubeadmConfig, bootstrapv1.GroupVersion.WithKind("KubeadmConfig"), kcp, cluster); err != nil {
+		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create KubeadmConfig")
 	}
 
 	return kubeadmConfig, clusterv1.ContractVersionedObjectReference{
@@ -272,8 +281,20 @@ func (r *KubeadmControlPlaneReconciler) createInfraMachine(ctx context.Context, 
 		return nil, clusterv1.ContractVersionedObjectReference{}, err
 	}
 
-	if err := c.Create(ctx, infraMachine); err != nil {
-		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrap(err, "failed to create InfraMachine")
+	// Write InfraMachine without the labels & annotations that are written continuously by applyExternalObjectLabelsAnnotations.
+	// TODO: Find a better way to remove labels & annotations that are written continuously by applyExternalObjectLabelsAnnotations so we don't miss anything.
+	infraMachine.SetLabels(nil)
+	infraMachine.SetAnnotations(map[string]string{
+		clusterv1.TemplateClonedFromNameAnnotation:      infraMachine.GetAnnotations()[clusterv1.TemplateClonedFromNameAnnotation],
+		clusterv1.TemplateClonedFromGroupKindAnnotation: infraMachine.GetAnnotations()[clusterv1.TemplateClonedFromGroupKindAnnotation],
+	})
+	// FIXME(low-priority): figure out if the cache still works
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, infraMachine, ssa.WithCachingProxy{Cache: r.ssaCache, Original: infraMachine}); err != nil {
+		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create %s", infraMachine.GetKind())
+	}
+
+	if err := r.applyExternalObjectLabelsAnnotations(ctx, infraMachine, infraMachine.GroupVersionKind(), kcp, cluster); err != nil {
+		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create %s", infraMachine.GetKind())
 	}
 
 	return infraMachine, clusterv1.ContractVersionedObjectReference{
@@ -296,12 +317,12 @@ func (r *KubeadmControlPlaneReconciler) createMachine(ctx context.Context, kcp *
 func (r *KubeadmControlPlaneReconciler) updateMachine(ctx context.Context, machine *clusterv1.Machine, kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster) (*clusterv1.Machine, error) {
 	updatedMachine, err := desiredstate.ComputeDesiredMachine(kcp, cluster, machine.Spec.FailureDomain, machine)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to update Machine: failed to compute desired Machine")
+		return nil, errors.Wrap(err, "failed to apply Machine: failed to compute desired Machine")
 	}
 
 	err = ssa.Patch(ctx, r.Client, kcpManagerName, updatedMachine, ssa.WithCachingProxy{Cache: r.ssaCache, Original: machine})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to update Machine")
+		return nil, errors.Wrap(err, "failed to apply Machine")
 	}
 	return updatedMachine, nil
 }

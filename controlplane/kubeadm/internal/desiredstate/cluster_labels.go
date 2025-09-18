@@ -39,3 +39,16 @@ func ControlPlaneMachineLabelsForCluster(kcp *controlplanev1.KubeadmControlPlane
 	labels[clusterv1.MachineControlPlaneNameLabel] = format.MustFormatValue(kcp.Name)
 	return labels
 }
+
+// ControlPlaneMachineAnnotationsForCluster returns a set of annotations to add to a control plane machine for this specific cluster.
+func ControlPlaneMachineAnnotationsForCluster(kcp *controlplanev1.KubeadmControlPlane) map[string]string {
+	annotations := map[string]string{}
+
+	// Add the annotations from the MachineTemplate.
+	// Note: we intentionally don't use the map directly to ensure we don't modify the map in KCP.
+	for k, v := range kcp.Spec.MachineTemplate.ObjectMeta.Annotations {
+		annotations[k] = v
+	}
+
+	return annotations
+}

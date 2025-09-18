@@ -42,6 +42,14 @@ func UpToDate(ctx context.Context, c client.Client, cluster *clusterv1.Cluster, 
 		EligibleForInPlaceUpdate: true,
 	}
 
+	if _, ok := machine.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok {
+		// Note: At this point it's not always possible anymore to calculate a correct diff as
+		// the Machine / InfraMachine / KubeadmConfig objects might have already been updated.
+		res.LogMessages = append(res.LogMessages, "in-place update in progress")
+		res.ConditionMessages = append(res.ConditionMessages, "In-place update in progress")
+		return false, res, nil
+	}
+
 	// Machines whose certificates are about to expire.
 	if collections.ShouldRolloutBefore(reconciliationTime, kcp.Spec.Rollout.Before)(machine) {
 		res.LogMessages = append(res.LogMessages, "certificates will expire soon, rolloutBefore expired")

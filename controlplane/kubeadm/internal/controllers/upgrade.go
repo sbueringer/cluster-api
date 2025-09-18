@@ -106,6 +106,9 @@ func (r *KubeadmControlPlaneReconciler) rollingUpdate(
 
 	// FIXME(low-priority): if in place in progress => return (ensure that while an in-place update is ongoing we wait for it to complete) // FIXME(trigger)
 	// Alternative: modify preflightChecks to add controlPlane.HasInPlaceUpdatingMachine
+	if controlPlane.MachineWithPendingUpdateMachineHook(machinesNeedingRollout).Len() > 0 {
+		return ctrl.Result{}, nil // TODO: check if that's enough to get a reconcile once the Machine makes progress
+	}
 
 	maxSurge := int32(controlPlane.KCP.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntValue())
 	var maxUnavailable int32 // maxUnavailable is a bit too confusing here as KCP doesn't have the same concept here as MD

@@ -51,7 +51,6 @@ var (
 	ControlPlaneKubeletLocalMode = "ControlPlaneKubeletLocalMode"
 )
 
-
 // mandatoryMachineReadinessGates are readinessGates KCP enforces to be set on machine it owns.
 var mandatoryMachineReadinessGates = []clusterv1.MachineReadinessGate{
 	{ConditionType: controlplanev1.KubeadmControlPlaneMachineAPIServerPodHealthyCondition},
@@ -120,6 +119,10 @@ func ComputeDesiredMachine(kcp *controlplanev1.KubeadmControlPlane, cluster *clu
 		if remediationData, ok := existingMachine.Annotations[controlplanev1.RemediationForAnnotation]; ok {
 			annotations[controlplanev1.RemediationForAnnotation] = remediationData
 		}
+		// If the machine already has the MachineInPlaceUpdateInProgressAnnotation then preserve it.
+		if _, ok := existingMachine.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok {
+			annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation] = ""
+		}
 	}
 	// Setting pre-terminate hook so we can later remove the etcd member right before Machine termination
 	// (i.e. before InfraMachine deletion).
@@ -139,8 +142,6 @@ func ComputeDesiredMachine(kcp *controlplanev1.KubeadmControlPlane, cluster *clu
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(kcp, controlplanev1.GroupVersion.WithKind("KubeadmControlPlane")),
 			},
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
 		},
 		Spec: clusterv1.MachineSpec{
 			ClusterName:   cluster.Name,
@@ -157,11 +158,7 @@ func ComputeDesiredMachine(kcp *controlplanev1.KubeadmControlPlane, cluster *clu
 	desiredMachine.Labels = ControlPlaneMachineLabelsForCluster(kcp, cluster.Name)
 
 	// Set annotations
-	// Add the annotations from the MachineTemplate.
-	// Note: we intentionally don't use the map directly to ensure we don't modify the map in KCP.
-	for k, v := range kcp.Spec.MachineTemplate.ObjectMeta.Annotations {
-		desiredMachine.Annotations[k] = v
-	}
+	desiredMachine.Annotations = ControlPlaneMachineAnnotationsForCluster(kcp)
 	for k, v := range annotations {
 		desiredMachine.Annotations[k] = v
 	}
@@ -226,7 +223,7 @@ func ComputeKubeadmConfig(kcp *controlplanev1.KubeadmControlPlane, cluster *clus
 			Name:            name,
 			Namespace:       kcp.Namespace,
 			Labels:          ControlPlaneMachineLabelsForCluster(kcp, cluster.Name),
-			Annotations:     kcp.Spec.MachineTemplate.ObjectMeta.Annotations,
+			Annotations:     ControlPlaneMachineAnnotationsForCluster(kcp),
 			OwnerReferences: []metav1.OwnerReference{owner},
 		},
 		Spec: *spec,
@@ -285,7 +282,7 @@ func ComputeInfraMachine(ctx context.Context, c client.Client, kcp *controlplane
 		ClusterName: cluster.Name,
 		OwnerRef:    infraCloneOwner,
 		Labels:      ControlPlaneMachineLabelsForCluster(kcp, cluster.Name),
-		Annotations: kcp.Spec.MachineTemplate.ObjectMeta.Annotations,
+		Annotations: ControlPlaneMachineAnnotationsForCluster(kcp),
 	}
 	infraMachine, err := external.GenerateTemplate(generateTemplateInput)
 	if err != nil {
