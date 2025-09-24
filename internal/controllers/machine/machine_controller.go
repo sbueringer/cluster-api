@@ -52,6 +52,7 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/clustercache"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	"sigs.k8s.io/cluster-api/controllers/noderefutil"
+	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/contract"
 	"sigs.k8s.io/cluster-api/internal/controllers/machine/drain"
@@ -93,9 +94,10 @@ var (
 
 // Reconciler reconciles a Machine object.
 type Reconciler struct {
-	Client       client.Client
-	APIReader    client.Reader
-	ClusterCache clustercache.ClusterCache
+	Client        client.Client
+	APIReader     client.Reader
+	RuntimeClient runtimeclient.Client
+	ClusterCache  clustercache.ClusterCache
 
 	// WatchFilterValue is the label value used to filter events prior to reconciliation.
 	WatchFilterValue string
@@ -128,6 +130,9 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		// connection. There might be some additional delays in health checking under high load. So we use 2m as a minimum
 		// to have some buffer.
 		return errors.New("Client, APIReader and ClusterCache must not be nil and RemoteConditionsGracePeriod must not be < 2m")
+	}
+	if feature.Gates.Enabled(feature.InPlaceUpdates) && r.RuntimeClient == nil {
+		return errors.New("RuntimeClient must not be nil")
 	}
 
 	r.predicateLog = ptr.To(ctrl.LoggerFrom(ctx).WithValues("controller", "machine"))
@@ -267,6 +272,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 		r.reconcileMachineOwnerAndLabels,
 		r.reconcileBootstrap,
 		r.reconcileInfrastructure,
+		r.reconcileInPlaceUpdate,
 		r.reconcileNode,
 		r.reconcileCertificateExpiry,
 	}

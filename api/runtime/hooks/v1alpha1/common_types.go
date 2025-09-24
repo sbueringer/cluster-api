@@ -147,8 +147,8 @@ const (
 	JSONMergePatchType PatchType = "JSONMergePatch"
 )
 
-// PatchItem represents a single patch to be applied to an object.
-type PatchItem struct {
+// Patch represents a single patch to be applied to an object.
+type Patch struct {
 	// patchType defines the type of the patch.
 	// One of: "JSONPatch" or "JSONMergePatch".
 	// +required

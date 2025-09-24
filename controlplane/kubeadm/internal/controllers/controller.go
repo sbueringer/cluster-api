@@ -46,6 +46,7 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/clustercache"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
+	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
@@ -79,6 +80,7 @@ const (
 type KubeadmControlPlaneReconciler struct {
 	Client              client.Client
 	SecretCachingClient client.Client
+	RuntimeClient       runtimeclient.Client
 	controller          controller.Controller
 	recorder            record.EventRecorder
 	ClusterCache        clustercache.ClusterCache
@@ -113,6 +115,9 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(ctx context.Context, mg
 		return errors.New("Client, SecretCachingClient and ClusterCache must not be nil and " +
 			"EtcdDialTimeout and EtcdCallTimeout must not be 0 and " +
 			"RemoteConditionsGracePeriod must not be < 2m")
+	}
+	if feature.Gates.Enabled(feature.InPlaceUpdates) && r.RuntimeClient == nil {
+		return errors.New("RuntimeClient must not be nil")
 	}
 
 	predicateLog := ctrl.LoggerFrom(ctx).WithValues("controller", "kubeadmcontrolplane")

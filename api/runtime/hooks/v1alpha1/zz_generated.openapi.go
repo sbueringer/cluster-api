@@ -71,7 +71,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.MachineDeploymentBuiltins":                            schema_api_runtime_hooks_v1alpha1_MachineDeploymentBuiltins(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.MachineInfrastructureRefBuiltins":                     schema_api_runtime_hooks_v1alpha1_MachineInfrastructureRefBuiltins(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.MachinePoolBuiltins":                                  schema_api_runtime_hooks_v1alpha1_MachinePoolBuiltins(ref),
-		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem":                                            schema_api_runtime_hooks_v1alpha1_PatchItem(ref),
+		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch":                                            schema_api_runtime_hooks_v1alpha1_PatchItem(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineObjects":                                 schema_api_runtime_hooks_v1alpha1_UpdateMachineObjects(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineRequest":                                 schema_api_runtime_hooks_v1alpha1_UpdateMachineRequest(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineResponse":                                schema_api_runtime_hooks_v1alpha1_UpdateMachineResponse(ref),
@@ -873,7 +873,7 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineResponse(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem"),
+										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 									},
 								},
 							},
@@ -887,7 +887,7 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineResponse(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem"),
+										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 									},
 								},
 							},
@@ -901,7 +901,7 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineResponse(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem"),
+										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 									},
 								},
 							},
@@ -912,7 +912,7 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineResponse(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem"},
+			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"},
 	}
 }
 
@@ -1021,7 +1021,7 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetResponse(ref common.Re
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem"),
+										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 									},
 								},
 							},
@@ -1035,7 +1035,7 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetResponse(ref common.Re
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem"),
+										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 									},
 								},
 							},
@@ -1049,7 +1049,7 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetResponse(ref common.Re
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem"),
+										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 									},
 								},
 							},
@@ -1060,7 +1060,7 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetResponse(ref common.Re
 			},
 		},
 		Dependencies: []string{
-			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.PatchItem"},
+			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"},
 	}
 }
 
@@ -2180,7 +2180,7 @@ func schema_api_runtime_hooks_v1alpha1_PatchItem(ref common.ReferenceCallback) c
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PatchItem represents a single patch to be applied to an object.",
+				Description: "Patch represents a single patch to be applied to an object.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"patchType": {

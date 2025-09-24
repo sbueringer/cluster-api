@@ -17,16 +17,26 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"runtime/debug"
+	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	runtimehooksv1 "sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal/desiredstate"
+	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/hooks"
 	"sigs.k8s.io/cluster-api/internal/util/compare"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
@@ -36,6 +46,9 @@ func (r *KubeadmControlPlaneReconciler) tryInPlaceUpdate(ctx context.Context, co
 	if r.overrideTryInPlaceFunc != nil {
 		return r.overrideTryInPlaceFunc(ctx, controlPlane)
 	}
+
+	log := ctrl.LoggerFrom(ctx)
+
 	// Run preflight checks to ensure that the control plane is stable before proceeding with in-place update operation.
 	if resultForAllMachines := r.preflightChecks(ctx, controlPlane); !resultForAllMachines.IsZero() {
 		// FIXME(low-priority): figure out the details here:
@@ -51,7 +64,17 @@ func (r *KubeadmControlPlaneReconciler) tryInPlaceUpdate(ctx context.Context, co
 	// Compute current & desired including in-place updatable changes
 	// All in-place updatable changes have been already applied in syncMachines.
 
-	// FIXME: check if feature flag is enabled & check if there are CanUpdateMachine hooks registered that match the namespace of KCP
+	if !feature.Gates.Enabled(feature.InPlaceUpdates) {
+		return ctrl.Result{}, nil
+	}
+
+	extensions, err := r.RuntimeClient.GetAllExtensions(ctx, runtimehooksv1.CanUpdateMachine, machineToInPlaceUpdate)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if len(extensions) == 0 {
+		return ctrl.Result{}, nil
+	}
 
 	// Machine might have been changed during the reconcile, so we take the latest version of the Machine here
 	// FIXME(low-priority): double check this is actually the latest version
@@ -107,6 +130,77 @@ func (r *KubeadmControlPlaneReconciler) tryInPlaceUpdate(ctx context.Context, co
 			"infraMachineDiff", diff(machinesNeedingRolloutResult.CurrentInfraMachine.Object["spec"], machinesNeedingRolloutResult.DesiredInfraMachine.Object["spec"]),
 		)
 
+		req := &runtimehooksv1.CanUpdateMachineRequest{
+			Current:       runtimehooksv1.UpdateMachineObjects{
+				Machine:               *currentMachine,
+				BootstrapConfig:       &runtime.RawExtension{Object: currentKubeadmConfigForDiff},
+				InfrastructureMachine: runtime.RawExtension{Object: machinesNeedingRolloutResult.CurrentInfraMachine},
+			},
+			Desired:       runtimehooksv1.UpdateMachineObjects{
+				Machine: *desiredMachine,
+				BootstrapConfig:       &runtime.RawExtension{Object: desiredKubeadmConfigForDiff},
+				InfrastructureMachine: runtime.RawExtension{Object: machinesNeedingRolloutResult.DesiredInfraMachine},
+			},
+		}
+		resp := &runtimehooksv1.CanUpdateMachineResponse{}
+		// TODO: Has to be called in a loop etc
+		// TODO: should the RX call use caching? Probably not, we're not calling it that often
+		if err := r.RuntimeClient.CallExtension(ctx, runtimehooksv1.CanUpdateMachine, machineToInPlaceUpdate, extensions[0], req, resp); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "failed to call CanUpdateMachine")
+		}
+
+		patchedMachine, err := applyPatchToObject(ctx, currentMachine, resp.MachinePatch)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		desiredMachineMarshalled, err := json.Marshal(desiredMachine)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		patchedKubeadmConfig, err := applyPatchToObject(ctx, currentKubeadmConfigForDiff, resp.MachinePatch) // run kubeadmconfig again through PrepareKubeadmConfigsForDiff before diff?
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		desiredKubeadmConfigMarshalled, err := json.Marshal(desiredKubeadmConfigForDiff)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		patchedInfraMachine, err := applyPatchToObject(ctx, machinesNeedingRolloutResult.CurrentInfraMachine, resp.MachinePatch) // run kubeadmconfig again through PrepareKubeadmConfigsForDiff before diff?
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		desiredInfraMachineMarshalled, err := json.Marshal(machinesNeedingRolloutResult.DesiredInfraMachine)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		var reasons []string
+		match, _, err := compare.Diff(patchedMachine, desiredMachineMarshalled)
+		if err != nil {
+			return ctrl.Result{}, errors.Wrapf(err, "failed to match Machine")
+		}
+		if !match {
+			reasons = append(reasons, "Machine cannot be updated in-place")
+		}
+		match, _, err = compare.Diff(patchedKubeadmConfig, desiredKubeadmConfigMarshalled)
+		if err != nil {
+			return ctrl.Result{}, errors.Wrapf(err, "failed to match KubeadmConfig")
+		}
+		if !match {
+			reasons = append(reasons, "KubeadmConfig cannot be updated in-place")
+		}
+		match, _, err = compare.Diff(patchedInfraMachine, desiredInfraMachineMarshalled)
+		if err != nil {
+			return ctrl.Result{}, errors.Wrapf(err, "failed to match InfraMachine")
+		}
+		if !match {
+			reasons = append(reasons, "InfraMachine cannot be updated in-place")
+		}
+
+		if len(reasons) > 0 {
+			log.Info(fmt.Sprintf("Machine cannot be updated in-place, reasons: %s", strings.Join(reasons, ","), "Machine", klog.KObj(currentMachine)))
+			return ctrl.Result{}, nil
+		}
+
 		// TODO: diff logic, compare: spec: yes, status: no, metadata? (probably no: labels & annotations are the same anyway)
 
 		// Update Machine
@@ -157,6 +251,60 @@ func (r *KubeadmControlPlaneReconciler) tryInPlaceUpdate(ctx context.Context, co
 	}
 
 	return ctrl.Result{Requeue: true}, nil
+}
+
+func applyPatchToObject(ctx context.Context, obj client.Object, patch runtimehooksv1.Patch) (object []byte, reterr error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Info(fmt.Sprintf("Observed a panic when applying patch: %v\n%s", r, string(debug.Stack())))
+			reterr = kerrors.NewAggregate([]error{reterr, fmt.Errorf("observed a panic when applying patch: %v", r)})
+		}
+	}()
+
+	patchedObject, err := json.Marshal(obj)
+	if reterr != nil {
+		return object, err
+	}
+
+	switch patch.PatchType {
+	case runtimehooksv1.JSONPatchType:
+		log.V(5).Info("Accumulating JSON patch", "patch", string(patch.Patch))
+		jsonPatch, err := jsonpatch.DecodePatch(patch.Patch)
+		if err != nil {
+			return object, errors.Wrap(err, "failed to apply patch: error decoding json patch (RFC6902)")
+		}
+
+		if len(jsonPatch) == 0 {
+			// Return if there are no patches, nothing to do.
+			// If the requestItem.Object does not have a spec and we don't have a patch that adds one,
+			// patchTemplateSpec below would fail, so let's return early.
+			return object, nil
+		}
+
+		patchedObject, err = jsonPatch.Apply(patchedObject)
+		if err != nil {
+			return object, errors.Wrap(err, "failed to apply patch: error applying json patch (RFC6902)")
+		}
+	case runtimehooksv1.JSONMergePatchType:
+		if len(patch.Patch) == 0 || bytes.Equal(patch.Patch, []byte("{}")) {
+			// Return if there are no patches, nothing to do.
+			// If the requestItem.Object does not have a spec and we don't have a patch that adds one,
+			// patchTemplateSpec below would fail, so let's return early.
+			return object, nil
+		}
+
+		log.V(5).Info("Accumulating JSON merge patch", "patch", string(patch.Patch))
+		patchedObject, err = jsonpatch.MergePatch(patchedObject, patch.Patch)
+		if err != nil {
+			return object, errors.Wrap(err, "failed to apply patch: error applying json merge patch (RFC7386)")
+		}
+	}
+
+	// FIXME: should we ensure that we only patch spec?? (probably)
+
+	return patchedObject, nil
 }
 
 func diff(current, desired any) string {

@@ -206,10 +206,6 @@ type BeforeClusterDeleteResponse struct {
 // and before the cluster and its underlying objects are deleted.
 func BeforeClusterDelete(*BeforeClusterDeleteRequest, *BeforeClusterDeleteResponse) {}
 
-// UpdateMachine
-// FIXME: tmp: will be rebased away later
-func UpdateMachine(*BeforeClusterCreateRequest, *BeforeClusterCreateResponse) {}
-
 func init() {
 	catalogBuilder.RegisterHook(BeforeClusterCreate, &runtimecatalog.HookMeta{
 		Tags:    []string{"Lifecycle Hooks"},
