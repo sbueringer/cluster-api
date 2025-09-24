@@ -104,12 +104,6 @@ func (r *KubeadmControlPlaneReconciler) rollingUpdate(
 ) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	// FIXME(low-priority): if in place in progress => return (ensure that while an in-place update is ongoing we wait for it to complete) // FIXME(trigger)
-	// Alternative: modify preflightChecks to add controlPlane.HasInPlaceUpdatingMachine
-	if controlPlane.MachineWithPendingUpdateMachineHook(machinesNeedingRollout).Len() > 0 {
-		return ctrl.Result{}, nil
-	}
-
 	maxSurge := int32(controlPlane.KCP.Spec.Rollout.Strategy.RollingUpdate.MaxSurge.IntValue())
 	var maxUnavailable int32 // maxUnavailable is a bit too confusing here as KCP doesn't have the same concept here as MD
 	switch {
@@ -142,19 +136,19 @@ func (r *KubeadmControlPlaneReconciler) rollingUpdate(
 		}
 
 		if machinesNeedingRolloutResult.EligibleForInPlaceUpdate && currentUpToDateReplicas < desiredReplicas {
-			// If we need more upToDate replicas, try in-place // FIXME(low-priority) make fallthrough more explicit
-			res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, machinesNeedingRolloutResult)
+			// If we need more upToDate replicas, try in-place
+			fallbackToScaleDown, res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, machinesNeedingRolloutResult)
 			if err != nil {
-				// If error => return
 				return ctrl.Result{}, err
 			}
 			if !res.IsZero() {
-				// If preflightChecks error or in-place update triggered / in-progress
 				return res, nil
 			}
-			// Otherwise => scaleDown
-			// * preflightChecks error only on machineToInPlaceUpdateOrScaleDown
-			// * CanUpdateMachine == false
+			if fallbackToScaleDown {
+				return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown)
+			}
+			// In-place update triggered
+			return ctrl.Result{Requeue: true}, nil
 		}
 		return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown)
 	case currentReplicas < desiredMaxReplicas:

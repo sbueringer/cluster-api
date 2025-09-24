@@ -259,8 +259,7 @@ func (r *KubeadmControlPlaneReconciler) createKubeadmConfig(ctx context.Context,
 	// Write KubeadmConfig without labels & annotations.
 	kubeadmConfig.Labels = nil
 	kubeadmConfig.Annotations = nil
-	// FIXME(low-priority): figure out if the cache still works
-	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, kubeadmConfig, ssa.WithCachingProxy{Cache: r.ssaCache, Original: kubeadmConfig}); err != nil {
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, kubeadmConfig); err != nil {
 		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create KubeadmConfig")
 	}
 
@@ -288,8 +287,7 @@ func (r *KubeadmControlPlaneReconciler) createInfraMachine(ctx context.Context, 
 		clusterv1.TemplateClonedFromNameAnnotation:      infraMachine.GetAnnotations()[clusterv1.TemplateClonedFromNameAnnotation],
 		clusterv1.TemplateClonedFromGroupKindAnnotation: infraMachine.GetAnnotations()[clusterv1.TemplateClonedFromGroupKindAnnotation],
 	})
-	// FIXME(low-priority): figure out if the cache still works
-	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, infraMachine, ssa.WithCachingProxy{Cache: r.ssaCache, Original: infraMachine}); err != nil {
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, infraMachine); err != nil {
 		return nil, clusterv1.ContractVersionedObjectReference{}, errors.Wrapf(err, "failed to create %s", infraMachine.GetKind())
 	}
 

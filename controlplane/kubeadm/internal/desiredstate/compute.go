@@ -119,10 +119,6 @@ func ComputeDesiredMachine(kcp *controlplanev1.KubeadmControlPlane, cluster *clu
 		if remediationData, ok := existingMachine.Annotations[controlplanev1.RemediationForAnnotation]; ok {
 			annotations[controlplanev1.RemediationForAnnotation] = remediationData
 		}
-		// If the machine already has the MachineInPlaceUpdateInProgressAnnotation then preserve it.
-		if _, ok := existingMachine.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok {
-			annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation] = ""
-		}
 	}
 	// Setting pre-terminate hook so we can later remove the etcd member right before Machine termination
 	// (i.e. before InfraMachine deletion).

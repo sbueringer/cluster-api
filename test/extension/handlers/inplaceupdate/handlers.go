@@ -25,11 +25,14 @@ package inplaceupdate
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"gomodules.xyz/jsonpatch/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -42,6 +45,7 @@ import (
 type ExtensionHandlers struct {
 	decoder runtime.Decoder
 	client  client.Client
+	state   sync.Map
 }
 
 func NewExtensionHandlers(client client.Client) *ExtensionHandlers {
@@ -60,7 +64,7 @@ func NewExtensionHandlers(client client.Client) *ExtensionHandlers {
 
 func (h *ExtensionHandlers) DoCanUpdateMachine(ctx context.Context, req *runtimehooksv1.CanUpdateMachineRequest, resp *runtimehooksv1.CanUpdateMachineResponse) {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("CanUpdateMachine is called")
+	log.Info("CanUpdateMachine is called", "Machine", klog.KObj(&req.Desired.Machine))
 
 	// Create copies of current.
 	modifiedCurrentMachine := req.Current.Machine.DeepCopy()
@@ -91,7 +95,7 @@ func (h *ExtensionHandlers) DoCanUpdateMachine(ctx context.Context, req *runtime
 
 	// Declare changes that this Runtime Extension can update in-place.
 
-	// Machine
+	// Machine // FIXME: Maybe implement something for Machine. I think only options are failureDomain & version
 
 	// BootstrapConfig
 	switch current := modifiedCurrentBootstrapConfig.(type) {
@@ -135,7 +139,7 @@ func (h *ExtensionHandlers) DoCanUpdateMachine(ctx context.Context, req *runtime
 		resp.Message = err.Error()
 		return
 	}
-	infraMachinePatch, err := createJSONPatch(req.Current.BootstrapConfig.Raw, modifiedCurrentInfraMachine)
+	infraMachinePatch, err := createJSONPatch(req.Current.InfrastructureMachine.Raw, modifiedCurrentInfraMachine)
 	if err != nil {
 		resp.Status = runtimehooksv1.ResponseStatusFailure
 		resp.Message = err.Error()
@@ -150,26 +154,43 @@ func (h *ExtensionHandlers) DoCanUpdateMachine(ctx context.Context, req *runtime
 		PatchType: runtimehooksv1.JSONPatchType,
 		Patch:     bootstrapConfigPatch,
 	}
-	resp.BootstrapConfigPatch = runtimehooksv1.Patch{
+	resp.InfrastructureMachinePatch = runtimehooksv1.Patch{
 		PatchType: runtimehooksv1.JSONPatchType,
 		Patch:     infraMachinePatch,
 	}
 	resp.Status = runtimehooksv1.ResponseStatusSuccess
 }
 
-func (h *ExtensionHandlers) DoCanUpdateMachineSet(ctx context.Context, _ *runtimehooksv1.CanUpdateMachineSetRequest, resp *runtimehooksv1.CanUpdateMachineSetResponse) {
+func (h *ExtensionHandlers) DoCanUpdateMachineSet(_ context.Context, _ *runtimehooksv1.CanUpdateMachineSetRequest, resp *runtimehooksv1.CanUpdateMachineSetResponse) {
 	resp.Status = runtimehooksv1.ResponseStatusSuccess
 }
 
-func (h *ExtensionHandlers) DoUpdateMachine(ctx context.Context, _ *runtimehooksv1.UpdateMachineRequest, resp *runtimehooksv1.UpdateMachineResponse) {
+func (h *ExtensionHandlers) DoUpdateMachine(ctx context.Context, req *runtimehooksv1.UpdateMachineRequest, resp *runtimehooksv1.UpdateMachineResponse) {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("UpdateMachine is called")
+	log.Info("UpdateMachine is called", "Machine", klog.KObj(&req.Desired.Machine))
+	defer func() {
+		log.Info("UpdateMachine response", "Machine", klog.KObj(&req.Desired.Machine), "status", resp.Status, "message", resp.Message, "retryAfterSeconds", resp.RetryAfterSeconds)
+	}()
+
+	key := klog.KObj(&req.Desired.Machine).String()
+
+	if firstTimeCalled, ok := h.state.Load(key); ok {
+		if time.Since(firstTimeCalled.(time.Time)) > 20*time.Second {
+			h.state.Delete(key)
+			resp.Status = runtimehooksv1.ResponseStatusSuccess
+			resp.Message = "In-place update is done"
+			resp.RetryAfterSeconds = 0
+			return
+		}
+	} else {
+		h.state.Store(key, time.Now())
+	}
 
 	resp.Status = runtimehooksv1.ResponseStatusSuccess
-	resp.Message = "In-place update is done"
-	resp.RetryAfterSeconds = 0
+	resp.Message = "In-place update still in progress"
+	resp.RetryAfterSeconds = 5
+	return
 }
-
 
 // createJSONPatch creates a RFC 6902 JSON patch from the original and the modified object.
 func createJSONPatch(marshalledOriginal []byte, modified runtime.Object) ([]byte, error) {

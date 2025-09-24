@@ -40,6 +40,7 @@ type NotUpToDateResult struct {
 	LogMessages              []string
 	ConditionMessages        []string
 	EligibleForInPlaceUpdate bool
+	DesiredMachine           *clusterv1.Machine
 	CurrentInfraMachine      *unstructured.Unstructured
 	DesiredInfraMachine      *unstructured.Unstructured
 	CurrentKubeadmConfig     *bootstrapv1.KubeadmConfig
@@ -78,22 +79,11 @@ func UpToDate(ctx context.Context, c client.Client, cluster *clusterv1.Cluster, 
 		res.ConditionMessages = append(res.ConditionMessages, specConditionMessages...)
 	}
 
-	if _, ok := machine.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok {
-		// Note: Overwriting LogMessages and ConditionMessages because once an in-place update is in progress
-		// it's not possible anymore to calculate a correct diff as the Machine / InfraMachine / KubeadmConfig
-		// objects have already been updated.
-		// We still have to execute the code above to collect current & desired objects.
-		res.LogMessages = []string{"in-place update in progress"}
-		res.ConditionMessages = []string{"In-place update in progress"}
-		// If an in-place update is already in progress we are going to complete it.
-		res.EligibleForInPlaceUpdate = true
-	}
-
 	if len(res.LogMessages) > 0 || len(res.ConditionMessages) > 0 {
 		return false, res, nil
 	}
 
-	return true, nil, nil
+	return true, res, nil
 }
 
 // matchesMachineSpec checks if a Machine matches any of a set of KubeadmConfigs and a set of infra machine configs.
@@ -114,6 +104,14 @@ func matchesMachineSpec(ctx context.Context, c client.Client, infraMachines map[
 		// Note: the code computing the message for KCP's RolloutOut condition is making assumptions on the format/content of this message.
 		conditionMessages = append(conditionMessages, fmt.Sprintf("Version %s, %s required", machineVersion, kcp.Spec.Version))
 	}
+	desiredMachine, err := desiredstate.ComputeDesiredMachine(kcp, cluster, machine.Spec.FailureDomain, machine)
+	if err != nil {
+		return false, nil, nil, err
+	}
+	// spec.version is the only change that we are not rolling out in-place
+	desiredMachine.Spec.Version = kcp.Spec.Version
+	// Note: Not setting CurrentMachine here as current Machine can change later, e.g. through syncMachines.
+	res.DesiredMachine = desiredMachine
 
 	reason, currentKubeadmConfig, desiredKubeadmConfig, matches, err := matchesKubeadmConfig(kubeadmConfigs, kcp, cluster, machine)
 	if err != nil {
@@ -166,13 +164,14 @@ func matchesInfraMachine(ctx context.Context, c client.Client, infraMachines map
 		return "", nil, nil, true, nil
 	}
 
+	desiredInfraMachine, err := desiredstate.ComputeInfraMachine(ctx, c, kcp, cluster, machine.Name)
+	if err != nil {
+		return "", nil, nil, false, err
+	}
+
 	// Check if the machine's infrastructure reference has been created from the current KCP infrastructure template.
 	if clonedFromName != kcp.Spec.MachineTemplate.Spec.InfrastructureRef.Name ||
 		clonedFromGroupKind != kcp.Spec.MachineTemplate.Spec.InfrastructureRef.GroupKind().String() {
-		desiredInfraMachine, err := desiredstate.ComputeInfraMachine(ctx, c, kcp, cluster, machine.Name)
-		if err != nil {
-			return "", nil, nil, false, err
-		}
 
 		reason := fmt.Sprintf("Infrastructure template on KCP rotated from %s %s to %s %s",
 			clonedFromGroupKind, clonedFromName,
@@ -182,7 +181,7 @@ func matchesInfraMachine(ctx context.Context, c client.Client, infraMachines map
 
 	// Note: We assume desiredInfraMachine == currentInfraMachine if the infrastructureRef didn't change
 	// (even if that's not necessarily true)
-	return "", currentInfraMachine, currentInfraMachine, true, nil
+	return "", currentInfraMachine, desiredInfraMachine, true, nil
 }
 
 // matchesKubeadmConfig checks if machine's KubeadmConfigSpec is equivalent with KCP's KubeadmConfigSpec.
@@ -273,6 +272,7 @@ func PrepareKubeadmConfigsForDiff(desiredKubeadmConfig, currentKubeadmConfig *bo
 	// Cleanup JoinConfiguration.Discovery from desiredKubeadmConfig and currentKubeadmConfig, because those info are relevant only for
 	// the join process and not for comparing the configuration of the machine.
 	// Note: Changes to Discovery will apply for the next join, but they will not lead to a rollout.
+	// Note: We should also not send Discovery.BootstrapToken.Token to a RuntimeExtension for security reasons.
 	desiredKubeadmConfig.Spec.JoinConfiguration.Discovery = bootstrapv1.Discovery{}
 	currentKubeadmConfig.Spec.JoinConfiguration.Discovery = bootstrapv1.Discovery{}
 

@@ -30,11 +30,13 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	runtimehooksv1 "sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1"
+	runtimev1 "sigs.k8s.io/cluster-api/api/runtime/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 	"sigs.k8s.io/cluster-api/feature"
@@ -487,29 +489,62 @@ func (r *Reconciler) reconcileInPlaceUpdate(ctx context.Context, s *scope) (ctrl
 		return ctrl.Result{}, nil
 	}
 
+	if _, ok := s.infraMachine.GetAnnotations()[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; !ok {
+		log.V(5).Info("InfraMachine not marked for in-place update yet, skipping UpdateMachine hooks")
+		return ctrl.Result{}, nil
+	}
+
+	if s.bootstrapConfig != nil {
+		if _, ok := s.bootstrapConfig.GetAnnotations()[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; !ok {
+			log.V(5).Info("BootstrapConfig not marked for in-place update yet, skipping UpdateMachine hooks")
+			return ctrl.Result{}, nil
+		}
+	}
+
 	// Note: UpToDate condition is managed entirely by the owner controller (KCP/MD)
 	// This controller only handles the hook execution and lifecycle
 
 	updateRequest := &runtimehooksv1.UpdateMachineRequest{
-		// FIXME: CommonRequest: runtimehooksv1.CommonRequest{} (if not handled in the client)
 		Desired: runtimehooksv1.UpdateMachineObjects{
-			// FIXME(tbd) apiVersion, maybe we should use v1beta2, less edge cases around marshalling...
-			// TODO: add status & metadata cleanup...
+			// FIXME:: add status & metadata cleanup...
 			Machine:               *m,
 			InfrastructureMachine: runtime.RawExtension{Object: s.infraMachine},
-			BootstrapConfig:       &runtime.RawExtension{Object: s.bootstrapConfig},
+			BootstrapConfig:       &runtime.RawExtension{Object: s.bootstrapConfig}, // TODO bootstrap is optional
 		},
 	}
 
+	// FIXME: ensure that some of the status recording we'll add doesn't lead to a lot of reconciles
 	if result, err := r.callUpdateMachineHooks(ctx, s, updateRequest); err != nil {
 		return ctrl.Result{}, err
 	} else if !result.IsZero() {
 		return result, nil
 	}
 
-	if err := hooks.MarkAsDone(ctx, r.Client, m, runtimehooksv1.UpdateMachine); err != nil {
-		return ctrl.Result{}, err
+	if _, ok := s.infraMachine.GetAnnotations()[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok {
+		orig := s.infraMachine.DeepCopy()
+		annotations := s.infraMachine.GetAnnotations()
+		delete(annotations, clusterv1.MachineInPlaceUpdateInProgressAnnotation)
+		s.infraMachine.SetAnnotations(annotations)
+		if err := r.Client.Patch(ctx, s.infraMachine, client.MergeFrom(orig)); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
+
+	if s.bootstrapConfig != nil {
+		if _, ok := s.bootstrapConfig.GetAnnotations()[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok {
+			orig := s.bootstrapConfig.DeepCopy()
+			annotations := s.bootstrapConfig.GetAnnotations()
+			delete(annotations, clusterv1.MachineInPlaceUpdateInProgressAnnotation)
+			s.bootstrapConfig.SetAnnotations(annotations)
+			if err := r.Client.Patch(ctx, s.bootstrapConfig, client.MergeFrom(orig)); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
+	// TODO: re-use logic from hooks.MarkAsDone but directly modify m.Annotations to ensure both annotations are removed in one atomic write
+	delete(m.Annotations, runtimev1.PendingHooksAnnotation)
+	delete(m.Annotations, clusterv1.MachineInPlaceUpdateInProgressAnnotation)
 
 	log.Info("External update completed successfully, marked ExternalUpdate hook as done")
 	return ctrl.Result{}, nil
@@ -522,6 +557,8 @@ func (r *Reconciler) callUpdateMachineHooks(ctx context.Context, s *scope, req *
 
 	updateResponse := &runtimehooksv1.UpdateMachineResponse{}
 	if err := r.RuntimeClient.CallAllExtensions(ctx, runtimehooksv1.UpdateMachine, s.machine, req, updateResponse); err != nil {
+		s.updatingReason = clusterv1.MachineUpdatingReason
+		s.updatingMessage = fmt.Sprintf("UpdateMachine hooks failed: %s", err.Error())
 		return ctrl.Result{}, errors.Wrap(err, "failed to call UpdateMachine hooks")
 	}
 
@@ -529,16 +566,17 @@ func (r *Reconciler) callUpdateMachineHooks(ctx context.Context, s *scope, req *
 	case runtimehooksv1.ResponseStatusSuccess:
 		if updateResponse.GetRetryAfterSeconds() > 0 {
 			requeueAfter := time.Duration(updateResponse.GetRetryAfterSeconds()) * time.Second
+			s.updatingReason = clusterv1.MachineUpdatingReason
+			s.updatingMessage = fmt.Sprintf("UpdateMachine hooks still in progress: %s", updateResponse.Message)
 			log.V(5).Info("UpdateMachine hooks still in progress, requeuing", "retryAfterSeconds", updateResponse.GetRetryAfterSeconds())
 			return ctrl.Result{RequeueAfter: requeueAfter}, nil
 		}
 		log.Info("UpdateMachine hooks completed successfully")
 		return ctrl.Result{}, nil
 
-	case runtimehooksv1.ResponseStatusFailure:
-		return ctrl.Result{}, errors.Errorf("UpdateMachine hooks failed: %s", updateResponse.GetMessage())
-
 	default:
+		s.updatingReason = clusterv1.MachineUpdatingReason
+		s.updatingMessage = fmt.Sprintf("UpdateMachine hooks returned unknown status: %s (message: %s)", updateResponse.GetStatus(), updateResponse.GetMessage())
 		return ctrl.Result{}, errors.Errorf("UpdateMachine hooks returned unknown status: %s", updateResponse.GetStatus())
 	}
 }

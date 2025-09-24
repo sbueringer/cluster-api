@@ -99,7 +99,7 @@ type KubeadmControlPlaneReconciler struct {
 	ssaCache                  ssa.Cache
 
 	// Only used for testing
-	overrideTryInPlaceFunc            func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error)
+	overrideTryInPlaceFunc            func(ctx context.Context, controlPlane *internal.ControlPlane) (bool, ctrl.Result, error)
 	overrideScaleUpControlPlaneFunc   func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error)
 	overrideScaleDownControlPlaneFunc func(ctx context.Context, controlPlane *internal.ControlPlane, machineToDelete *clusterv1.Machine) (ctrl.Result, error)
 }
@@ -470,10 +470,24 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
 		return result, err
 	}
 
+	if m := controlPlane.MachineToCompleteTriggerInPlaceUpdate(controlPlane.Machines).Oldest(); m != nil {
+		// Note: There should be at most one Machine, otherwise we'll trigger in-place incrementally one per reconcile.
+		_, machinesNotUpToDateResults := controlPlane.NotUpToDateMachines() // FIXME: verify this also works
+		if err := r.completeTriggerInPlaceUpdate(ctx, machinesNotUpToDateResults[m.Name]); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil // Note: Changes to Machines trigger another reconcile.
+	}
+
 	// Reconcile unhealthy machines by triggering deletion and requeue if it is considered safe to remediate,
 	// otherwise continue with the other KCP operations.
 	if result, err := r.reconcileUnhealthyMachines(ctx, controlPlane); err != nil || !result.IsZero() {
 		return result, err
+	}
+
+	if inPlaceUpdatingMachines := controlPlane.MachineWithPendingUpdateMachineHook(controlPlane.Machines); inPlaceUpdatingMachines.Len() > 0 { // Note: We have to wait here even if there are no more Machines that need rollout (in-place update in progress is not counted as needs rollout)
+		log.Info("Waiting for in-place update to complete", "machines", strings.Join(inPlaceUpdatingMachines.Names(), ", "))
+		return ctrl.Result{}, nil // Note: Changes to Machines trigger another reconcile.
 	}
 
 	// Control plane machines rollout due to configuration changes (e.g. upgrades) takes precedence over other operations.
@@ -1009,9 +1023,17 @@ func reconcileMachineUpToDateCondition(_ context.Context, controlPlane *internal
 				Reason:  clusterv1.MachineNotUpToDateReason,
 				Message: message,
 			})
-
 			continue
 		}
+		if _, ok := machine.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok {
+			conditions.Set(machine, metav1.Condition{
+				Type:   clusterv1.MachineUpToDateCondition,
+				Status: metav1.ConditionFalse,
+				Reason: clusterv1.MachineUpToDateUpdatingReason,
+			})
+			continue
+		}
+
 		conditions.Set(machine, metav1.Condition{
 			Type:   clusterv1.MachineUpToDateCondition,
 			Status: metav1.ConditionTrue,

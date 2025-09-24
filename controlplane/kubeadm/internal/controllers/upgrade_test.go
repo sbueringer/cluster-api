@@ -396,7 +396,7 @@ func Test_rollingUpdate(t *testing.T) {
 				},
 				Cluster:             &clusterv1.Cluster{},
 				Machines:            machines,
-				MachinesNotUptoDate: machines.Difference(machinesUpToDate),
+				machinesNotUptoDate: machines.Difference(machinesUpToDate),
 			}
 			machinesNeedingRollout, _ := controlPlane.MachinesNeedingRollout()
 

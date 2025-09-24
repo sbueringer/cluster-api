@@ -52,8 +52,8 @@ type ControlPlane struct {
 	Machines             collections.Machines
 	machinesPatchHelpers map[string]*patch.Helper
 
-	MachinesNotUptoDate        collections.Machines
-	MachinesNotUpToDateResults map[string]NotUpToDateResult
+	machinesNotUptoDate        collections.Machines
+	machinesNotUpToDateResults map[string]NotUpToDateResult
 
 	// reconciliationTime is the time of the current reconciliation, and should be used for all "now" calculations
 	reconciliationTime metav1.Time
@@ -127,8 +127,10 @@ func NewControlPlane(ctx context.Context, managementCluster ManagementCluster, c
 		}
 		if !upToDate {
 			machinesNotUptoDate.Insert(m)
-			machinesNotUpToDateResults[m.Name] = *notUpToDateResult
 		}
+		// Set this even if machine is UpToDate. This is needed to complete triggering in-place updates
+		// machinesNotUptoDate should always be used instead to check if a Machine is up-to-date.
+		machinesNotUpToDateResults[m.Name] = *notUpToDateResult
 	}
 
 	return &ControlPlane{
@@ -136,8 +138,8 @@ func NewControlPlane(ctx context.Context, managementCluster ManagementCluster, c
 		Cluster:                    cluster,
 		Machines:                   ownedMachines,
 		machinesPatchHelpers:       patchHelpers,
-		MachinesNotUptoDate:        machinesNotUptoDate,
-		MachinesNotUpToDateResults: machinesNotUpToDateResults,
+		machinesNotUptoDate:        machinesNotUptoDate,
+		machinesNotUpToDateResults: machinesNotUpToDateResults,
 		KubeadmConfigs:             kubeadmConfigs,
 		InfraResources:             infraMachines,
 		reconciliationTime:         reconciliationTime,
@@ -180,9 +182,12 @@ func (c *ControlPlane) MachineWithDeleteAnnotation(machines collections.Machines
 	return annotatedMachines
 }
 
-// MachineWithInPlaceUpdateInProgressAnnotation returns a machine that has been annotated with the MachineInPlaceUpdateInProgressAnnotation.
-func (c *ControlPlane) MachineWithInPlaceUpdateInProgressAnnotation(machines collections.Machines) collections.Machines {
-	return machines.Filter(collections.HasAnnotationKey(clusterv1.MachineInPlaceUpdateInProgressAnnotation))
+// MachineToCompleteTriggerInPlaceUpdate returns a machine that has been annotated with the MachineInPlaceUpdateInProgressAnnotation but does not yet have the UpdateMachine hook pending.
+func (c *ControlPlane) MachineToCompleteTriggerInPlaceUpdate(machines collections.Machines) collections.Machines {
+	return machines.Filter(func(machine *clusterv1.Machine) bool {
+		_, ok := machine.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]
+		return ok && !hooks.IsPending(runtimehooksv1.UpdateMachine, machine)
+	})
 }
 
 // MachineWithPendingUpdateMachineHook returns a machine that has a pending UpdateMachine hook.
@@ -249,19 +254,19 @@ func (c *ControlPlane) GetKubeadmConfig(machineName string) (*bootstrapv1.Kubead
 // MachinesNeedingRollout return a list of machines that need to be rolled out.
 func (c *ControlPlane) MachinesNeedingRollout() (collections.Machines, map[string]NotUpToDateResult) {
 	// Note: Machines already deleted are dropped because they will be replaced by new machines after deletion completes.
-	return c.MachinesNotUptoDate.Filter(collections.Not(collections.HasDeletionTimestamp)), c.MachinesNotUpToDateResults
+	return c.machinesNotUptoDate.Filter(collections.Not(collections.HasDeletionTimestamp)), c.machinesNotUpToDateResults
 }
 
 // NotUpToDateMachines return a list of machines that are not up to date with the control
 // plane's configuration.
 func (c *ControlPlane) NotUpToDateMachines() (collections.Machines, map[string]NotUpToDateResult) {
-	return c.MachinesNotUptoDate, c.MachinesNotUpToDateResults
+	return c.machinesNotUptoDate, c.machinesNotUpToDateResults
 }
 
 // UpToDateMachines returns the machines that are up to date with the control
 // plane's configuration.
 func (c *ControlPlane) UpToDateMachines() collections.Machines {
-	return c.Machines.Difference(c.MachinesNotUptoDate)
+	return c.Machines.Difference(c.machinesNotUptoDate)
 }
 
 // getInfraMachines fetches the InfraMachine for each machine in the collection and returns a map of machine.Name -> InfraMachine.

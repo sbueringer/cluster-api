@@ -403,6 +403,12 @@ type scope struct {
 
 	// deletingMessage is the message that should be used when setting the Deleting condition.
 	deletingMessage string
+
+	// updatingReason is the reason that should be used when setting the Updating condition.
+	updatingReason string
+
+	// updatingMessage is the message that should be used when setting the Updating condition.
+	updatingMessage string
 }
 
 func (r *Reconciler) reconcileMachineOwnerAndLabels(_ context.Context, s *scope) (ctrl.Result, error) {
