@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/external"
 	"sigs.k8s.io/cluster-api/internal/contract"
 	topologynames "sigs.k8s.io/cluster-api/internal/topology/names"
+	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/version"
 )
 
@@ -192,13 +193,16 @@ func ComputeDesiredMachine(kcp *controlplanev1.KubeadmControlPlane, cluster *clu
 	return desiredMachine, nil
 }
 
-func ComputeKubeadmConfig(kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster, isJoin bool, name string) (*bootstrapv1.KubeadmConfig, error) {
+func ComputeKubeadmConfig(kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster, isJoin bool, name string, existingKubeadmConfig *bootstrapv1.KubeadmConfig) (*bootstrapv1.KubeadmConfig, error) {
 	// Create an owner reference without a controller reference because the owning controller is the machine controller
-	owner := metav1.OwnerReference{
-		APIVersion: controlplanev1.GroupVersion.String(),
-		Kind:       "KubeadmControlPlane",
-		Name:       kcp.Name,
-		UID:        kcp.UID,
+	var ownerReferences []metav1.OwnerReference
+	if existingKubeadmConfig == nil || !util.HasOwnerWithKind(existingKubeadmConfig.OwnerReferences, "Machine") {
+		ownerReferences = append(ownerReferences, metav1.OwnerReference{
+			APIVersion: controlplanev1.GroupVersion.String(),
+			Kind:       "KubeadmControlPlane",
+			Name:       kcp.Name,
+			UID:        kcp.UID,
+		})
 	}
 
 	var spec *bootstrapv1.KubeadmConfigSpec
@@ -220,7 +224,7 @@ func ComputeKubeadmConfig(kcp *controlplanev1.KubeadmControlPlane, cluster *clus
 			Namespace:       kcp.Namespace,
 			Labels:          ControlPlaneMachineLabelsForCluster(kcp, cluster.Name),
 			Annotations:     ControlPlaneMachineAnnotationsForCluster(kcp),
-			OwnerReferences: []metav1.OwnerReference{owner},
+			OwnerReferences: ownerReferences,
 		},
 		Spec: *spec,
 	}, nil
@@ -245,14 +249,16 @@ func joinControlPlaneConfig(kcp *controlplanev1.KubeadmControlPlane) *bootstrapv
 	return bootstrapSpec
 }
 
-func ComputeInfraMachine(ctx context.Context, c client.Client, kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster, name string) (*unstructured.Unstructured, error) {
-	// Since the cloned resource should eventually have a controller ref for the Machine, we create an
-	// OwnerReference here without the Controller field set
-	infraCloneOwner := &metav1.OwnerReference{
-		APIVersion: controlplanev1.GroupVersion.String(),
-		Kind:       "KubeadmControlPlane",
-		Name:       kcp.Name,
-		UID:        kcp.UID,
+func ComputeInfraMachine(ctx context.Context, c client.Client, kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster, name string, existingInfraMachine *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	// Create an owner reference without a controller reference because the owning controller is the machine controller
+	var ownerReference *metav1.OwnerReference
+	if existingInfraMachine == nil || !util.HasOwnerWithKind(existingInfraMachine.GetOwnerReferences(), "Machine") {
+		ownerReference = &metav1.OwnerReference{
+			APIVersion: controlplanev1.GroupVersion.String(),
+			Kind:       "KubeadmControlPlane",
+			Name:       kcp.Name,
+			UID:        kcp.UID,
+		}
 	}
 
 	apiVersion, err := contract.GetAPIVersion(ctx, c, kcp.Spec.MachineTemplate.Spec.InfrastructureRef.GroupKind())
@@ -276,7 +282,7 @@ func ComputeInfraMachine(ctx context.Context, c client.Client, kcp *controlplane
 		Namespace:   kcp.Namespace,
 		Name:        name,
 		ClusterName: cluster.Name,
-		OwnerRef:    infraCloneOwner,
+		OwnerRef:    ownerReference,
 		Labels:      ControlPlaneMachineLabelsForCluster(kcp, cluster.Name),
 		Annotations: ControlPlaneMachineAnnotationsForCluster(kcp),
 	}

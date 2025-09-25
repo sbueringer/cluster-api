@@ -164,7 +164,7 @@ func matchesInfraMachine(ctx context.Context, c client.Client, infraMachines map
 		return "", nil, nil, true, nil
 	}
 
-	desiredInfraMachine, err := desiredstate.ComputeInfraMachine(ctx, c, kcp, cluster, machine.Name)
+	desiredInfraMachine, err := desiredstate.ComputeInfraMachine(ctx, c, kcp, cluster, machine.Name, currentInfraMachine)
 	if err != nil {
 		return "", nil, nil, false, err
 	}
@@ -204,7 +204,7 @@ func matchesKubeadmConfig(kubeadmConfigs map[string]*bootstrapv1.KubeadmConfig, 
 		return "", nil, nil, true, nil
 	}
 
-	desiredKubeadmConfig, err := desiredstate.ComputeKubeadmConfig(kcp, cluster, true, machine.Name)
+	desiredKubeadmConfig, err := desiredstate.ComputeKubeadmConfig(kcp, cluster, true, machine.Name, currentKubeadmConfig)
 	if err != nil {
 		return "", nil, nil, false, err
 	}

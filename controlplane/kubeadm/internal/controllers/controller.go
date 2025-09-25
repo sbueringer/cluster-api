@@ -471,6 +471,7 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
 	}
 
 	if m := controlPlane.MachineToCompleteTriggerInPlaceUpdate(controlPlane.Machines).Oldest(); m != nil {
+		// TODO: change this to a for loop for all Machine
 		// Note: There should be at most one Machine, otherwise we'll trigger in-place incrementally one per reconcile.
 		_, machinesNotUpToDateResults := controlPlane.NotUpToDateMachines() // FIXME: verify this also works
 		if err := r.completeTriggerInPlaceUpdate(ctx, machinesNotUpToDateResults[m.Name]); err != nil {

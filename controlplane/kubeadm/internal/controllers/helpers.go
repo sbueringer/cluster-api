@@ -185,7 +185,7 @@ func (r *KubeadmControlPlaneReconciler) cloneConfigsAndGenerateMachine(ctx conte
 	machine.Spec.InfrastructureRef = infraRef
 
 	// Clone the bootstrap configuration
-	bootstrapConfig, bootstrapRef, err := r.createKubeadmConfig(ctx, r.Client, kcp, cluster, isJoin, machine.Name)
+	bootstrapConfig, bootstrapRef, err := r.createKubeadmConfig(ctx, kcp, cluster, isJoin, machine.Name)
 	if err != nil {
 		v1beta1conditions.MarkFalse(kcp, controlplanev1.MachinesCreatedV1Beta1Condition, controlplanev1.BootstrapTemplateCloningFailedV1Beta1Reason,
 			clusterv1.ConditionSeverityError, "%s", err.Error())
@@ -250,8 +250,8 @@ func (r *KubeadmControlPlaneReconciler) updateExternalObject(ctx context.Context
 	return nil
 }
 
-func (r *KubeadmControlPlaneReconciler) createKubeadmConfig(ctx context.Context, c client.Client, kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster, isJoin bool, name string) (*bootstrapv1.KubeadmConfig, clusterv1.ContractVersionedObjectReference, error) {
-	kubeadmConfig, err := desiredstate.ComputeKubeadmConfig(kcp, cluster, isJoin, name)
+func (r *KubeadmControlPlaneReconciler) createKubeadmConfig(ctx context.Context, kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster, isJoin bool, name string) (*bootstrapv1.KubeadmConfig, clusterv1.ContractVersionedObjectReference, error) {
+	kubeadmConfig, err := desiredstate.ComputeKubeadmConfig(kcp, cluster, isJoin, name, nil)
 	if err != nil {
 		return nil, clusterv1.ContractVersionedObjectReference{}, err
 	}
@@ -275,7 +275,7 @@ func (r *KubeadmControlPlaneReconciler) createKubeadmConfig(ctx context.Context,
 }
 
 func (r *KubeadmControlPlaneReconciler) createInfraMachine(ctx context.Context, c client.Client, kcp *controlplanev1.KubeadmControlPlane, cluster *clusterv1.Cluster, name string) (*unstructured.Unstructured, clusterv1.ContractVersionedObjectReference, error) {
-	infraMachine, err := desiredstate.ComputeInfraMachine(ctx, c, kcp, cluster, name)
+	infraMachine, err := desiredstate.ComputeInfraMachine(ctx, c, kcp, cluster, name, nil)
 	if err != nil {
 		return nil, clusterv1.ContractVersionedObjectReference{}, err
 	}

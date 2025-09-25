@@ -310,22 +310,19 @@ func cleanupInfraMachine(u *unstructured.Unstructured) *unstructured.Unstructure
 }
 
 func (r *KubeadmControlPlaneReconciler) completeTriggerInPlaceUpdate(ctx context.Context, machinesNeedingRolloutResult internal.NotUpToDateResult) error {
+	// TODO: If this func fails "in the middle" we are going to reconcile again, if KCP changed in the mean time
+	// desired objects might change and then we would use different desired objects for UpdateMachine compared to
+	// what we used in CanUpdateMachine.
+	// If we want to account for that we could consider writing desired InfraMachine/KubeadmConfig/Machine with the in-progress annotation
+	// on the Machine and use it if necessary (and clean it up if necessary when we set the pending annotation).
 
 	// BootstrapConfig intentionally before InfraMachine (because patching the BootstrapConfig doesn't trigger any "real" changes)
 	// Note: if there are no changes some of these Patch calls won't do anything
 
 	// FIXME(trigger): implement: fixup these applies until the changes are only as intended
 
-	// Write KubeadmConfig without labels & annotations.
-	machinesNeedingRolloutResult.DesiredKubeadmConfig.Labels = nil
-	machinesNeedingRolloutResult.DesiredKubeadmConfig.Annotations = map[string]string{
-		clusterv1.MachineInPlaceUpdateInProgressAnnotation: "",
-	}
-	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, machinesNeedingRolloutResult.DesiredKubeadmConfig); err != nil {
-		return errors.Wrapf(err, "failed to apply KubeadmConfig")
-	}
-
 	// Write InfraMachine without the labels & annotations that are written continuously by applyExternalObjectLabelsAnnotations.
+	// Note: Let's update InfraMachine first because that is the call that is most likely to fail.
 	// TODO: Find a better way to remove labels & annotations that are written continuously by applyExternalObjectLabelsAnnotations so we don't miss anything.
 	machinesNeedingRolloutResult.DesiredInfraMachine.SetLabels(nil)
 	machinesNeedingRolloutResult.DesiredInfraMachine.SetAnnotations(map[string]string{
@@ -336,6 +333,15 @@ func (r *KubeadmControlPlaneReconciler) completeTriggerInPlaceUpdate(ctx context
 	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, machinesNeedingRolloutResult.DesiredInfraMachine); err != nil {
 		// FIXME(tilt) figure out why this call picks up ownership of finalizers, ownerReferences and some spec fields => for ownerRefs stop setting KCP ownerRef after Machine controller took over ownership (ensure clean hand off to Machine controller, same for KubeadmConfig)
 		return errors.Wrapf(err, "failed to apply %s", machinesNeedingRolloutResult.DesiredInfraMachine.GetKind())
+	}
+
+	// Write KubeadmConfig without labels & annotations.
+	machinesNeedingRolloutResult.DesiredKubeadmConfig.Labels = nil
+	machinesNeedingRolloutResult.DesiredKubeadmConfig.Annotations = map[string]string{
+		clusterv1.MachineInPlaceUpdateInProgressAnnotation: "",
+	}
+	if err := ssa.Patch(ctx, r.Client, kcpManagerName2, machinesNeedingRolloutResult.DesiredKubeadmConfig); err != nil {
+		return errors.Wrapf(err, "failed to apply KubeadmConfig")
 	}
 
 	if err := ssa.Patch(ctx, r.Client, kcpManagerName, machinesNeedingRolloutResult.DesiredMachine); err != nil {
