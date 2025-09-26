@@ -150,7 +150,7 @@ const (
 	// the MachineSet.
 	MachineSetSkipPreflightChecksAnnotation = "machineset.cluster.x-k8s.io/skip-preflight-checks"
 
-	// MachineInPlaceUpdateInProgressAnnotation marks a Machine to signal an in-place update is in progress
+	// MachineInPlaceUpdateInProgressAnnotation marks a Machine to signal an in-place update is in progress.
 	MachineInPlaceUpdateInProgressAnnotation = "machine.cluster.x-k8s.io/in-place-update-in-progress"
 
 	// ClusterSecretType defines the type of secret created by core components.

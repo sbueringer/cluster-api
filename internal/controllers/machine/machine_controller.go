@@ -272,7 +272,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 		r.reconcileMachineOwnerAndLabels,
 		r.reconcileBootstrap,
 		r.reconcileInfrastructure,
-		r.reconcileInPlaceUpdate,
 		r.reconcileNode,
 		r.reconcileCertificateExpiry,
 	}
@@ -288,7 +287,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 	}
 
 	// Handle normal reconciliation loop.
-	return doReconcile(ctx, alwaysReconcile, s)
+	reconcileNormal := append(
+		alwaysReconcile,
+		r.reconcileInPlaceUpdate,
+	)
+	return doReconcile(ctx, reconcileNormal, s)
 }
 
 func patchMachine(ctx context.Context, patchHelper *patch.Helper, machine *clusterv1.Machine, options ...patch.Option) error {

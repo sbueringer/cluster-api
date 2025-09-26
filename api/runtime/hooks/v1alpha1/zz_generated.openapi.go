@@ -42,8 +42,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.BeforeClusterUpgradeResponse":                         schema_api_runtime_hooks_v1alpha1_BeforeClusterUpgradeResponse(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Builtins":                                             schema_api_runtime_hooks_v1alpha1_Builtins(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineRequest":                              schema_api_runtime_hooks_v1alpha1_CanUpdateMachineRequest(ref),
+		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineRequestObjects":                       schema_api_runtime_hooks_v1alpha1_CanUpdateMachineRequestObjects(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineResponse":                             schema_api_runtime_hooks_v1alpha1_CanUpdateMachineResponse(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineSetRequest":                           schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetRequest(ref),
+		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineSetRequestObjects":                    schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetRequestObjects(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineSetResponse":                          schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetResponse(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.ClusterBuiltins":                                      schema_api_runtime_hooks_v1alpha1_ClusterBuiltins(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.ClusterNetworkBuiltins":                               schema_api_runtime_hooks_v1alpha1_ClusterNetworkBuiltins(ref),
@@ -71,11 +73,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.MachineDeploymentBuiltins":                            schema_api_runtime_hooks_v1alpha1_MachineDeploymentBuiltins(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.MachineInfrastructureRefBuiltins":                     schema_api_runtime_hooks_v1alpha1_MachineInfrastructureRefBuiltins(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.MachinePoolBuiltins":                                  schema_api_runtime_hooks_v1alpha1_MachinePoolBuiltins(ref),
-		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch":                                            schema_api_runtime_hooks_v1alpha1_PatchItem(ref),
-		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineObjects":                                 schema_api_runtime_hooks_v1alpha1_UpdateMachineObjects(ref),
+		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch":                                                schema_api_runtime_hooks_v1alpha1_Patch(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineRequest":                                 schema_api_runtime_hooks_v1alpha1_UpdateMachineRequest(ref),
+		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineRequestObjects":                          schema_api_runtime_hooks_v1alpha1_UpdateMachineRequestObjects(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineResponse":                                schema_api_runtime_hooks_v1alpha1_UpdateMachineResponse(ref),
-		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineSetObjects":                              schema_api_runtime_hooks_v1alpha1_UpdateMachineSetObjects(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.ValidateTopologyRequest":                              schema_api_runtime_hooks_v1alpha1_ValidateTopologyRequest(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.ValidateTopologyRequestItem":                          schema_api_runtime_hooks_v1alpha1_ValidateTopologyRequestItem(ref),
 		"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.ValidateTopologyResponse":                             schema_api_runtime_hooks_v1alpha1_ValidateTopologyResponse(ref),
@@ -805,26 +806,61 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineRequest(ref common.Refere
 							},
 						},
 					},
-					"currentMachineObjects": {
+					"current": {
 						SchemaProps: spec.SchemaProps{
-							Description: "currentMachineObjects contains the current state of the Machine and related objects.",
+							Description: "current contains the current state of the Machine and related objects.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineObjects"),
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineRequestObjects"),
 						},
 					},
-					"desiredMachineObjects": {
+					"desired": {
 						SchemaProps: spec.SchemaProps{
-							Description: "desiredMachineObjects contains the desired state of the Machine and related objects.",
+							Description: "desired contains the desired state of the Machine and related objects.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineObjects"),
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineRequestObjects"),
 						},
 					},
 				},
-				Required: []string{"currentMachineObjects", "desiredMachineObjects"},
+				Required: []string{"current", "desired"},
 			},
 		},
 		Dependencies: []string{
-			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineObjects"},
+			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineRequestObjects"},
+	}
+}
+
+func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineRequestObjects(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CanUpdateMachineRequestObjects groups objects for CanUpdateMachineRequest.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"machine": {
+						SchemaProps: spec.SchemaProps{
+							Description: "machine is the full Machine object.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.Machine"),
+						},
+					},
+					"infrastructureMachine": {
+						SchemaProps: spec.SchemaProps{
+							Description: "infrastructureMachine is the infra Machine object.",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
+					"bootstrapConfig": {
+						SchemaProps: spec.SchemaProps{
+							Description: "bootstrapConfig is the bootstrap config object.",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
+				},
+				Required: []string{"machine", "infrastructureMachine"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/runtime.RawExtension", "sigs.k8s.io/cluster-api/api/core/v1beta2.Machine"},
 	}
 }
 
@@ -865,46 +901,25 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineResponse(ref common.Refer
 							Format:      "",
 						},
 					},
-					"machinePatches": {
+					"machinePatch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "machinePatches are patches which, when applied to the current Machine spec from the request, indicate the subset of spec changes this extension can handle in-place.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
-									},
-								},
-							},
+							Description: "machinePatch when applied to the current Machine spec, indicates changes handled in-place.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 						},
 					},
-					"infrastructureMachinePatches": {
+					"infrastructureMachinePatch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "infrastructureMachinePatches are patches which, when applied to the current InfrastructureMachine spec from the request, indicate the subset of spec changes this extension can handle in-place.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
-									},
-								},
-							},
+							Description: "infrastructureMachinePatch indicates infra Machine spec changes handled in-place.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 						},
 					},
-					"bootstrapConfigPatches": {
+					"bootstrapConfigPatch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "bootstrapConfigPatches are patches which, when applied to the current BootstrapConfig spec from the request, indicate the subset of spec changes this extension can handle in-place.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
-									},
-								},
-							},
+							Description: "bootstrapConfigPatch indicates bootstrap config spec changes handled in-place.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 						},
 					},
 				},
@@ -953,26 +968,61 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetRequest(ref common.Ref
 							},
 						},
 					},
-					"currentUpdateMachineSetObjects": {
+					"current": {
 						SchemaProps: spec.SchemaProps{
-							Description: "currentUpdateMachineSetObjects contains the current state of the MachineSet spec and related objects.",
+							Description: "current contains the current state of the MachineSet and related objects.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineSetObjects"),
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineSetRequestObjects"),
 						},
 					},
-					"desiredUpdateMachineSetObjects": {
+					"desired": {
 						SchemaProps: spec.SchemaProps{
-							Description: "desiredUpdateMachineSetObjects contains the desired state of the MachineSet spec and related objects.",
+							Description: "desired contains the desired state of the MachineSet and related objects.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineSetObjects"),
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineSetRequestObjects"),
 						},
 					},
 				},
-				Required: []string{"currentUpdateMachineSetObjects", "desiredUpdateMachineSetObjects"},
+				Required: []string{"current", "desired"},
 			},
 		},
 		Dependencies: []string{
-			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineSetObjects"},
+			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.CanUpdateMachineSetRequestObjects"},
+	}
+}
+
+func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetRequestObjects(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CanUpdateMachineSetRequestObjects groups objects for CanUpdateMachineSetRequest.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"machineSet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "machineSet is the full MachineSet object.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.MachineSet"),
+						},
+					},
+					"infrastructureMachineTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "infrastructureMachineTemplate is the provider-specific InfrastructureMachineTemplate object.",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
+					"bootstrapConfigTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "bootstrapConfigTemplate is the provider-specific BootstrapConfigTemplate object.",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
+				},
+				Required: []string{"machineSet", "infrastructureMachineTemplate"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/runtime.RawExtension", "sigs.k8s.io/cluster-api/api/core/v1beta2.MachineSet"},
 	}
 }
 
@@ -1013,46 +1063,25 @@ func schema_api_runtime_hooks_v1alpha1_CanUpdateMachineSetResponse(ref common.Re
 							Format:      "",
 						},
 					},
-					"machineSetPatches": {
+					"machineSetPatch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "machineSetPatches are patches which, when applied to the current MachineSet spec from the request, indicate the subset of spec changes this extension can handle in-place.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
-									},
-								},
-							},
+							Description: "machineSetPatch when applied to the current MachineSet spec, indicates changes handled in-place.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 						},
 					},
-					"infrastructureMachineTemplateSpecPatches": {
+					"infrastructureMachineTemplatePatch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "infrastructureMachineTemplateSpecPatches are patches which, when applied to the current InfrastructureMachineTemplateSpec from the request, indicate the subset of spec changes this extension can handle in-place.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
-									},
-								},
-							},
+							Description: "infrastructureMachineTemplatePatch indicates infra template spec changes handled in-place.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 						},
 					},
-					"bootstrapConfigTemplateSpecPatches": {
+					"bootstrapConfigTemplatePatch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "bootstrapConfigTemplateSpecPatches are patches which, when applied to the current BootstrapConfigTemplateSpec from the request, indicate the subset of spec changes this extension can handle in-place.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
-									},
-								},
-							},
+							Description: "bootstrapConfigTemplatePatch indicates bootstrap template spec changes handled in-place.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.Patch"),
 						},
 					},
 				},
@@ -1874,11 +1903,10 @@ func schema_api_runtime_hooks_v1alpha1_GeneratePatchesResponseItem(ref common.Re
 					},
 					"patchType": {
 						SchemaProps: spec.SchemaProps{
-							Description: "patchType defines the type of the patch. One of: \"JSONPatch\" or \"JSONMergePatch\".\n\nPossible enum values:\n - `\"JSONMergePatch\"` identifies a https://datatracker.ietf.org/doc/html/rfc7386 JSON merge patch.\n - `\"JSONPatch\"` identifies a https://datatracker.ietf.org/doc/html/rfc6902 JSON patch.",
+							Description: "patchType defines the type of the patch. One of: \"JSONPatch\" or \"JSONMergePatch\".",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"JSONMergePatch", "JSONPatch"},
 						},
 					},
 					"patch": {
@@ -2176,25 +2204,23 @@ func schema_api_runtime_hooks_v1alpha1_MachinePoolBuiltins(ref common.ReferenceC
 	}
 }
 
-func schema_api_runtime_hooks_v1alpha1_PatchItem(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_api_runtime_hooks_v1alpha1_Patch(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Patch represents a single patch to be applied to an object.",
+				Description: "Patch is a single patch (JSONPatch or JSONMergePatch) which can include multiple operations.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"patchType": {
 						SchemaProps: spec.SchemaProps{
-							Description: "patchType defines the type of the patch. One of: \"JSONPatch\" or \"JSONMergePatch\".\n\nPossible enum values:\n - `\"JSONMergePatch\"` identifies a https://datatracker.ietf.org/doc/html/rfc7386 JSON merge patch.\n - `\"JSONPatch\"` identifies a https://datatracker.ietf.org/doc/html/rfc6902 JSON patch.",
-							Default:     "",
+							Description: "patchType JSONPatch or JSONMergePatch.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"JSONMergePatch", "JSONPatch"},
 						},
 					},
 					"patch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "patch contains the patch which should be applied to the target object. It must be of the corresponding PatchType.",
+							Description: "patch data for the target object.",
 							Type:        []string{"string"},
 							Format:      "byte",
 						},
@@ -2203,41 +2229,6 @@ func schema_api_runtime_hooks_v1alpha1_PatchItem(ref common.ReferenceCallback) c
 				Required: []string{"patchType", "patch"},
 			},
 		},
-	}
-}
-
-func schema_api_runtime_hooks_v1alpha1_UpdateMachineObjects(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "UpdateMachineObjects groups Machine and related objects.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"machineSpec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "machineSpec is the Machine spec.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta1.MachineSpec"),
-						},
-					},
-					"infrastructureMachineSpec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "infrastructureMachineSpec contains the infrastructure Machine object spec.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
-						},
-					},
-					"bootstrapConfigSpec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "bootstrapConfigSpec contains the bootstrap configuration object spec.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
-						},
-					},
-				},
-				Required: []string{"machineSpec", "infrastructureMachineSpec"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension", "sigs.k8s.io/cluster-api/api/core/v1beta1.MachineSpec"},
 	}
 }
 
@@ -2278,19 +2269,54 @@ func schema_api_runtime_hooks_v1alpha1_UpdateMachineRequest(ref common.Reference
 							},
 						},
 					},
-					"desiredUpdateMachineObjects": {
+					"desired": {
 						SchemaProps: spec.SchemaProps{
-							Description: "desiredUpdateMachineObjects contains the desired state of the Machine and related objects.",
+							Description: "desired contains the desired state of the Machine and related objects.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineObjects"),
+							Ref:         ref("sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineRequestObjects"),
 						},
 					},
 				},
-				Required: []string{"desiredUpdateMachineObjects"},
+				Required: []string{"desired"},
 			},
 		},
 		Dependencies: []string{
-			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineObjects"},
+			"sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1.UpdateMachineRequestObjects"},
+	}
+}
+
+func schema_api_runtime_hooks_v1alpha1_UpdateMachineRequestObjects(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UpdateMachineRequestObjects groups objects for UpdateMachineRequest.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"machine": {
+						SchemaProps: spec.SchemaProps{
+							Description: "machine is the full Machine object.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta2.Machine"),
+						},
+					},
+					"infrastructureMachine": {
+						SchemaProps: spec.SchemaProps{
+							Description: "infrastructureMachine is the infra Machine object.",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
+					"bootstrapConfig": {
+						SchemaProps: spec.SchemaProps{
+							Description: "bootstrapConfig is the bootstrap config object.",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
+				},
+				Required: []string{"machine", "infrastructureMachine"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/runtime.RawExtension", "sigs.k8s.io/cluster-api/api/core/v1beta2.Machine"},
 	}
 }
 
@@ -2343,41 +2369,6 @@ func schema_api_runtime_hooks_v1alpha1_UpdateMachineResponse(ref common.Referenc
 				Required: []string{"status", "retryAfterSeconds"},
 			},
 		},
-	}
-}
-
-func schema_api_runtime_hooks_v1alpha1_UpdateMachineSetObjects(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "UpdateMachineSetObjects groups MachineSet and related template objects.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"machineSetSpec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "machineSetSpec is the MachineSet spec.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("sigs.k8s.io/cluster-api/api/core/v1beta1.MachineSetSpec"),
-						},
-					},
-					"infrastructureMachineTemplateSpec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "infrastructureMachineTemplateSpec contains the provider-specific infrastructure Machine template spec object.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
-						},
-					},
-					"bootstrapConfigTemplateSpec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "bootstrapConfigTemplateSpec contains the bootstrap configuration template spec object.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
-						},
-					},
-				},
-				Required: []string{"machineSetSpec", "infrastructureMachineTemplateSpec"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension", "sigs.k8s.io/cluster-api/api/core/v1beta1.MachineSetSpec"},
 	}
 }
 

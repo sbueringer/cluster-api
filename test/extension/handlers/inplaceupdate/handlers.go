@@ -95,7 +95,10 @@ func (h *ExtensionHandlers) DoCanUpdateMachine(ctx context.Context, req *runtime
 
 	// Declare changes that this Runtime Extension can update in-place.
 
-	// Machine // FIXME: Maybe implement something for Machine. I think only options are failureDomain & version
+	// Machine
+	if modifiedCurrentMachine.Spec.FailureDomain != req.Desired.Machine.Spec.FailureDomain {
+		modifiedCurrentMachine.Spec.FailureDomain = req.Desired.Machine.Spec.FailureDomain
+	}
 
 	// BootstrapConfig
 	switch current := modifiedCurrentBootstrapConfig.(type) {

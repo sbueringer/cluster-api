@@ -891,7 +891,7 @@ func (r *Reconciler) computeDesiredMachine(machineSet *clusterv1.MachineSet, exi
 			Annotations:     map[string]string{},
 			Finalizers:      []string{clusterv1.MachineFinalizer},
 		},
-		Spec: *machineSet.Spec.Template.Spec.DeepCopy(), // FIXME: think about the implications of this e.g. the version field
+		Spec: *machineSet.Spec.Template.Spec.DeepCopy(),
 	}
 	// Set ClusterName.
 	desiredMachine.Spec.ClusterName = machineSet.Spec.ClusterName

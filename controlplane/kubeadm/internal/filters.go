@@ -150,7 +150,7 @@ func matchesInfraMachine(ctx context.Context, c client.Client, infraMachines map
 	currentInfraMachine, found := infraMachines[machine.Name]
 	if !found {
 		// Return true here because failing to get infrastructure machine should not be considered as unmatching.
-		// FIXME(low-priority) consider making this an error case to simplify logic elsewhere (avoid handling no InfraMachine)
+		// FIXME(low-priority) consider making this an error case to simplify logic elsewhere (avoid handling no InfraMachine): decision: handle this as CanUpdateMachine => false (early check in canUpdateMachine) (if we hit this code path because of some other changes)
 		return "", nil, nil, true, nil
 	}
 
@@ -192,7 +192,7 @@ func matchesKubeadmConfig(kubeadmConfigs map[string]*bootstrapv1.KubeadmConfig, 
 	if !bootstrapRef.IsDefined() {
 		// Missing bootstrap reference should not be considered as unmatching.
 		// This is a safety precaution to avoid selecting machines that are broken, which in the future should be remediated separately.
-		// FIXME(low-priority) consider making this an error case to simplify logic elsewhere (avoid handling no InfraMachine)
+		// FIXME(low-priority) consider making this an error case to simplify logic elsewhere (avoid handling no InfraMachine) => decision: let's make this an error case
 		return "", nil, nil, true, nil
 	}
 

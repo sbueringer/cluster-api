@@ -20,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	runtimecatalog "sigs.k8s.io/cluster-api/exp/runtime/catalog"
 )
@@ -35,26 +34,26 @@ type CanUpdateMachineRequest struct {
 
 	// current contains the current state of the Machine and related objects.
 	// +required
-	Current UpdateMachineObjects `json:"current"`
+	Current CanUpdateMachineRequestObjects `json:"current,omitempty,omitzero"`
 
 	// desired contains the desired state of the Machine and related objects.
 	// +required
-	Desired UpdateMachineObjects `json:"desired"`
+	Desired CanUpdateMachineRequestObjects `json:"desired,omitempty,omitzero"`
 }
 
-// UpdateMachineObjects groups Machine and related objects.
-type UpdateMachineObjects struct {
-	// machine is the Machine.
+// CanUpdateMachineRequestObjects groups objects for CanUpdateMachineRequest.
+type CanUpdateMachineRequestObjects struct {
+	// machine is the full Machine object.
 	// +required
-	Machine clusterv1.Machine `json:"machine"`
+	Machine clusterv1.Machine `json:"machine,omitempty,omitzero"`
 
-	// infrastructureMachine contains the infrastructure Machine object spec.
+	// infrastructureMachine is the infra Machine object.
 	// +required
-	InfrastructureMachine runtime.RawExtension `json:"infrastructureMachine"`
+	InfrastructureMachine runtime.RawExtension `json:"infrastructureMachine,omitempty,omitzero"`
 
-	// bootstrapConfig contains the bootstrap configuration object spec.
+	// bootstrapConfig is the bootstrap config object.
 	// +optional
-	BootstrapConfig *runtime.RawExtension `json:"bootstrapConfig,omitempty"`
+	BootstrapConfig runtime.RawExtension `json:"bootstrapConfig,omitempty,omitzero"`
 }
 
 var _ ResponseObject = &CanUpdateMachineResponse{}
@@ -67,20 +66,28 @@ type CanUpdateMachineResponse struct {
 	// CommonResponse contains Status and Message fields common to all response types.
 	CommonResponse `json:",inline"`
 
-	// machinePatch are patches which, when applied to the current Machine spec from the request,
-	// indicate the subset of spec changes this extension can handle in-place.
+	// machinePatch when applied to the current Machine spec, indicates changes handled in-place.
 	// +optional
-	MachinePatch Patch `json:"machinePatch,omitempty"`
+	MachinePatch Patch `json:"machinePatch,omitempty,omitzero"`
 
-	// infrastructureMachinePatch are patches which, when applied to the current InfrastructureMachine spec
-	// from the request, indicate the subset of spec changes this extension can handle in-place.
+	// infrastructureMachinePatch indicates infra Machine spec changes handled in-place.
 	// +optional
-	InfrastructureMachinePatch Patch `json:"infrastructureMachinePatch,omitempty"`
+	InfrastructureMachinePatch Patch `json:"infrastructureMachinePatch,omitempty,omitzero"`
 
-	// bootstrapConfigPatch are patches which, when applied to the current BootstrapConfig spec from the request,
-	// indicate the subset of spec changes this extension can handle in-place.
+	// bootstrapConfigPatch indicates bootstrap config spec changes handled in-place.
 	// +optional
-	BootstrapConfigPatch Patch `json:"bootstrapConfigPatch,omitempty"`
+	BootstrapConfigPatch Patch `json:"bootstrapConfigPatch,omitempty,omitzero"`
+}
+
+// Patch is a single patch (JSONPatch or JSONMergePatch) which can include multiple operations.
+type Patch struct {
+	// patchType JSONPatch or JSONMergePatch.
+	// +required
+	PatchType PatchType `json:"patchType,omitempty"`
+
+	// patch data for the target object.
+	// +required
+	Patch []byte `json:"patch,omitempty"`
 }
 
 // CanUpdateMachine is the hook that will be called to determine if an extension
@@ -95,29 +102,31 @@ type CanUpdateMachineSetRequest struct {
 	// CommonRequest contains fields common to all request types.
 	CommonRequest `json:",inline"`
 
-	// currentUpdateMachineSetObjects contains the current state of the MachineSet spec and related objects.
+	// current contains the current state of the MachineSet and related objects.
 	// +required
-	CurrentUpdateMachineSetObjects UpdateMachineSetObjects `json:"currentUpdateMachineSetObjects"`
+	Current CanUpdateMachineSetRequestObjects `json:"current,omitempty,omitzero"`
 
-	// desiredUpdateMachineSetObjects contains the desired state of the MachineSet spec and related objects.
+	// desired contains the desired state of the MachineSet and related objects.
 	// +required
-	DesiredUpdateMachineSetObjects UpdateMachineSetObjects `json:"desiredUpdateMachineSetObjects"`
+	Desired CanUpdateMachineSetRequestObjects `json:"desired,omitempty,omitzero"`
 }
 
-// UpdateMachineSetObjects groups MachineSet and related template objects.
-type UpdateMachineSetObjects struct {
-	// machineSetSpec is the MachineSet spec.
+// CanUpdateMachineSetRequestObjects groups objects for CanUpdateMachineSetRequest.
+type CanUpdateMachineSetRequestObjects struct {
+	// machineSet is the full MachineSet object.
 	// +required
-	MachineSetSpec clusterv1beta1.MachineSetSpec `json:"machineSetSpec"`
+	MachineSet clusterv1.MachineSet `json:"machineSet,omitempty,omitzero"`
 
-	// infrastructureMachineTemplateSpec contains the provider-specific infrastructure Machine template spec object.
+	// infrastructureMachineTemplate is the provider-specific InfrastructureMachineTemplate object.
 	// +required
-	InfrastructureMachineTemplateSpec runtime.RawExtension `json:"infrastructureMachineTemplateSpec"`
+	InfrastructureMachineTemplate runtime.RawExtension `json:"infrastructureMachineTemplate,omitempty,omitzero"`
 
-	// bootstrapConfigTemplateSpec contains the bootstrap configuration template spec object.
+	// bootstrapConfigTemplate is the provider-specific BootstrapConfigTemplate object.
 	// +optional
-	BootstrapConfigTemplateSpec *runtime.RawExtension `json:"bootstrapConfigTemplateSpec,omitempty"`
+	BootstrapConfigTemplate runtime.RawExtension `json:"bootstrapConfigTemplate,omitempty,omitzero"`
 }
+
+var _ ResponseObject = &CanUpdateMachineSetResponse{}
 
 // CanUpdateMachineSetResponse is the response of the CanUpdateMachineSet hook.
 // +kubebuilder:object:root=true
@@ -127,23 +136,18 @@ type CanUpdateMachineSetResponse struct {
 	// CommonResponse contains Status and Message fields common to all response types.
 	CommonResponse `json:",inline"`
 
-	// machineSetPatches are patches which, when applied to the current MachineSet spec from the request,
-	// indicate the subset of spec changes this extension can handle in-place.
+	// machineSetPatch when applied to the current MachineSet spec, indicates changes handled in-place.
 	// +optional
-	MachineSetPatches []Patch `json:"machineSetPatches,omitempty"`
+	MachineSetPatch Patch `json:"machineSetPatch,omitempty,omitzero"`
 
-	// infrastructureMachineTemplateSpecPatches are patches which, when applied to the current InfrastructureMachineTemplateSpec
-	// from the request, indicate the subset of spec changes this extension can handle in-place.
+	// infrastructureMachineTemplatePatch indicates infra template spec changes handled in-place.
 	// +optional
-	InfrastructureMachineTemplateSpecPatches []Patch `json:"infrastructureMachineTemplateSpecPatches,omitempty"`
+	InfrastructureMachineTemplatePatch Patch `json:"infrastructureMachineTemplatePatch,omitempty,omitzero"`
 
-	// bootstrapConfigTemplateSpecPatches are patches which, when applied to the current BootstrapConfigTemplateSpec from the request,
-	// indicate the subset of spec changes this extension can handle in-place.
+	// bootstrapConfigTemplatePatch indicates bootstrap template spec changes handled in-place.
 	// +optional
-	BootstrapConfigTemplateSpecPatches []Patch `json:"bootstrapConfigTemplateSpecPatches,omitempty"`
+	BootstrapConfigTemplatePatch Patch `json:"bootstrapConfigTemplatePatch,omitempty,omitzero"`
 }
-
-var _ ResponseObject = &CanUpdateMachineSetResponse{}
 
 // CanUpdateMachineSet is the hook that will be called to determine if an extension
 // can handle specific MachineSet changes for in-place updates.
@@ -159,7 +163,22 @@ type UpdateMachineRequest struct {
 
 	// desired contains the desired state of the Machine and related objects.
 	// +required
-	Desired UpdateMachineObjects `json:"desired"`
+	Desired UpdateMachineRequestObjects `json:"desired,omitempty,omitzero"`
+}
+
+// UpdateMachineRequestObjects groups objects for UpdateMachineRequest.
+type UpdateMachineRequestObjects struct {
+	// machine is the full Machine object.
+	// +required
+	Machine clusterv1.Machine `json:"machine,omitempty,omitzero"`
+
+	// infrastructureMachine is the infra Machine object.
+	// +required
+	InfrastructureMachine runtime.RawExtension `json:"infrastructureMachine,omitempty,omitzero"`
+
+	// bootstrapConfig is the bootstrap config object.
+	// +optional
+	BootstrapConfig runtime.RawExtension `json:"bootstrapConfig,omitempty,omitzero"`
 }
 
 var _ RetryResponseObject = &UpdateMachineResponse{}
@@ -185,9 +204,9 @@ func UpdateMachine(*UpdateMachineRequest, *UpdateMachineResponse) {}
 func init() {
 	catalogBuilder.RegisterHook(CanUpdateMachine, &runtimecatalog.HookMeta{
 		Tags:    []string{"In-Place Update Hooks"},
-		Summary: "Cluster API Runtime will call this hook to determine if an extension can handle specific machine changes",
-		Description: "Called during update planning to determine if an extension can handle machine changes. " +
-			"The request contains current and desired state spec for Machine, InfraMachine and optionally BootstrapConfig. " +
+		Summary: "Cluster API Runtime will call this hook to determine if an extension can handle specific Machine changes",
+		Description: "Called during update planning to determine if an extension can handle Machine changes. " +
+			"The request contains current and desired state for Machine, InfraMachine and optionally BootstrapConfig. " +
 			"Extensions should return per-object patches to be applied on current objects to indicate which changes they can handle in-place.\n" +
 			"\n" +
 			"Notes:\n" +
@@ -200,18 +219,23 @@ func init() {
 		Tags:    []string{"In-Place Update Hooks"},
 		Summary: "Cluster API Runtime will call this hook to determine if an extension can handle specific MachineSet changes",
 		Description: "Called during update planning to determine if an extension can handle MachineSet changes. " +
-			"The request contains current and desired state spec for MachineSet, InfraMachineTemplate and optionally BootstrapConfigTemplate. " +
-			"Extensions should return per-object patches to be applied on current objects to indicate which changes they can handle in-place.",
+			"The request contains current and desired state for MachineSet, InfraMachineTemplate and optionally BootstrapConfigTemplate. " +
+			"Extensions should return per-object patches to be applied on current objects to indicate which changes they can handle in-place.\n" +
+			"\n" +
+			"Notes:\n" +
+			"- This hook is called during the planning phase of updates\n" +
+			"- Only spec is provided, status fields are not included\n" +
+			"- If no extension can cover the required changes, CAPI will fallback to rolling updates\n",
 	})
 
 	catalogBuilder.RegisterHook(UpdateMachine, &runtimecatalog.HookMeta{
 		Tags:    []string{"In-Place Update Hooks"},
-		Summary: "Cluster API Runtime will call this hook to perform in-place updates on a machine",
-		Description: "Cluster API Runtime will call this hook to perform the actual in-place update on a machine. " +
-			"The request contains the desired state spec for Machine, InfraMachine and optionally BootstrapConfig. " +
+		Summary: "Cluster API Runtime will call this hook to perform in-place updates on a Machine",
+		Description: "Cluster API Runtime will call this hook to perform the actual in-place update on a Machine. " +
+			"The request contains the desired state for Machine, InfraMachine and optionally BootstrapConfig. " +
 			"The hook will be called repeatedly until it reports Done or Failed status.\n" +
 			"\n" +
 			"Notes:\n" +
-			"- This hook must be idempotent - it can be called multiple times for the same machine\n",
+			"- This hook must be idempotent - it can be called multiple times for the same Machine\n",
 	})
 }

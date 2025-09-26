@@ -69,7 +69,7 @@ func (r *Reconciler) updateStatus(ctx context.Context, s *scope) {
 	setReadyCondition(ctx, s.machine)
 	setAvailableCondition(ctx, s.machine)
 
-	setMachinePhaseAndLastUpdated(ctx, s.machine)
+	setMachinePhaseAndLastUpdated(ctx, s.machine, s.updatingReason)
 }
 
 func setBootstrapReadyCondition(_ context.Context, machine *clusterv1.Machine, bootstrapConfig *unstructured.Unstructured, bootstrapConfigIsNotFound bool) {
@@ -635,7 +635,7 @@ func setDeletingCondition(_ context.Context, machine *clusterv1.Machine, reconci
 }
 
 func setUpdatingCondition(_ context.Context, machine *clusterv1.Machine, updatingReason, updatingMessage string) {
-	if _, ok := machine.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; !ok {
+	if updatingReason == "" {
 		conditions.Set(machine, metav1.Condition{
 			Type:   clusterv1.MachineUpdatingCondition,
 			Status: metav1.ConditionFalse,
@@ -814,7 +814,7 @@ func setAvailableCondition(ctx context.Context, machine *clusterv1.Machine) {
 	})
 }
 
-func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
+func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine, updatingReason string) {
 	originalPhase := m.Status.Phase
 
 	// Set the phase to "pending" if nil.
@@ -837,7 +837,7 @@ func setMachinePhaseAndLastUpdated(_ context.Context, m *clusterv1.Machine) {
 		m.Status.SetTypedPhase(clusterv1.MachinePhaseRunning)
 	}
 
-	if _, ok := m.Annotations[clusterv1.MachineInPlaceUpdateInProgressAnnotation]; ok {
+	if updatingReason != "" {
 		m.Status.SetTypedPhase(clusterv1.MachinePhaseUpdating)
 	}
 

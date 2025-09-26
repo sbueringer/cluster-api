@@ -125,14 +125,14 @@ func (r *KubeadmControlPlaneReconciler) canUpdateMachine(ctx context.Context, cu
 		"infraMachineDiff", diff(currentInfraMachineForDiff, desiredInfraMachineForDiff),
 	)
 	req := &runtimehooksv1.CanUpdateMachineRequest{
-		Current: runtimehooksv1.UpdateMachineObjects{
+		Current: runtimehooksv1.CanUpdateMachineRequestObjects{
 			Machine:               *currentMachineForDiff,
-			BootstrapConfig:       &runtime.RawExtension{Object: currentKubeadmConfigForDiff},
+			BootstrapConfig:       runtime.RawExtension{Object: currentKubeadmConfigForDiff},
 			InfrastructureMachine: runtime.RawExtension{Object: currentInfraMachineForDiff},
 		},
-		Desired: runtimehooksv1.UpdateMachineObjects{
+		Desired: runtimehooksv1.CanUpdateMachineRequestObjects{
 			Machine:               *desiredMachineForDiff,
-			BootstrapConfig:       &runtime.RawExtension{Object: desiredKubeadmConfigForDiff},
+			BootstrapConfig:       runtime.RawExtension{Object: desiredKubeadmConfigForDiff},
 			InfrastructureMachine: runtime.RawExtension{Object: desiredInfraMachineForDiff},
 		},
 	}
@@ -243,70 +243,67 @@ func (r *KubeadmControlPlaneReconciler) prepareObjectsForDiff(ctx context.Contex
 	// * KubeadmConfig doesn't have a defaulting webhook and no API defaulting anymore (pre-existing objects are handled correctly in PrepareKubeadmConfigsForDiff)
 	//   * KubeadmConfigTemplate in the MD controller has different considerations as the defaulting is in the webhook
 	desiredKubeadmConfigForDiff, currentKubeadmConfigForDiff = internal.PrepareKubeadmConfigsForDiff(desiredKubeadmConfigForDiff, currentKubeadmConfigForDiff)
-	// Set GVK because object is later marshalled with json.Marshal when CanUpdateMachine request is sent.
-	currentKubeadmConfigForDiff.SetGroupVersionKind(bootstrapv1.GroupVersion.WithKind("KubeadmConfig"))
-	desiredKubeadmConfigForDiff.SetGroupVersionKind(bootstrapv1.GroupVersion.WithKind("KubeadmConfig"))
 
 	// Cleanup objects
 	currentMachineForDiff = cleanupMachine(currentMachineForDiff)
 	currentKubeadmConfigForDiff = cleanupKubeadmConfig(currentKubeadmConfigForDiff)
-	currentInfraMachineForDiff = cleanupInfraMachine(currentInfraMachineForDiff)
+	currentInfraMachineForDiff = cleanupUnstructured(currentInfraMachineForDiff)
 
 	desiredMachineForDiff = cleanupMachine(desiredMachineForDiff)
 	desiredKubeadmConfigForDiff = cleanupKubeadmConfig(desiredKubeadmConfigForDiff)
-	desiredInfraMachineForDiff = cleanupInfraMachine(desiredInfraMachineForDiff)
+	desiredInfraMachineForDiff = cleanupUnstructured(desiredInfraMachineForDiff)
 
 	return currentMachineForDiff, currentKubeadmConfigForDiff, currentInfraMachineForDiff,
 		desiredMachineForDiff, desiredKubeadmConfigForDiff, desiredInfraMachineForDiff, nil
 }
 
 func cleanupMachine(machine *clusterv1.Machine) *clusterv1.Machine {
-	// Delete metadata apart from name, namespace, labels and annotations
-	machine.SetUID("")
-	machine.SetResourceVersion("")
-	machine.SetGeneration(0)
-	machine.SetGenerateName("")
-	machine.SetCreationTimestamp(metav1.Time{})
-	machine.SetDeletionTimestamp(nil)
-	machine.SetDeletionGracePeriodSeconds(nil)
-	machine.SetOwnerReferences(nil)
-	machine.SetFinalizers(nil)
-	machine.SetManagedFields(nil)
-	machine.Status = clusterv1.MachineStatus{}
-	return machine
+	return &clusterv1.Machine{
+		// Set GVK because object is later marshalled with json.Marshal when the hook request is sent.
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Machine",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        machine.Name,
+			Namespace:   machine.Namespace,
+			Labels:      machine.Labels,
+			Annotations: machine.Annotations,
+		},
+		Spec: *machine.Spec.DeepCopy(),
+	}
 }
 
 func cleanupKubeadmConfig(kubeadmConfig *bootstrapv1.KubeadmConfig) *bootstrapv1.KubeadmConfig {
-	// Delete metadata apart from name, namespace, labels and annotations
-	kubeadmConfig.SetUID("")
-	kubeadmConfig.SetResourceVersion("")
-	kubeadmConfig.SetGeneration(0)
-	kubeadmConfig.SetGenerateName("")
-	kubeadmConfig.SetCreationTimestamp(metav1.Time{})
-	kubeadmConfig.SetDeletionTimestamp(nil)
-	kubeadmConfig.SetDeletionGracePeriodSeconds(nil)
-	kubeadmConfig.SetOwnerReferences(nil)
-	kubeadmConfig.SetFinalizers(nil)
-	kubeadmConfig.SetManagedFields(nil)
-	kubeadmConfig.Status = bootstrapv1.KubeadmConfigStatus{}
-	return kubeadmConfig
+	return &bootstrapv1.KubeadmConfig{
+		// Set GVK because object is later marshalled with json.Marshal when the hook request is sent.
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: bootstrapv1.GroupVersion.String(),
+			Kind:       "KubeadmConfig",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        kubeadmConfig.Name,
+			Namespace:   kubeadmConfig.Namespace,
+			Labels:      kubeadmConfig.Labels,
+			Annotations: kubeadmConfig.Annotations,
+		},
+		Spec: *kubeadmConfig.Spec.DeepCopy(),
+	}
 }
 
-func cleanupInfraMachine(u *unstructured.Unstructured) *unstructured.Unstructured {
-	// Delete metadata apart from name, namespace, labels and annotations
-	u.SetUID("")
-	u.SetResourceVersion("")
-	u.SetGeneration(0)
-	u.SetGenerateName("")
-	u.SetCreationTimestamp(metav1.Time{})
-	u.SetDeletionTimestamp(nil)
-	u.SetDeletionGracePeriodSeconds(nil)
-	u.SetOwnerReferences(nil)
-	u.SetFinalizers(nil)
-	u.SetManagedFields(nil)
-	delete(u.Object, "status")
-
-	return u
+func cleanupUnstructured(u *unstructured.Unstructured) *unstructured.Unstructured {
+	cleanedUpU := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": u.GetAPIVersion(),
+			"kind":       u.GetKind(),
+			"spec":       u.Object["spec"],
+		},
+	}
+	cleanedUpU.SetName(u.GetName())
+	cleanedUpU.SetNamespace(u.GetNamespace())
+	cleanedUpU.SetLabels(u.GetLabels())
+	cleanedUpU.SetAnnotations(u.GetAnnotations())
+	return cleanedUpU
 }
 
 func (r *KubeadmControlPlaneReconciler) completeTriggerInPlaceUpdate(ctx context.Context, machinesNeedingRolloutResult internal.NotUpToDateResult) error {

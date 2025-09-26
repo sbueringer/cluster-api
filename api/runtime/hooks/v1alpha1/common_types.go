@@ -136,7 +136,7 @@ func (r *CommonRetryResponse) SetRetryAfterSeconds(retryAfterSeconds int32) {
 }
 
 // PatchType defines the supported patch types.
-// +enum
+// +kubebuilder:validation:Enum=JSONPatch;JSONMergePatch
 type PatchType string
 
 const (
@@ -146,16 +146,3 @@ const (
 	// JSONMergePatchType identifies a https://datatracker.ietf.org/doc/html/rfc7386 JSON merge patch.
 	JSONMergePatchType PatchType = "JSONMergePatch"
 )
-
-// Patch represents a single patch to be applied to an object.
-type Patch struct {
-	// patchType defines the type of the patch.
-	// One of: "JSONPatch" or "JSONMergePatch".
-	// +required
-	PatchType PatchType `json:"patchType"`
-
-	// patch contains the patch which should be applied to the target object.
-	// It must be of the corresponding PatchType.
-	// +required
-	Patch []byte `json:"patch"`
-}
