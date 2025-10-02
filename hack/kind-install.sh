@@ -51,7 +51,7 @@ fi
 # https://github.com/containerd/containerd/blob/main/docs/cri/config.md#registry-configuration
 # See: https://github.com/containerd/containerd/blob/main/docs/hosts.md
 
-echo "$KIND_CLUSTER_CONFIG" | kind create cluster --name="$KIND_CLUSTER_NAME"  --config=-
+echo "$KIND_CLUSTER_CONFIG" | kind create cluster --image="kindest/node:v1.30.13" --name="$KIND_CLUSTER_NAME"  --config=-
 
 # 4. Add the registry config to the nodes
 #
