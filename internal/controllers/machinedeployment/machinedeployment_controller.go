@@ -305,7 +305,7 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
 	return errors.Errorf("unexpected deployment strategy type: %s", md.Spec.Rollout.Strategy.Type)
 }
 
-// createOrUpdateMachineSets apply changes identified by the rolloutPlanner to both newMS and oldMSs.
+// createOrUpdateMachineSets applies changes identified by the rolloutPlanner to both newMS and oldMSs.
 // Note: Both newMS and oldMS include the full intent for the SSA apply call with mandatory labels,
 // in place propagated fields, the annotations derived from the MachineDeployment, revision annotations
 // and also annotations influencing how to perform scale up/down operations.
@@ -352,7 +352,7 @@ func (r *Reconciler) createOrUpdateMachineSets(ctx context.Context, p *rolloutPl
 				return errors.Wrapf(kerrors.NewAggregate(pollErrors), "failed to get the MachineSet %s after creation", klog.KObj(ms))
 			}
 
-			// Report back creation timestamp, because legacy scale func leverage on this info to sort machines.
+			// Report back creation timestamp, because legacy scale func uses it to sort machines.
 			// TODO(in-place): drop this as soon as handling of MD with paused rollouts is moved into rollout planner (see scale in machinedeployment_sync.go).
 			ms.CreationTimestamp = tmpMS.CreationTimestamp
 			continue
@@ -373,11 +373,11 @@ func (r *Reconciler) createOrUpdateMachineSets(ctx context.Context, p *rolloutPl
 		newReplicas := ptr.Deref(ms.Spec.Replicas, 0)
 		if newReplicas < originalReplicas {
 			log.Info(fmt.Sprintf("Scaled down MachineSet %s to %d replicas (-%d)", ms.Name, newReplicas, originalReplicas-newReplicas))
-			r.recorder.Eventf(p.md, corev1.EventTypeNormal, "SuccessfulScale", "Scaled Down MachineSet %v: %d -> %d", ms.Name, originalReplicas, newReplicas)
+			r.recorder.Eventf(p.md, corev1.EventTypeNormal, "SuccessfulScale", "Scaled down MachineSet %v: %d -> %d", ms.Name, originalReplicas, newReplicas)
 		}
 		if newReplicas > originalReplicas {
 			log.Info(fmt.Sprintf("Scaled up MachineSet %s to %d replicas (+%d)", ms.Name, newReplicas, newReplicas-originalReplicas))
-			r.recorder.Eventf(p.md, corev1.EventTypeNormal, "SuccessfulScale", "Scaled Up MachineSet %v: %d -> %d", ms.Name, originalReplicas, newReplicas)
+			r.recorder.Eventf(p.md, corev1.EventTypeNormal, "SuccessfulScale", "Scaled up MachineSet %v: %d -> %d", ms.Name, originalReplicas, newReplicas)
 		}
 	}
 

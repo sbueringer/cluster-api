@@ -286,7 +286,7 @@ func (r *Reconciler) scaleMachineSet(ctx context.Context, ms *clusterv1.MachineS
 		return errors.Errorf("spec.replicas for MachineDeployment %v is nil, this is unexpected", client.ObjectKeyFromObject(deployment))
 	}
 
-	// No need to scale nor setting annotations, return.
+	// No need to scale, return.
 	if *(ms.Spec.Replicas) == newScale {
 		return nil
 	}
