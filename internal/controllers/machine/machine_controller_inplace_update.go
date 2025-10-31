@@ -65,7 +65,7 @@ func (r *Reconciler) reconcileInPlaceUpdate(ctx context.Context, s *scope) (ctrl
 
 	// If hook is not pending, we're waiting for the owner controller to mark it as pending.
 	if !hasUpdateMachinePending {
-		log.Info("In-place update annotations are set, waiting for UpdateMachine hook to be marked as pending")
+		log.Info("In-place update annotation is set, waiting for UpdateMachine hook to be marked as pending")
 		return ctrl.Result{}, nil
 	}
 
@@ -79,7 +79,7 @@ func (r *Reconciler) reconcileInPlaceUpdate(ctx context.Context, s *scope) (ctrl
 	}
 
 	if s.infraMachine == nil {
-		s.updatingReason = clusterv1.MachineUpdateFailedReason
+		s.updatingReason = clusterv1.MachineInPlaceUpdateFailedReason
 		s.updatingMessage = "In-place update not possible: InfraMachine not found"
 		return ctrl.Result{}, errors.New("in-place update failed: InfraMachine not found")
 	}
@@ -95,17 +95,17 @@ func (r *Reconciler) reconcileInPlaceUpdate(ctx context.Context, s *scope) (ctrl
 	log.Info("UpdateMachine hook is pending, calling runtime hook")
 	result, message, err := r.callUpdateMachineHook(ctx, s)
 	if err != nil {
-		s.updatingReason = clusterv1.MachineUpdateFailedReason
-		s.updatingMessage = fmt.Sprintf("UpdateMachine hook failed: %v", err)
-		return ctrl.Result{}, err
+		s.updatingReason = clusterv1.MachineInPlaceUpdateFailedReason
+		s.updatingMessage = "UpdateMachine hook failed: please check controller logs for errors"
+		return ctrl.Result{}, errors.Wrap(err, "in-place update failed")
 	}
 
 	if result.RequeueAfter > 0 {
-		s.updatingReason = clusterv1.MachineWaitingForUpdateMachineHookReason
+		s.updatingReason = clusterv1.MachineInPlaceUpdatingReason
 		if message != "" {
-			s.updatingMessage = fmt.Sprintf("UpdateMachine hook in progress: %s", message)
+			s.updatingMessage = fmt.Sprintf("In-place update in progress: %s", message)
 		} else {
-			s.updatingMessage = "UpdateMachine hook in progress"
+			s.updatingMessage = "In-place update in progress"
 		}
 		return result, nil
 	}
@@ -167,7 +167,7 @@ func (r *Reconciler) callUpdateMachineHook(ctx context.Context, s *scope) (ctrl.
 	response := &runtimehooksv1.UpdateMachineResponse{}
 
 	if err := r.RuntimeClient.CallAllExtensions(ctx, runtimehooksv1.UpdateMachine, s.machine, request, response); err != nil {
-		return ctrl.Result{}, "", errors.Wrap(err, "failed to call UpdateMachine hook")
+		return ctrl.Result{}, "", err
 	}
 
 	if response.GetRetryAfterSeconds() != 0 {

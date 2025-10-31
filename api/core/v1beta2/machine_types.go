@@ -175,18 +175,11 @@ const (
 	// MachineNotUpdatingReason surfaces when the Machine is not performing an in-place update.
 	MachineNotUpdatingReason = "NotUpdating"
 
-	// MachineWaitingForInPlaceUpdateAnnotationsReason surfaces when the Machine is waiting for
-	// InfraMachine and BootstrapConfig to be annotated for in-place update.
-	MachineWaitingForInPlaceUpdateAnnotationsReason = "WaitingForInPlaceUpdateAnnotations"
+	// MachineInPlaceUpdatingReason surfaces when the Machine is waiting for in-place update to complete.
+	MachineInPlaceUpdatingReason = "InPlaceUpdating"
 
-	// MachineWaitingForUpdateMachineHookReason surfaces when the Machine is waiting for the UpdateMachine hook to complete.
-	MachineWaitingForUpdateMachineHookReason = "WaitingForUpdateMachineHook"
-
-	// MachineUpdateFailedReason surfaces when the in-place update has failed.
-	MachineUpdateFailedReason = "UpdateFailed"
-
-	// MachineUpdatingInternalErrorReason surfaces unexpected failures during in-place update.
-	MachineUpdatingInternalErrorReason = InternalErrorReason
+	// MachineInPlaceUpdateFailedReason surfaces when the in-place update has failed.
+	MachineInPlaceUpdateFailedReason = "InPlaceUpdateFailed"
 )
 
 // Machine's BootstrapConfigReady condition and corresponding reasons.

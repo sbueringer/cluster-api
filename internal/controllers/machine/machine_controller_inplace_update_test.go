@@ -135,7 +135,7 @@ func TestReconcileInPlaceUpdate(t *testing.T) {
 			wantResult:      ctrl.Result{},
 			wantErr:         true,
 			wantErrContains: "InfraMachine not found",
-			wantReason:      clusterv1.MachineUpdateFailedReason,
+			wantReason:      clusterv1.MachineInPlaceUpdateFailedReason,
 			wantMessage:     "In-place update not possible: InfraMachine not found",
 		},
 		{
