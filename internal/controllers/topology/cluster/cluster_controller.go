@@ -55,6 +55,7 @@ import (
 	"sigs.k8s.io/cluster-api/exp/topology/scope"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/hooks"
+	reconcilerutil "sigs.k8s.io/cluster-api/internal/util/reconciler"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/internal/webhooks"
 	"sigs.k8s.io/cluster-api/util"
@@ -106,7 +107,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	}
 
 	predicateLog := ctrl.LoggerFrom(ctx).WithValues("controller", "topology/cluster")
-	c, err := ctrl.NewControllerManagedBy(mgr).
+	_, c, err := reconcilerutil.ControllerManagedBy(mgr, predicateLog).
 		For(&clusterv1.Cluster{}, builder.WithPredicates(
 			// Only reconcile Cluster with topology and with changes relevant for this controller.
 			predicates.All(mgr.GetScheme(), predicateLog,
@@ -121,31 +122,23 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		Watches(
 			&clusterv1.ClusterClass{},
 			handler.EnqueueRequestsFromMapFunc(r.clusterClassToCluster),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
 		).
 		Watches(
 			&clusterv1.MachineDeployment{},
 			handler.EnqueueRequestsFromMapFunc(r.machineDeploymentToCluster),
 			// Only trigger Cluster reconciliation if the MachineDeployment is topology owned, the resource is changed, and the change is relevant.
-			builder.WithPredicates(predicates.All(mgr.GetScheme(), predicateLog,
-				predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog),
-				predicates.ResourceIsTopologyOwned(mgr.GetScheme(), predicateLog),
-				machineDeploymentChangeIsRelevant(mgr.GetScheme(), predicateLog),
-			)),
+			predicates.ResourceIsTopologyOwned(mgr.GetScheme(), predicateLog),
+			machineDeploymentChangeIsRelevant(mgr.GetScheme(), predicateLog),
 		).
 		Watches(
 			&clusterv1.MachinePool{},
 			handler.EnqueueRequestsFromMapFunc(r.machinePoolToCluster),
 			// Only trigger Cluster reconciliation if the MachinePool is topology owned, the resource is changed.
-			builder.WithPredicates(predicates.All(mgr.GetScheme(), predicateLog,
-				predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog),
-				predicates.ResourceIsTopologyOwned(mgr.GetScheme(), predicateLog),
-			)),
+			predicates.ResourceIsTopologyOwned(mgr.GetScheme(), predicateLog),
 		).
 		WithOptions(options).
 		WithEventFilter(predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue)).
 		Build(r)
-
 	if err != nil {
 		return errors.Wrap(err, "failed setting up with a controller manager")
 	}

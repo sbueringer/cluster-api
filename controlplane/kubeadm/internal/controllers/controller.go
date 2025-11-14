@@ -36,7 +36,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -50,6 +49,7 @@ import (
 	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/util/inplace"
+	reconcilerutil "sigs.k8s.io/cluster-api/internal/util/reconciler"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/cache"
@@ -102,6 +102,11 @@ type KubeadmControlPlaneReconciler struct {
 	managementClusterUncached internal.ManagementCluster
 	ssaCache                  ssa.Cache
 
+	// reconcileCache is used to store when Reconcile should not be executed before a
+	// specific time for a specific Request. This is used to implement rate-limiting to avoid
+	// e.g. spamming workload clusters with eviction requests during Node drain.
+	reconcileCache cache.Cache[cache.ReconcileEntry]
+
 	// Only used for testing.
 	overrideTryInPlaceUpdateFunc       func(ctx context.Context, controlPlane *internal.ControlPlane, machineToInPlaceUpdate *clusterv1.Machine, machineUpToDateResult internal.UpToDateResult) (bool, ctrl.Result, error)
 	overrideScaleUpControlPlaneFunc    func(ctx context.Context, controlPlane *internal.ControlPlane) (ctrl.Result, error)
@@ -132,22 +137,19 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(ctx context.Context, mg
 	}
 
 	predicateLog := ctrl.LoggerFrom(ctx).WithValues("controller", "kubeadmcontrolplane")
-	c, err := ctrl.NewControllerManagedBy(mgr).
+	reconcileCache, c, err := reconcilerutil.ControllerManagedBy(mgr, predicateLog).
 		For(&controlplanev1.KubeadmControlPlane{}).
-		Owns(&clusterv1.Machine{}, builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog))).
+		Owns(&clusterv1.Machine{}).
 		WithOptions(options).
 		WithEventFilter(predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue)).
 		Watches(
 			&clusterv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(r.ClusterToKubeadmControlPlane),
-			builder.WithPredicates(
-				predicates.All(mgr.GetScheme(), predicateLog,
-					predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog),
-					predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue),
-					predicates.Any(mgr.GetScheme(), predicateLog,
-						predicates.ClusterPausedTransitionsOrInfrastructureProvisioned(mgr.GetScheme(), predicateLog),
-						predicates.ClusterTopologyVersionChanged(mgr.GetScheme(), predicateLog),
-					),
+			predicates.All(mgr.GetScheme(), predicateLog,
+				predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue),
+				predicates.Any(mgr.GetScheme(), predicateLog,
+					predicates.ClusterPausedTransitionsOrInfrastructureProvisioned(mgr.GetScheme(), predicateLog),
+					predicates.ClusterTopologyVersionChanged(mgr.GetScheme(), predicateLog),
 				),
 			),
 		).
@@ -158,6 +160,7 @@ func (r *KubeadmControlPlaneReconciler) SetupWithManager(ctx context.Context, mg
 		return errors.Wrap(err, "failed setting up with a controller manager")
 	}
 
+	r.reconcileCache = reconcileCache
 	r.controller = c
 	r.recorder = mgr.GetEventRecorderFor("kubeadmcontrolplane-controller")
 	r.ssaCache = ssa.NewCache("kubeadmcontrolplane")

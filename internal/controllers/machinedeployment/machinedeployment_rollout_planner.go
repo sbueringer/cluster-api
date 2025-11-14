@@ -19,11 +19,13 @@ package machinedeployment
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -31,11 +33,13 @@ import (
 	"sigs.k8s.io/cluster-api/internal/controllers/machinedeployment/mdutil"
 	"sigs.k8s.io/cluster-api/internal/util/hash"
 	"sigs.k8s.io/cluster-api/util/annotations"
+	"sigs.k8s.io/cluster-api/util/cache"
 )
 
 type rolloutPlanner struct {
-	Client        client.Client
-	RuntimeClient runtimeclient.Client
+	Client                   client.Client
+	RuntimeClient            runtimeclient.Client
+	canUpdateMachineSetCache cache.Cache[CanUpdateMachineSetCacheEntry]
 
 	md       *clusterv1.MachineDeployment
 	revision string
@@ -50,16 +54,19 @@ type rolloutPlanner struct {
 	upToDateResults map[string]mdutil.UpToDateResult
 
 	scaleIntents                          map[string]int32
+	notes                                 map[string][]string
 	overrideComputeDesiredMS              func(ctx context.Context, deployment *clusterv1.MachineDeployment, currentMS *clusterv1.MachineSet) (*clusterv1.MachineSet, error)
 	overrideCanUpdateMachineSetInPlace    func(ctx context.Context, oldMS, newMS *clusterv1.MachineSet) (bool, error)
 	overrideCanExtensionsUpdateMachineSet func(ctx context.Context, oldMS, newMS *clusterv1.MachineSet, templateObjects *templateObjects, extensionHandlers []string) (bool, []string, error)
 }
 
-func newRolloutPlanner(c client.Client, runtimeClient runtimeclient.Client) *rolloutPlanner {
+func newRolloutPlanner(c client.Client, runtimeClient runtimeclient.Client, canUpdateMachineSetCache cache.Cache[CanUpdateMachineSetCacheEntry]) *rolloutPlanner {
 	return &rolloutPlanner{
-		Client:        c,
-		RuntimeClient: runtimeClient,
-		scaleIntents:  make(map[string]int32),
+		Client:                   c,
+		RuntimeClient:            runtimeClient,
+		canUpdateMachineSetCache: canUpdateMachineSetCache,
+		scaleIntents:             make(map[string]int32),
+		notes:                    make(map[string][]string),
 	}
 }
 
@@ -86,6 +93,8 @@ func (p *rolloutPlanner) init(ctx context.Context, md *clusterv1.MachineDeployme
 		}
 	}
 
+	log := ctrl.LoggerFrom(ctx)
+
 	// Store md and machines.
 	p.md = md
 	p.machines = machines
@@ -94,6 +103,7 @@ func (p *rolloutPlanner) init(ctx context.Context, md *clusterv1.MachineDeployme
 	p.originalMS = make(map[string]*clusterv1.MachineSet)
 	for _, ms := range msList {
 		p.originalMS[ms.Name] = ms.DeepCopy()
+		log.V(5).Info(fmt.Sprintf("Rollout planner init: %s", msLog2(ms, machines)))
 	}
 
 	// Try to find a MachineSet which matches the MachineDeployments intent, the newMS; consider all the other MachineSets as oldMs.
@@ -321,4 +331,15 @@ func computeDesiredMS(ctx context.Context, deployment *clusterv1.MachineDeployme
 	desiredMS.Spec.Template.Spec.Taints = deployment.Spec.Template.Spec.Taints
 
 	return desiredMS, nil
+}
+
+func (p *rolloutPlanner) addNote(ms *clusterv1.MachineSet, format string, a ...any) {
+	p.notes[ms.Name] = append(p.notes[ms.Name], fmt.Sprintf(format, a...))
+}
+
+func (p *rolloutPlanner) noteSummary(ms *clusterv1.MachineSet) string {
+	if len(p.notes[ms.Name]) == 0 {
+		return ""
+	}
+	return strings.Join(p.notes[ms.Name], ", ")
 }

@@ -21,9 +21,8 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestCache(t *testing.T) {
@@ -31,13 +30,13 @@ func TestCache(t *testing.T) {
 
 	c := New[ReconcileEntry](DefaultTTL)
 
-	machine := &clusterv1.Machine{
-		ObjectMeta: metav1.ObjectMeta{
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
 			Namespace: "default",
 			Name:      "test-machine",
 		},
 	}
-	entry := NewReconcileEntry(machine, time.Now())
+	entry := NewReconcileEntry(req, time.Now())
 
 	_, ok := c.Has(entry.Key())
 	g.Expect(ok).To(BeFalse())

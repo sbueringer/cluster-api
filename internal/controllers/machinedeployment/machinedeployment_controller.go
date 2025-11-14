@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -42,8 +42,10 @@ import (
 	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
 	"sigs.k8s.io/cluster-api/feature"
 	clientutil "sigs.k8s.io/cluster-api/internal/util/client"
+	reconcilerutil "sigs.k8s.io/cluster-api/internal/util/reconciler"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/cache"
 	"sigs.k8s.io/cluster-api/util/collections"
 	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/cluster-api/util/finalizers"
@@ -81,6 +83,8 @@ type Reconciler struct {
 
 	recorder record.EventRecorder
 	ssaCache ssa.Cache
+
+	canUpdateMachineSetCache cache.Cache[CanUpdateMachineSetCacheEntry]
 }
 
 func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -97,30 +101,27 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		return err
 	}
 
-	err = ctrl.NewControllerManagedBy(mgr).
+	_, _, err = reconcilerutil.ControllerManagedBy(mgr, predicateLog).
 		For(&clusterv1.MachineDeployment{}).
-		Owns(&clusterv1.MachineSet{}, builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog))).
+		Owns(&clusterv1.MachineSet{}).
 		// Watches enqueues MachineDeployment for corresponding MachineSet resources, if no managed controller reference (owner) exists.
 		Watches(
 			&clusterv1.MachineSet{},
 			handler.EnqueueRequestsFromMapFunc(r.MachineSetToDeployments),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
 		).
 		WithOptions(options).
 		WithEventFilter(predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue)).
 		Watches(
 			&clusterv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(clusterToMachineDeployments),
-			builder.WithPredicates(predicates.All(mgr.GetScheme(), predicateLog,
-				predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog),
-				predicates.ClusterPausedTransitions(mgr.GetScheme(), predicateLog),
-			)),
+			predicates.ClusterPausedTransitions(mgr.GetScheme(), predicateLog),
 			// TODO: should this wait for Cluster.Status.InfrastructureReady similar to Infra Machine resources?
-		).Complete(r)
+		).Build(r)
 	if err != nil {
 		return errors.Wrap(err, "failed setting up with a controller manager")
 	}
 
+	r.canUpdateMachineSetCache = cache.New[CanUpdateMachineSetCacheEntry](24 * time.Hour)
 	r.recorder = mgr.GetEventRecorderFor("machinedeployment-controller")
 	r.ssaCache = ssa.NewCache("machinedeployment")
 	return nil
@@ -332,8 +333,9 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
 // Note: When the newMS has been created by the rollout planner, also wait for the cache to be up to date.
 func (r *Reconciler) createOrUpdateMachineSetsAndSyncMachineDeploymentRevision(ctx context.Context, p *rolloutPlanner) error {
 	log := ctrl.LoggerFrom(ctx)
-	allMSs := append(p.oldMSs, p.newMS)
 
+	// Note first create/update newMS, then oldMSs
+	allMSs := append([]*clusterv1.MachineSet{p.newMS}, p.oldMSs...)
 	for _, ms := range allMSs {
 		log = log.WithValues("MachineSet", klog.KObj(ms))
 		ctx = ctrl.LoggerInto(ctx, log)
@@ -348,7 +350,13 @@ func (r *Reconciler) createOrUpdateMachineSetsAndSyncMachineDeploymentRevision(c
 				r.recorder.Eventf(p.md, corev1.EventTypeWarning, "FailedCreate", "Failed to create MachineSet %s: %v", klog.KObj(ms), err)
 				return errors.Wrapf(err, "failed to create MachineSet %s", klog.KObj(ms))
 			}
-			log.Info(fmt.Sprintf("MachineSet created (%s)", p.createReason))
+			if len(p.oldMSs) > 0 {
+				log.Info(fmt.Sprintf("MachineSets need rollout: %s", machineSetNames(p.oldMSs)), "reason", p.createReason)
+			}
+			log.Info(fmt.Sprintf("MachineSet %s created, it is now the current MachineSet", ms.Name))
+			if ptr.Deref(ms.Spec.Replicas, 0) > 0 {
+				log.Info(fmt.Sprintf("Scaled up current MachineSet %s from 0 to %d replicas (+%[2]d)", ms.Name, ptr.Deref(ms.Spec.Replicas, 0)), "reason", p.noteSummary(ms))
+			}
 			r.recorder.Eventf(p.md, corev1.EventTypeNormal, "SuccessfulCreate", "Created MachineSet %s with %d replicas", klog.KObj(ms), ptr.Deref(ms.Spec.Replicas, 0))
 
 			// Keep trying to get the MachineSet. This will force the cache to update and prevent any future reconciliation of
@@ -360,6 +368,7 @@ func (r *Reconciler) createOrUpdateMachineSetsAndSyncMachineDeploymentRevision(c
 
 			continue
 		}
+		// FIXME: surface when new MS is changed
 
 		// Update the MachineSet to propagate in-place mutable fields from the MachineDeployment and/or changes applied by the rollout planner.
 		originalMS, ok := p.originalMS[ms.Name]
@@ -381,19 +390,24 @@ func (r *Reconciler) createOrUpdateMachineSetsAndSyncMachineDeploymentRevision(c
 
 		changes := getAnnotationChanges(originalMS, ms)
 
+		msType := "current"
+		if ms.Name != p.newMS.Name {
+			msType = "old"
+		}
+
 		newReplicas := ptr.Deref(ms.Spec.Replicas, 0)
 		if newReplicas < originalReplicas {
 			changes = append(changes, fmt.Sprintf("replicas %d", newReplicas))
-			log.Info(fmt.Sprintf("Scaled down MachineSet %s to %d replicas (-%d)", ms.Name, newReplicas, originalReplicas-newReplicas), "diff", strings.Join(changes, ","))
+			log.Info(fmt.Sprintf("Scaled down %s MachineSet %s from %d to %d replicas (-%d)", msType, ms.Name, originalReplicas, newReplicas, originalReplicas-newReplicas), "reason", p.noteSummary(ms), "diff", strings.Join(changes, ","))
 			r.recorder.Eventf(p.md, corev1.EventTypeNormal, "SuccessfulScale", "Scaled down MachineSet %v: %d -> %d", ms.Name, originalReplicas, newReplicas)
 		}
 		if newReplicas > originalReplicas {
 			changes = append(changes, fmt.Sprintf("replicas %d", newReplicas))
-			log.Info(fmt.Sprintf("Scaled up MachineSet %s to %d replicas (+%d)", ms.Name, newReplicas, newReplicas-originalReplicas), "diff", strings.Join(changes, ","))
+			log.Info(fmt.Sprintf("Scaled up %s MachineSet %s from %d to %d replicas (+%d)", msType, ms.Name, originalReplicas, newReplicas, newReplicas-originalReplicas), "reason", p.noteSummary(ms), "diff", strings.Join(changes, ","))
 			r.recorder.Eventf(p.md, corev1.EventTypeNormal, "SuccessfulScale", "Scaled up MachineSet %v: %d -> %d", ms.Name, originalReplicas, newReplicas)
 		}
 		if newReplicas == originalReplicas && len(changes) > 0 {
-			log.Info(fmt.Sprintf("Updated MachineSet %s", ms.Name), "diff", strings.Join(changes, ","))
+			log.Info(fmt.Sprintf("Updated %s MachineSet %s", msType, ms.Name), "diff", strings.Join(changes, ","))
 		}
 
 		// Only wait for cache if the object was changed.
@@ -413,6 +427,14 @@ func (r *Reconciler) createOrUpdateMachineSetsAndSyncMachineDeploymentRevision(c
 	}
 
 	return nil
+}
+
+func machineSetNames(machineSets []*clusterv1.MachineSet) string {
+	var machineSetNames []string
+	for _, ms := range machineSets {
+		machineSetNames = append(machineSetNames, ms.Name)
+	}
+	return sortAndJoin(machineSetNames)
 }
 
 func getAnnotationChanges(originalMS *clusterv1.MachineSet, ms *clusterv1.MachineSet) []string {

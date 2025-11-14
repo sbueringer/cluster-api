@@ -38,7 +38,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -55,6 +54,7 @@ import (
 	topologynames "sigs.k8s.io/cluster-api/internal/topology/names"
 	clientutil "sigs.k8s.io/cluster-api/internal/util/client"
 	"sigs.k8s.io/cluster-api/internal/util/inplace"
+	reconcilerutil "sigs.k8s.io/cluster-api/internal/util/reconciler"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
@@ -126,36 +126,31 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		return err
 	}
 
-	err = ctrl.NewControllerManagedBy(mgr).
+	_, _, err = reconcilerutil.ControllerManagedBy(mgr, predicateLog).
 		For(&clusterv1.MachineSet{}).
-		Owns(&clusterv1.Machine{}, builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog))).
+		Owns(&clusterv1.Machine{}).
 		// Watches enqueues MachineSet for corresponding Machine resources, if no managed controller reference (owner) exists.
 		Watches(
 			&clusterv1.Machine{},
 			handler.EnqueueRequestsFromMapFunc(r.MachineToMachineSets),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
-		).
+			).
 		Watches(
 			&clusterv1.MachineDeployment{},
 			handler.EnqueueRequestsFromMapFunc(mdToMachineSets),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
-		).
+			).
 		WithOptions(options).
 		WithEventFilter(predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue)).
 		Watches(
 			&clusterv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(clusterToMachineSets),
-			builder.WithPredicates(
-				// TODO: should this wait for Cluster.Status.InfrastructureReady similar to Infra Machine resources?
-				predicates.All(mgr.GetScheme(), predicateLog,
-					predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog),
-					predicates.ClusterPausedTransitions(mgr.GetScheme(), predicateLog),
-					predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue),
-				),
+			// TODO: should this wait for Cluster.Status.InfrastructureReady similar to Infra Machine resources?
+			predicates.All(mgr.GetScheme(), predicateLog,
+				predicates.ClusterPausedTransitions(mgr.GetScheme(), predicateLog),
+				predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue),
 			),
 		).
 		WatchesRawSource(r.ClusterCache.GetClusterSource("machineset", clusterToMachineSets)).
-		Complete(r)
+		Build(r)
 	if err != nil {
 		return errors.Wrap(err, "failed setting up with a controller manager")
 	}
@@ -908,6 +903,7 @@ func (r *Reconciler) deleteMachines(ctx context.Context, s *scope, machinesToDel
 	ms := s.machineSet
 	machines := s.machines
 
+	// FIXME: consider improving this by only logging if we actually do a delete (we need infos from above)
 	log.Info(fmt.Sprintf("MachineSet is scaling down to %d replicas by deleting %d Machines", *(ms.Spec.Replicas), machinesToDelete), "replicas", *(ms.Spec.Replicas), "machineCount", len(machines), "order", cmp.Or(ms.Spec.Deletion.Order, clusterv1.RandomMachineSetDeletionOrder))
 
 	// Pick the list of machines to be deleted according to the criteria defined in ms.Spec.Deletion.Order.

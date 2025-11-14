@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal/desiredstate"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/cache"
 	"sigs.k8s.io/cluster-api/util/collections"
 )
 
@@ -153,6 +154,7 @@ func TestKubeadmControlPlaneReconciler_scaleUpControlPlane(t *testing.T) {
 			Client:                    env,
 			managementCluster:         fmc,
 			managementClusterUncached: fmc,
+			reconcileCache:            cache.New[cache.ReconcileEntry](cache.DefaultTTL),
 			recorder:                  record.NewFakeRecorder(32),
 		}
 		controlPlane := &internal.ControlPlane{
@@ -223,6 +225,7 @@ func TestKubeadmControlPlaneReconciler_scaleUpControlPlane(t *testing.T) {
 			SecretCachingClient:       secretCachingClient,
 			managementCluster:         fmc,
 			managementClusterUncached: fmc,
+			reconcileCache:            cache.New[cache.ReconcileEntry](cache.DefaultTTL),
 			recorder:                  record.NewFakeRecorder(32),
 		}
 
@@ -357,6 +360,7 @@ func TestKubeadmControlPlaneReconciler_scaleDownControlPlane_NoError(t *testing.
 			managementCluster: &fakeManagementCluster{
 				Workload: &fakeWorkloadCluster{},
 			},
+			reconcileCache: cache.New[cache.ReconcileEntry](cache.DefaultTTL),
 		}
 
 		cluster := &clusterv1.Cluster{}
@@ -781,7 +785,8 @@ func TestPreflightChecks(t *testing.T) {
 			g := NewWithT(t)
 
 			r := &KubeadmControlPlaneReconciler{
-				recorder: record.NewFakeRecorder(32),
+				reconcileCache: cache.New[cache.ReconcileEntry](cache.DefaultTTL),
+				recorder:       record.NewFakeRecorder(32),
 			}
 			cluster := &clusterv1.Cluster{}
 			if tt.cluster != nil {

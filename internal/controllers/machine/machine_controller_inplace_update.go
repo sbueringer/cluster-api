@@ -31,11 +31,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	runtimehooksv1 "sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/hooks"
+	"sigs.k8s.io/cluster-api/util/cache"
 )
 
 // reconcileInPlaceUpdate handles the in-place update workflow for a Machine.
@@ -150,6 +152,13 @@ func (r *Reconciler) callUpdateMachineHook(ctx context.Context, s *scope) (ctrl.
 		return ctrl.Result{}, "", errors.Errorf("found multiple UpdateMachine hooks (%s): only one hook is supported", strings.Join(extensions, ","))
 	}
 
+	if cacheEntry, ok := r.updateMachineRequestCache.Has(cache.NewReconcileEntryKey(reconcile.Request{NamespacedName: client.ObjectKeyFromObject(s.machine)})); ok {
+		if requeueAfter, requeue := cacheEntry.ShouldRequeue(time.Now()); requeue {
+			log.V(5).Info(fmt.Sprintf("Skip calling UpdateMachine hook retry after %s seconds", requeueAfter))
+			return ctrl.Result{RequeueAfter: requeueAfter}, cacheEntry.AdditionalData[0], nil
+		}
+	}
+
 	// Note: When building request message, dropping status; Runtime extension should treat UpdateMachine
 	// requests as desired state; it is up to them to compare with current state and perform necessary actions.
 	request := &runtimehooksv1.UpdateMachineRequest{
@@ -171,7 +180,9 @@ func (r *Reconciler) callUpdateMachineHook(ctx context.Context, s *scope) (ctrl.
 
 	if response.GetRetryAfterSeconds() != 0 {
 		log.Info(fmt.Sprintf("UpdateMachine hook requested retry after %d seconds", response.GetRetryAfterSeconds()))
-		return ctrl.Result{RequeueAfter: time.Duration(response.GetRetryAfterSeconds()) * time.Second}, response.GetMessage(), nil
+		requeueAfter := time.Duration(response.GetRetryAfterSeconds()) * time.Second
+		r.updateMachineRequestCache.Add(cache.NewReconcileEntry(cache.ObjToRequest(s.machine), time.Now().Add(requeueAfter), response.GetMessage()))
+		return ctrl.Result{RequeueAfter: requeueAfter}, response.GetMessage(), nil
 	}
 
 	log.Info("UpdateMachine hook completed successfully")

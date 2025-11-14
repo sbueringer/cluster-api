@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -47,6 +46,7 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/external"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/hooks"
+	reconcilerutil "sigs.k8s.io/cluster-api/internal/util/reconciler"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -94,7 +94,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	}
 
 	predicateLog := ctrl.LoggerFrom(ctx).WithValues("controller", "cluster")
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := reconcilerutil.ControllerManagedBy(mgr, predicateLog).
 		For(&clusterv1.Cluster{}).
 		WatchesRawSource(r.ClusterCache.GetClusterSource("cluster", func(_ context.Context, o client.Object) []ctrl.Request {
 			return []ctrl.Request{{NamespacedName: client.ObjectKeyFromObject(o)}}
@@ -102,26 +102,22 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		Watches(
 			&clusterv1.Machine{},
 			handler.EnqueueRequestsFromMapFunc(r.controlPlaneMachineToCluster),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
 		).
 		Watches(
 			&clusterv1.MachineDeployment{},
 			handler.EnqueueRequestsFromMapFunc(r.machineDeploymentToCluster),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
 		)
 	if feature.Gates.Enabled(feature.MachinePool) {
 		b = b.Watches(
 			&clusterv1.MachinePool{},
 			handler.EnqueueRequestsFromMapFunc(r.machinePoolToCluster),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), predicateLog)),
 		)
 	}
 
-	c, err := b.
+	_, c, err := b.
 		WithOptions(options).
 		WithEventFilter(predicates.ResourceHasFilterLabel(mgr.GetScheme(), predicateLog, r.WatchFilterValue)).
 		Build(r)
-
 	if err != nil {
 		return errors.Wrap(err, "failed setting up with a controller manager")
 	}

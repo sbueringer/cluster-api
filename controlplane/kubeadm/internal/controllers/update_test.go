@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/cache"
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/test/builder"
 )
@@ -101,7 +102,8 @@ func TestKubeadmControlPlaneReconciler_RolloutStrategy_ScaleUp(t *testing.T) {
 				Status: internal.ClusterStatus{Nodes: 1},
 			},
 		},
-		ssaCache: ssa.NewCache("test-controller"),
+		ssaCache:       ssa.NewCache("test-controller"),
+		reconcileCache: cache.New[cache.ReconcileEntry](cache.DefaultTTL),
 	}
 	controlPlane := &internal.ControlPlane{
 		KCP:      kcp,

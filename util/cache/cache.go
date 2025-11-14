@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	kcache "k8s.io/client-go/tools/cache"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -99,30 +100,37 @@ func (r *cache[E]) Has(key string) (E, bool) {
 // ReconcileEntry is an Entry for the Cache that stores the
 // earliest time after which the next Reconcile should be executed.
 type ReconcileEntry struct {
-	Request        ctrl.Request
+	Request        reconcile.Request
 	ReconcileAfter time.Time
+	AdditionalData []string
+}
+
+func ObjToRequest(obj metav1.Object) reconcile.Request {
+	return reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: obj.GetNamespace(),
+			Name: obj.GetName(),
+		},
+	}
+
 }
 
 // NewReconcileEntry creates a new ReconcileEntry based on an object and a reconcileAfter time.
-func NewReconcileEntry(obj metav1.Object, reconcileAfter time.Time) ReconcileEntry {
+func NewReconcileEntry(req reconcile.Request, reconcileAfter time.Time, additionalData ...string) ReconcileEntry {
 	return ReconcileEntry{
-		Request: ctrl.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
-				Name:      obj.GetName(),
-			},
-		},
+		Request: req,
 		ReconcileAfter: reconcileAfter,
+		AdditionalData: additionalData,
 	}
 }
 
 // NewReconcileEntryKey returns the key of a ReconcileEntry based on an object.
-func NewReconcileEntryKey(obj metav1.Object) string {
+func NewReconcileEntryKey(req reconcile.Request) string {
 	return ReconcileEntry{
 		Request: ctrl.Request{
 			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
-				Name:      obj.GetName(),
+				Namespace: req.Namespace,
+				Name:      req.Name,
 			},
 		},
 	}.Key()

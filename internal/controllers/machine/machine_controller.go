@@ -39,7 +39,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -56,6 +55,7 @@ import (
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/internal/contract"
 	"sigs.k8s.io/cluster-api/internal/controllers/machine/drain"
+	reconcilerutil "sigs.k8s.io/cluster-api/internal/util/reconciler"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/cache"
@@ -115,10 +115,12 @@ type Reconciler struct {
 	// during a single reconciliation.
 	nodeDeletionRetryTimeout time.Duration
 
-	// reconcileDeleteCache is used to store when reconcileDelete should not be executed before a
+	updateMachineRequestCache cache.Cache[cache.ReconcileEntry]
+
+	// reconcileCache is used to store when Reconcile should not be executed before a
 	// specific time for a specific Request. This is used to implement rate-limiting to avoid
 	// e.g. spamming workload clusters with eviction requests during Node drain.
-	reconcileDeleteCache cache.Cache[cache.ReconcileEntry]
+	reconcileCache cache.Cache[cache.ReconcileEntry]
 
 	predicateLog *logr.Logger
 }
@@ -152,37 +154,36 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	if r.nodeDeletionRetryTimeout.Nanoseconds() == 0 {
 		r.nodeDeletionRetryTimeout = 10 * time.Second
 	}
-	c, err := ctrl.NewControllerManagedBy(mgr).
+
+	reconcileCache, c, err := reconcilerutil.ControllerManagedBy(mgr, *r.predicateLog).
 		For(&clusterv1.Machine{}).
 		WithOptions(options).
 		WithEventFilter(predicates.ResourceHasFilterLabel(mgr.GetScheme(), *r.predicateLog, r.WatchFilterValue)).
 		Watches(
 			&clusterv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(clusterToMachines),
-			builder.WithPredicates(
-				// TODO: should this wait for Cluster.Status.InfrastructureReady similar to Infra Machine resources?
-				predicates.All(mgr.GetScheme(), *r.predicateLog,
-					predicates.ResourceIsChanged(mgr.GetScheme(), *r.predicateLog),
-					predicates.ClusterControlPlaneInitialized(mgr.GetScheme(), *r.predicateLog),
-					predicates.ResourceHasFilterLabel(mgr.GetScheme(), *r.predicateLog, r.WatchFilterValue),
-				),
-			)).
+			// TODO: should this wait for Cluster.Status.InfrastructureReady similar to Infra Machine resources?
+			predicates.All(mgr.GetScheme(), *r.predicateLog,
+				predicates.ClusterControlPlaneInitialized(mgr.GetScheme(), *r.predicateLog),
+				predicates.ResourceHasFilterLabel(mgr.GetScheme(), *r.predicateLog, r.WatchFilterValue),
+			),
+		).
 		WatchesRawSource(r.ClusterCache.GetClusterSource("machine", clusterToMachines, clustercache.WatchForProbeFailure(r.RemoteConditionsGracePeriod))).
 		Watches(
 			&clusterv1.MachineSet{},
 			handler.EnqueueRequestsFromMapFunc(msToMachines),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), *r.predicateLog)),
 		).
 		Watches(
 			&clusterv1.MachineDeployment{},
 			handler.EnqueueRequestsFromMapFunc(mdToMachines),
-			builder.WithPredicates(predicates.ResourceIsChanged(mgr.GetScheme(), *r.predicateLog)),
 		).
 		Build(r)
 	if err != nil {
 		return errors.Wrap(err, "failed setting up with a controller manager")
 	}
 
+	r.reconcileCache = reconcileCache
+	r.updateMachineRequestCache = cache.New[cache.ReconcileEntry](cache.DefaultTTL)
 	r.controller = c
 	r.recorder = mgr.GetEventRecorderFor("machine-controller")
 	r.externalTracker = external.ObjectTracker{
@@ -191,7 +192,6 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 		Scheme:          mgr.GetScheme(),
 		PredicateLogger: r.predicateLog,
 	}
-	r.reconcileDeleteCache = cache.New[cache.ReconcileEntry](cache.DefaultTTL)
 	return nil
 }
 
@@ -237,16 +237,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retres ct
 
 	if isPaused, requeue, err := paused.EnsurePausedCondition(ctx, r.Client, cluster, m); err != nil || isPaused || requeue {
 		return ctrl.Result{}, err
-	}
-
-	if !m.DeletionTimestamp.IsZero() {
-		// Check reconcileDeleteCache to ensure we won't run reconcileDelete too frequently.
-		// Note: The reconcileDelete func will add entries to the cache.
-		if cacheEntry, ok := r.reconcileDeleteCache.Has(cache.NewReconcileEntryKey(m)); ok {
-			if requeueAfter, requeue := cacheEntry.ShouldRequeue(time.Now()); requeue {
-				return ctrl.Result{RequeueAfter: requeueAfter}, nil
-			}
-		}
 	}
 
 	s := &scope{
@@ -447,12 +437,6 @@ type scope struct {
 	// nodeGetError is the error that occurred when trying to get the Node.
 	nodeGetError error
 
-	// reconcileDeleteExecuted will be set to true if the logic in reconcileDelete is executed.
-	// We might requeue early in reconcileDelete because of rate-limiting.
-	// If the Machine has the deletionTimestamp set and this field is false we don't update the
-	// Deleting condition.
-	reconcileDeleteExecuted bool
-
 	// deletingReason is the reason that should be used when setting the Deleting condition.
 	deletingReason string
 
@@ -491,14 +475,6 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (ctrl.Result
 	log := ctrl.LoggerFrom(ctx)
 	cluster := s.cluster
 	m := s.machine
-
-	s.reconcileDeleteExecuted = true
-
-	// Add entry to the reconcileDeleteCache so we won't run reconcileDelete more than once per second.
-	// Under certain circumstances the ReconcileAfter time will be set to a later time, e.g. when we're waiting
-	// for Pods to terminate or volumes to detach.
-	// This is done to ensure we're not spamming the workload cluster API server.
-	r.reconcileDeleteCache.Add(cache.NewReconcileEntry(s.machine, time.Now().Add(1*time.Second)))
 
 	// Set "fallback" reason and message. This is used if we don't set a more specific reason and message below.
 	s.deletingReason = clusterv1.MachineDeletingReason
@@ -949,7 +925,7 @@ func (r *Reconciler) drainNode(ctx context.Context, s *scope) (ctrl.Result, erro
 	}
 
 	// Add entry to the reconcileDeleteCache so we won't retry drain again before drainRetryInterval.
-	r.reconcileDeleteCache.Add(cache.NewReconcileEntry(machine, time.Now().Add(drainRetryInterval)))
+	r.reconcileCache.Add(cache.NewReconcileEntry(cache.ObjToRequest(machine), time.Now().Add(drainRetryInterval)))
 
 	conditionMessage := evictionResult.ConditionMessage(machine.Status.Deletion.NodeDrainStartTime)
 	v1beta1conditions.MarkFalse(machine, clusterv1.DrainingSucceededV1Beta1Condition, clusterv1.DrainingV1Beta1Reason, clusterv1.ConditionSeverityInfo, "%s", conditionMessage)
@@ -1035,7 +1011,7 @@ func (r *Reconciler) shouldWaitForNodeVolumes(ctx context.Context, s *scope) (ct
 	}
 
 	// Add entry to the reconcileDeleteCache so we won't retry shouldWaitForNodeVolumes again before waitForVolumeDetachRetryInterval.
-	r.reconcileDeleteCache.Add(cache.NewReconcileEntry(machine, time.Now().Add(waitForVolumeDetachRetryInterval)))
+	r.reconcileCache.Add(cache.NewReconcileEntry(cache.ObjToRequest(machine), time.Now().Add(waitForVolumeDetachRetryInterval)))
 
 	s.deletingReason = clusterv1.MachineDeletingWaitingForVolumeDetachReason
 	s.deletingMessage = attachedVolumeInformation.conditionMessage(machine)

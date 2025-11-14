@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
 	"sigs.k8s.io/cluster-api/feature"
+	"sigs.k8s.io/cluster-api/util/cache"
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
@@ -190,6 +192,7 @@ func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, con
 			}
 			log.Info(fmt.Sprintf("Waiting for a version upgrade to %s to be propagated", v))
 			controlPlane.PreflightCheckResults.TopologyVersionMismatch = true
+			r.reconcileCache.Add(cache.NewReconcileEntry(cache.ObjToRequest(controlPlane.KCP), time.Now().Add(5*time.Second)))
 			return ctrl.Result{RequeueAfter: preflightFailedRequeueAfter}
 		}
 	}
@@ -198,6 +201,7 @@ func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, con
 	if controlPlane.HasDeletingMachine() {
 		controlPlane.PreflightCheckResults.HasDeletingMachine = true
 		log.Info("Waiting for machines to be deleted", "machines", strings.Join(controlPlane.Machines.Filter(collections.HasDeletionTimestamp).Names(), ", "))
+		r.reconcileCache.Add(cache.NewReconcileEntry(cache.ObjToRequest(controlPlane.KCP), time.Now().Add(5*time.Second)))
 		return ctrl.Result{RequeueAfter: deleteRequeueAfter}
 	}
 
@@ -255,6 +259,7 @@ loopmachines:
 			"Waiting for control plane to pass preflight checks to continue reconciliation: %v", aggregatedError)
 		log.Info("Waiting for control plane to pass preflight checks", "failures", aggregatedError.Error())
 
+		r.reconcileCache.Add(cache.NewReconcileEntry(cache.ObjToRequest(controlPlane.KCP), time.Now().Add(5*time.Second)))
 		return ctrl.Result{RequeueAfter: preflightFailedRequeueAfter}
 	}
 

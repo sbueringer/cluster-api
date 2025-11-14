@@ -37,6 +37,7 @@ import (
 	capierrors "sigs.k8s.io/cluster-api/errors"
 	"sigs.k8s.io/cluster-api/internal/contract"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/cache"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -333,6 +334,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
 		log.Info(fmt.Sprintf("Waiting for infrastructure provider to set %s on %s",
 			contract.InfrastructureMachine().ProviderID().Path().String(), s.infraMachine.GetKind()),
 			s.infraMachine.GetKind(), klog.KObj(s.infraMachine))
+		r.reconcileCache.Add(cache.NewReconcileEntry(cache.ObjToRequest(s.machine), time.Now().Add(5*time.Second)))
 		return ctrl.Result{}, nil // Note: Requeue is not needed, changes to InfraMachine trigger another reconcile.
 	}
 
