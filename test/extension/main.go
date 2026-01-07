@@ -22,12 +22,16 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	goruntime "runtime"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -201,6 +205,17 @@ func main() {
 		setupLog.Error(err, "Unable to start manager: invalid flags")
 		os.Exit(1)
 	}
+	var certPool *x509.CertPool
+
+	certPool, err = LoadCACert(filepath.Join(webhookCertDir, "client-ca", "ca.crt"))
+	if err != nil {
+		setupLog.Error(err, "failed to load webhook Client CA store")
+		os.Exit(1)
+	}
+	tlsOptions = append(tlsOptions, func(cfg *tls.Config) {
+		cfg.ClientCAs = certPool
+		cfg.ClientAuth = tls.VerifyClientCertIfGiven
+	})
 
 	if enableContentionProfiling {
 		goruntime.SetBlockProfileRate(1)
@@ -474,4 +489,19 @@ func setupReconcilers(_ context.Context, _ ctrl.Manager) {
 }
 
 func setupWebhooks(_ ctrl.Manager) {
+}
+
+func LoadCACert(path string) (*x509.CertPool, error) {
+	certPool := x509.NewCertPool()
+	clientCABytes, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read client CA cert: %w", err)
+	}
+
+	ok := certPool.AppendCertsFromPEM(clientCABytes)
+	if !ok {
+		return nil, errors.New("failed to append client CA cert to CA pool")
+	}
+
+	return certPool, nil
 }

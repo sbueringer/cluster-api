@@ -1,4 +1,4 @@
-namespace: test-extension-system
+namespace: capi-system
 
 namePrefix: test-extension-
 

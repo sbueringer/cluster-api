@@ -16,7 +16,17 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
           readOnly: true
+        - mountPath: /tmp/k8s-webhook-server/serving-certs/client-ca
+          name: client-auth-cert
+          readOnly: true
       volumes:
       - name: cert
         secret:
           secretName: test-extension-webhook-service-cert
+      - name: client-auth-cert
+        secret:
+          secretName: capi-webhook-client-cert
+          defaultMode: 0400
+          items:
+            - key: ca.crt
+              path: ca.crt
