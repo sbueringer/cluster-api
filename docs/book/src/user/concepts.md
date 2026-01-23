@@ -2,8 +2,8 @@
 
 Similar to how you can use StatefulSets or Deployments in Kubernetes to manage a group of Pods, in Cluster API you can use custom resources like KubeadmControlPlane (a control plane implementation) to manage a set of control plane Machines, or you can use MachineDeployments to manage a group of worker Machines, each one of them representing a host server and the corresponding Kubernetes Node.
 
-Extensibility is at the core of Cluster API and Cluster API provider like Cluster API provider VSphere, AWS, GCP etc. can be be used
-to deploy Cluster API managed Cluster to your proferred infrastructure, as well as to configure many other parts of the system.
+Extensibility is at the core of Cluster API and Cluster API providers like Cluster API provider VSphere, AWS, GCP etc. can be used
+to deploy Cluster API managed Clusters to your preferred infrastructure, as well as to configure many other parts of the system.
 
 ![](../images/management-cluster.svg)
 
@@ -15,9 +15,10 @@ A Kubernetes cluster where Cluster API and one or more Cluster API providers run
 
 ### Cluster
 
-A "Cluster" is a custom resource that represent a Kubernetes cluster whose lifecycle is managed by a Cluster API, usually referred also as Workload Cluster.
+A "Cluster" is a custom resource that represent a Kubernetes cluster whose lifecycle is managed by Cluster API, usually also referred to as workload cluster.
 
-Common properties such as Network CIDR are modeled as fields on the Cluster's spec. Any information that is provider-specific is part of the `InfrastructureRef` or `controlPlaneRef` and is not portable between different providers.
+Common properties such as network CIDRs are modeled as fields on the Cluster's spec. Any information that is provider-specific is part of the custom resources 
+referenced via `infrastructureRef` or `controlPlaneRef` and is not portable between different providers.
 
 ```yaml 
 apiVersion: cluster.x-k8s.io/v1beta2
@@ -39,12 +40,12 @@ spec:
     name: my-control-plane
 ```
 
-In most recent version of Cluster API, the control plane object can be used as a single point of control for the entire cluster.
+In most recent versions of Cluster API, the Cluster object can be used as a single point of control for the entire cluster.
 See [ClusterClass](../tasks/experimental-features/cluster-class)
 
 ### Machine
 
-A "Machine" is a custom resource providing the declarative spec for an infrastructure component hosting a Kubernetes Node (for example, a VM).
+A "Machine" is a custom resource providing the declarative spec for infrastructure hosting a Kubernetes Node (for example, a VM).
 
 ```yaml 
 apiVersion: cluster.x-k8s.io/v1beta2
@@ -68,11 +69,12 @@ status:
     name: the-node-running-on-my-machine
 ```
 
-Common fields such as Kubernetes version are modeled as fields on the Machine's spec. Any information that is provider-specific is part of the `InfrastructureRef` or part of the `BootstrapRef` and is not portable between different providers.
+Common fields such as the Kubernetes version are modeled as fields on the Machine's spec. Any information that is provider-specific is part of the custom resources
+referenced via `infrastructureRef` or `bootstrap.configRef` and is not portable between different providers.
 
-If a new Machine object is created, a provider-specific controller will provision and install a new host to register as a new Node matching the Machine spec. If a Machine object is deleted, its underlying infrastructure and corresponding Node will be deleted by the controller.
+If a new Machine object is created, a provider-specific controller will provision and install a new host to register as a new Node matching the Machine spec. If a Machine object is deleted, its underlying infrastructure and corresponding Node will be deleted.
 
-Like for pods in Kubernetes, also for Machines in Cluster API it is more convenient to not manage single Machines directly. Instead you should use resources like KubeadmControlPlane (a control plane implementation), [MachineDeployments](#machinedeployment) or [MachinePools](#machinepool) to manage group of Machines.
+Like for Pods in Kubernetes, also for Machines in Cluster API it is more convenient to not manage single Machines directly. Instead you should use resources like KubeadmControlPlane (a control plane implementation), [MachineDeployments](#machinedeployment) or [MachinePools](#machinepool) to manage a group of Machines.
 
 #### Machine Immutability (In-place update vs. Replace)
 
@@ -99,11 +101,11 @@ For example, cloud Infrastructure Providers include AWS, Azure, and Google, and 
 
 When there is more than one way to obtain resources from the same Infrastructure Provider (such as AWS offering both EC2 and EKS), each way is referred to as a variant.
 
-## control plane provider
+## Control plane provider
 
 A component responsible for the provisioning and for the management of the control plane of your Kubernetes Cluster, like e.g. the KubeadmControlPlane provider.
 
-Control plane providers can take different approach on how to manage the control plane;
+Control plane providers can take different approaches on how to manage the control plane:
 
 * __Self-provisioned__: A Kubernetes control plane consisting of pods or machines wholly managed by a single Cluster API deployment.
   e.g kubeadm uses [static pods](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/) for running components such as [kube-apiserver](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/), [kube-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/) and [kube-scheduler](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/)
@@ -121,13 +123,13 @@ A component responsible for turning a server into a Kubernetes node as well as f
 2. Initializing the control plane, and gating the creation of other nodes until it is complete
 3. Joining control plane and worker nodes to the cluster
 
-Boostrap provider achieve this goal by generating BootstrapData, which contains the Machine or Node role-specific initialization data (usually cloud-init). The bootstrap data are used by the Infrastructure Provider to bootstrap a Machine into a Node.
+Boostrap provider achieve this goal by generating BootstrapData, which contains the Machine or Node role-specific initialization data (usually cloud-init). The bootstrap data is used by the Infrastructure Provider to bootstrap a Machine into a Node.
 
 ## KubeadmControlPlane
 
-The KubeadmControlPlane is custom resource that is provided by the Kubeadm provider, and that allows to manage a set of Machines hosting control plane nodes created with kubeadm.
+The KubeadmControlPlane is a custom resource that is provided by the Kubeadm provider, and that allows to manage a set of Machines hosting control plane Nodes created with kubeadm.
 
-Other control plane providers implements similar resources as well. 
+Other control plane providers implement similar resources as well. 
 
 ### MachineDeployment
 
