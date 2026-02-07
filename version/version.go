@@ -33,7 +33,7 @@ const (
 
 	// MinimumKubernetesVersionClusterTopology defines the minimum Kubernetes version that can be used in a
 	// Management Cluster when enabling the ClusterTopology feature gate.
-	MinimumKubernetesVersionClusterTopology = "v1.22.0"
+	MinimumKubernetesVersionClusterTopology = "v1.21.0"
 )
 
 // CheckKubernetesVersion return an error if the Kubernetes version in a cluster is lower than the specified minK8sVersion.

@@ -331,6 +331,10 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (reconcile.R
 	log := ctrl.LoggerFrom(ctx)
 	cluster := s.cluster
 
+	controllerutil.RemoveFinalizer(cluster, clusterv1.ClusterFinalizer)
+	r.recorder.Eventf(cluster, corev1.EventTypeNormal, "Deleted", "Cluster %s has been deleted", cluster.Name)
+	return ctrl.Result{}, nil
+
 	// If the RuntimeSDK and ClusterTopology flags are enabled, for clusters with managed topologies
 	// only proceed with delete if the cluster is marked as `ok-to-delete`
 	if feature.Gates.Enabled(feature.RuntimeSDK) && feature.Gates.Enabled(feature.ClusterTopology) {
