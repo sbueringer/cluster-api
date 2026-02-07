@@ -150,9 +150,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retres ct
 		return ctrl.Result{}, err
 	}
 
-	cluster, err := util.GetClusterByName(ctx, r.Client, deployment.Namespace, deployment.Spec.ClusterName)
-	if err != nil {
-		return ctrl.Result{}, err
+	var cluster *clusterv1.Cluster
+	if deployment.DeletionTimestamp.IsZero() {
+		var err error
+		cluster, err = util.GetClusterByName(ctx, r.Client, deployment.Namespace, deployment.Spec.ClusterName)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Initialize the patch helper
@@ -251,7 +255,7 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
 	log.V(4).Info("Reconcile MachineDeployment")
 
 	md := s.machineDeployment
-	cluster := s.cluster
+	//cluster := s.cluster
 
 	// Reconcile and retrieve the Cluster object.
 	if md.Labels == nil {
@@ -267,12 +271,12 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope) error {
 	md.Labels[clusterv1.ClusterNameLabel] = md.Spec.ClusterName
 
 	// Ensure the MachineDeployment is owned by the Cluster.
-	md.SetOwnerReferences(util.EnsureOwnerRef(md.GetOwnerReferences(), metav1.OwnerReference{
-		APIVersion: clusterv1.GroupVersion.String(),
-		Kind:       "Cluster",
-		Name:       cluster.Name,
-		UID:        cluster.UID,
-	}))
+	//md.SetOwnerReferences(util.EnsureOwnerRef(md.GetOwnerReferences(), metav1.OwnerReference{
+	//	APIVersion: clusterv1.GroupVersion.String(),
+	//	Kind:       "Cluster",
+	//	Name:       cluster.Name,
+	//	UID:        cluster.UID,
+	//}))
 
 	if err := r.getTemplatesAndSetOwner(ctx, s); err != nil {
 		return err
