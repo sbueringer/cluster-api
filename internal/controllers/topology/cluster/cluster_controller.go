@@ -18,15 +18,19 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -42,7 +46,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
+	bootstrapv1 "sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2"
+	controlplanev1beta1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta1"
+	controlplanev1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/api/core/v1beta2/index"
 	runtimehooksv1 "sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1"
@@ -53,12 +61,12 @@ import (
 	"sigs.k8s.io/cluster-api/exp/topology/desiredstate"
 	"sigs.k8s.io/cluster-api/exp/topology/scope"
 	"sigs.k8s.io/cluster-api/feature"
+	"sigs.k8s.io/cluster-api/internal/controllers/topology/cluster/structuredmerge"
 	"sigs.k8s.io/cluster-api/internal/hooks"
 	capicontrollerutil "sigs.k8s.io/cluster-api/internal/util/controller"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/internal/webhooks"
 	"sigs.k8s.io/cluster-api/util"
-	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/cache"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/conversion"
@@ -97,6 +105,13 @@ type Reconciler struct {
 	desiredStateGenerator desiredstate.Generator
 
 	ssaCache ssa.Cache
+}
+
+var kcpScheme = runtime.NewScheme()
+
+func init() {
+	_ = controlplanev1.AddToScheme(kcpScheme)
+	_ = controlplanev1beta1.AddToScheme(kcpScheme)
 }
 
 func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -310,9 +325,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 	}()
 
 	// Return early if the Cluster is paused.
-	if ptr.Deref(cluster.Spec.Paused, false) || annotations.HasPaused(cluster) {
-		return ctrl.Result{}, nil
-	}
+	//if ptr.Deref(cluster.Spec.Paused, false) || annotations.HasPaused(cluster) {
+	//	return ctrl.Result{}, nil
+	//}
 
 	// In case the object is deleted, the managed topology stops to reconcile;
 	// (the other controllers will take care of deletion).
@@ -384,6 +399,20 @@ func (r *Reconciler) reconcile(ctx context.Context, s *scope.Scope) (ctrl.Result
 		return ctrl.Result{}, errors.Wrap(err, "error creating dynamic watch")
 	}
 
+	if s.Current.ControlPlane != nil && s.Current.ControlPlane.Object != nil && s.Current.ControlPlane.Object.GroupVersionKind().Kind == "KubeadmControlPlane" {
+		// Note: We want to return the Reconcile when we fixed up managedFields
+		// Note: We want to fixup managedFields as soon as possible
+		// Note: It might be good to fixup managedFields in this controller as we can then ensure that this controller is not writing these objects concurrently
+		// FIXME: move all into mitigateManagedFieldIssue and go through all objects that are written with SSA
+		changed, err := r.mitigateManagedFieldIssue(ctx, s.Current.ControlPlane.Object)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if changed {
+			return ctrl.Result{}, nil // No requeue needed, change will trigger another reconcile.
+		}
+	}
+
 	// Computes the desired state of the Cluster and store it in the request scope.
 	s.Desired, err = r.desiredStateGenerator.Generate(ctx, s)
 	if err != nil {
@@ -428,6 +457,153 @@ func (r *Reconciler) setupDynamicWatches(ctx context.Context, s *scope.Scope) er
 		}
 	}
 	return nil
+}
+
+func (r *Reconciler) mitigateManagedFieldIssue(ctx context.Context, controlPlane *unstructured.Unstructured) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	if len(controlPlane.GetManagedFields()) == 0 || slices.ContainsFunc(controlPlane.GetManagedFields(), func(entry metav1.ManagedFieldsEntry) bool { // FIXME: flip this if
+		return entry.Manager == "before-first-apply"
+	}) {
+		// Case 1: no managedFields                          => [capi-topology]
+		// Case 2: before-first-apply entry
+		//   * a: [before-first-apply]                       => [capi-topology]
+		//   * b: [before-first-apply,manager]               => [capi-topology,manager]
+		//   * c: [before-first-apply,capi-topology,manager] => [capi-topology,manager]
+		managedFields := slices.DeleteFunc(controlPlane.GetManagedFields(), func(entry metav1.ManagedFieldsEntry) bool {
+			return entry.Manager == "before-first-apply"
+		})
+
+		if !slices.ContainsFunc(controlPlane.GetManagedFields(), func(entry metav1.ManagedFieldsEntry) bool {
+			return entry.Manager == structuredmerge.TopologyManagerName
+		}) {
+			// Add a seeding managedFieldEntry for SSA to prevent SSA to create/infer a default managedFieldEntry
+			// when the first SSA is applied.
+			// More specifically, if an existing object doesn't have managedFields when applying the first SSA
+			// the API server creates an entry with operation=Update (kind of guessing where the object comes from),
+			// but this entry ends up acting as a co-ownership and we want to prevent this.
+			// NOTE: fieldV1Map cannot be empty, so we add metadata.name which will be cleaned up at the first
+			//       SSA patch of the same fieldManager.
+			// NOTE: We use the fieldManager and operation from the managedFields that we remove to increase the
+			//       chances that the managedField entry gets cleaned up. In any case having a minimal entry only
+			//       for metadata.name is better than leaving the old entry that uses an apiVersion that is not
+			//       served anymore (see: https://github.com/kubernetes/kubernetes/issues/111937).
+			managedFieldSet := fieldpath.NewSet()
+			switch controlPlane.GroupVersionKind().Version {
+			case controlplanev1.GroupVersion.Version:
+				kcp := &controlplanev1.KubeadmControlPlane{}
+				if err := kcpScheme.Convert(controlPlane, kcp, nil); err != nil {
+					return false, errors.Wrap(err, "failed to convert original object to Unstructured")
+				}
+
+				addArgs(managedFieldSet, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer.ExtraArgs,
+					"spec", "kubeadmConfigSpec", "clusterConfiguration", "apiServer", "extraArgs")
+				addArgs(managedFieldSet, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.ControllerManager.ExtraArgs,
+					"spec", "kubeadmConfigSpec", "clusterConfiguration", "controllerManager", "extraArgs")
+				addArgs(managedFieldSet, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Scheduler.ExtraArgs,
+					"spec", "kubeadmConfigSpec", "clusterConfiguration", "scheduler", "extraArgs")
+				addArgs(managedFieldSet, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.Local.ExtraArgs,
+					"spec", "kubeadmConfigSpec", "clusterConfiguration", "etcd", "local", "extraArgs")
+				addArgs(managedFieldSet, kcp.Spec.KubeadmConfigSpec.InitConfiguration.NodeRegistration.KubeletExtraArgs,
+					"spec", "kubeadmConfigSpec", "initConfiguration", "nodeRegistration", "kubeletExtraArgs")
+				addArgs(managedFieldSet, kcp.Spec.KubeadmConfigSpec.JoinConfiguration.NodeRegistration.KubeletExtraArgs,
+					"spec", "kubeadmConfigSpec", "joinConfiguration", "nodeRegistration", "kubeletExtraArgs")
+
+			case controlplanev1beta1.GroupVersion.Version:
+				kcp := &controlplanev1beta1.KubeadmControlPlane{}
+				if err := kcpScheme.Convert(controlPlane, kcp, nil); err != nil {
+					return false, errors.Wrap(err, "failed to convert original object to Unstructured")
+				}
+				if kcp.Spec.KubeadmConfigSpec.ClusterConfiguration != nil {
+					addArgsV1Beta1(managedFieldSet, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.APIServer.ExtraArgs,
+						"spec", "kubeadmConfigSpec", "clusterConfiguration", "apiServer", "extraArgs")
+					addArgsV1Beta1(managedFieldSet, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.ControllerManager.ExtraArgs,
+						"spec", "kubeadmConfigSpec", "clusterConfiguration", "controllerManager", "extraArgs")
+					addArgsV1Beta1(managedFieldSet, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Scheduler.ExtraArgs,
+						"spec", "kubeadmConfigSpec", "clusterConfiguration", "scheduler", "extraArgs")
+					if kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.Local != nil {
+						addArgsV1Beta1(managedFieldSet, kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.Etcd.Local.ExtraArgs,
+							"spec", "kubeadmConfigSpec", "clusterConfiguration", "etcd", "local", "extraArgs")
+					}
+				}
+				if kcp.Spec.KubeadmConfigSpec.InitConfiguration != nil {
+					addArgsV1Beta1(managedFieldSet, kcp.Spec.KubeadmConfigSpec.InitConfiguration.NodeRegistration.KubeletExtraArgs,
+						"spec", "kubeadmConfigSpec", "initConfiguration", "nodeRegistration", "kubeletExtraArgs")
+				}
+				if kcp.Spec.KubeadmConfigSpec.JoinConfiguration != nil {
+					addArgsV1Beta1(managedFieldSet, kcp.Spec.KubeadmConfigSpec.JoinConfiguration.NodeRegistration.KubeletExtraArgs,
+						"spec", "kubeadmConfigSpec", "joinConfiguration", "nodeRegistration", "kubeletExtraArgs")
+				}
+			}
+
+			if managedFieldSet.Empty() {
+				managedFieldSet.Insert(fieldpath.MakePathOrDie("metadata", "name"))
+			}
+
+			fieldV1, err := managedFieldSet.ToJSON()
+			if err != nil {
+				return false, errors.Wrap(err, "failed to create seeding managedField entry")
+			}
+			managedFields = append(managedFields, metav1.ManagedFieldsEntry{
+				Manager:    structuredmerge.TopologyManagerName,
+				Operation:  "Apply",
+				APIVersion: controlPlane.GetAPIVersion(),
+				Time:       ptr.To(metav1.Now()),
+				FieldsType: "FieldsV1",
+				FieldsV1:   &metav1.FieldsV1{Raw: fieldV1},
+			})
+		}
+
+		// Create a patch to update only managedFields.
+		// Include resourceVersion to avoid race conditions.
+		jsonPatch := []map[string]interface{}{
+			{
+				"op":    "replace",
+				"path":  "/metadata/managedFields",
+				"value": managedFields,
+			},
+			{
+				"op":    "replace",
+				"path":  "/metadata/resourceVersion",
+				"value": controlPlane.GetResourceVersion(),
+			},
+		}
+		patch, err := json.Marshal(jsonPatch)
+		if err != nil {
+			return false, errors.Wrap(err, "failed to marshal patch")
+		}
+
+		log.V(4).Info("Fixing up managedFields", controlPlane.GetKind(), klog.KObj(controlPlane))
+		if err := r.Client.Patch(ctx, controlPlane, client.RawPatch(types.JSONPatchType, patch)); err != nil {
+			return false, errors.Wrap(err, "failed to fixup managedFields")
+		}
+
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func addArgs(managedFieldSet *fieldpath.Set, args []bootstrapv1.Arg, fields ...any) {
+	if len(args) == 0 { // FIXME: verify if we got the managedFields right for the empty case
+		return
+	}
+
+	for _, arg := range args {
+		managedFieldSet.Insert(fieldpath.MakePathOrDie(append(fields, fieldpath.KeyByFields("name", arg.Name, "value", ptr.Deref(arg.Value, "")))...))
+		managedFieldSet.Insert(fieldpath.MakePathOrDie(append(fields, fieldpath.KeyByFields("name", arg.Name, "value", ptr.Deref(arg.Value, "")), "name")...))
+		managedFieldSet.Insert(fieldpath.MakePathOrDie(append(fields, fieldpath.KeyByFields("name", arg.Name, "value", ptr.Deref(arg.Value, "")), "value")...))
+	}
+}
+
+func addArgsV1Beta1(managedFieldSet *fieldpath.Set, args map[string]string, fields ...any) {
+	if len(args) == 0 { // FIXME: verify if we got the managedFields right for the empty case
+		return
+	}
+
+	for argName := range args {
+		managedFieldSet.Insert(fieldpath.MakePathOrDie(append(fields, argName)...))
+	}
 }
 
 func (r *Reconciler) callBeforeClusterCreateHook(ctx context.Context, s *scope.Scope) (reconcile.Result, error) {
