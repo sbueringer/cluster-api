@@ -52,6 +52,7 @@ import (
 	"sigs.k8s.io/cluster-api/internal/util/inplace"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/cache"
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -207,6 +208,10 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	log = log.WithValues("Cluster", klog.KObj(cluster))
 	ctx = ctrl.LoggerInto(ctx, log)
+
+	if ptr.Deref(cluster.Spec.Paused, false) || annotations.HasPaused(kcp) {
+		return ctrl.Result{}, nil
+	}
 
 	// Initialize the patch helper.
 	patchHelper, err := patch.NewHelper(kcp, r.Client)
