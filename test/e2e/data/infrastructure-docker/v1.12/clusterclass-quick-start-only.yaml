@@ -437,12 +437,6 @@ spec:
             controlPlane: true
         jsonPatches:
           - op: add
-            path: "/spec/template/spec/kubeadmConfigSpec/clusterConfiguration/apiServer/extraArgs/-"
-            valueFrom:
-              template: |
-                  name: v
-                  value: "{{ .kubeControlPlaneLogLevel }}"
-          - op: add
             path: "/spec/template/spec/kubeadmConfigSpec/clusterConfiguration/controllerManager"
             value: {}
           - op: add

@@ -425,10 +425,6 @@ spec:
             controlPlane: true
         jsonPatches:
           - op: add
-            path: "/spec/template/spec/kubeadmConfigSpec/clusterConfiguration/apiServer/extraArgs/v"
-            valueFrom:
-              variable: kubeControlPlaneLogLevel
-          - op: add
             path: "/spec/template/spec/kubeadmConfigSpec/clusterConfiguration/controllerManager/extraArgs/v"
             valueFrom:
               variable: kubeControlPlaneLogLevel
@@ -552,8 +548,6 @@ spec:
             extraArgs:
               v: "0"
           apiServer:
-            extraArgs:
-              v: "0"
             timeoutForControlPlane: 4m
             # host.docker.internal is required by kubetest when running on MacOS because of the way ports are proxied.
             certSANs: [localhost, host.docker.internal, "::", "::1", "127.0.0.1", "0.0.0.0"]
