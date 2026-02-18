@@ -25,12 +25,12 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	contractv1 "sigs.k8s.io/cluster-api/api/contract/v1beta2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/clustercache"
 	"sigs.k8s.io/cluster-api/internal/contract"
@@ -75,7 +75,7 @@ func (r *Reconciler) updateStatus(ctx context.Context, s *scope) ctrl.Result {
 	return setAvailableCondition(ctx, s.machine)
 }
 
-func setBootstrapReadyCondition(_ context.Context, machine *clusterv1.Machine, bootstrapConfig *unstructured.Unstructured, bootstrapConfigIsNotFound bool) {
+func setBootstrapReadyCondition(_ context.Context, machine *clusterv1.Machine, bootstrapConfig *contractv1.BootstrapConfig, bootstrapConfigIsNotFound bool) {
 	if !machine.Spec.Bootstrap.ConfigRef.IsDefined() {
 		conditions.Set(machine, metav1.Condition{
 			Type:   clusterv1.MachineBootstrapConfigReadyCondition,
@@ -87,7 +87,7 @@ func setBootstrapReadyCondition(_ context.Context, machine *clusterv1.Machine, b
 
 	if bootstrapConfig != nil {
 		dataSecretCreated := ptr.Deref(machine.Status.Initialization.BootstrapDataSecretCreated, false)
-		ready, err := conditions.NewMirrorConditionFromUnstructured(
+		ready := conditions.NewMirrorCondition(
 			bootstrapConfig,
 			contract.Bootstrap().ReadyConditionType(), conditions.TargetConditionType(clusterv1.MachineBootstrapConfigReadyCondition),
 			conditions.FallbackCondition{
@@ -96,15 +96,6 @@ func setBootstrapReadyCondition(_ context.Context, machine *clusterv1.Machine, b
 				Message: bootstrapConfigReadyFallBackMessage(machine.Spec.Bootstrap.ConfigRef.Kind, dataSecretCreated),
 			},
 		)
-		if err != nil {
-			conditions.Set(machine, metav1.Condition{
-				Type:    clusterv1.MachineBootstrapConfigReadyCondition,
-				Status:  metav1.ConditionUnknown,
-				Reason:  clusterv1.MachineBootstrapConfigInvalidConditionReportedReason,
-				Message: err.Error(),
-			})
-			return
-		}
 
 		// In case condition has NoReasonReported and status true, we assume it is a v1beta1 condition
 		// and replace the reason with something less confusing.
@@ -164,10 +155,10 @@ func bootstrapConfigReadyFallBackMessage(kind string, ready bool) string {
 	return fmt.Sprintf("%s status.initialization.dataSecretCreated is %t", kind, ready)
 }
 
-func setInfrastructureReadyCondition(_ context.Context, machine *clusterv1.Machine, infraMachine *unstructured.Unstructured, infraMachineIsNotFound bool) {
+func setInfrastructureReadyCondition(_ context.Context, machine *clusterv1.Machine, infraMachine *contractv1.InfraMachine, infraMachineIsNotFound bool) {
 	if infraMachine != nil {
 		infrastructureProvisioned := ptr.Deref(machine.Status.Initialization.InfrastructureProvisioned, false)
-		ready, err := conditions.NewMirrorConditionFromUnstructured(
+		ready := conditions.NewMirrorCondition(
 			infraMachine,
 			contract.InfrastructureMachine().ReadyConditionType(), conditions.TargetConditionType(clusterv1.MachineInfrastructureReadyCondition),
 			conditions.FallbackCondition{
@@ -176,15 +167,6 @@ func setInfrastructureReadyCondition(_ context.Context, machine *clusterv1.Machi
 				Message: infrastructureReadyFallBackMessage(machine.Spec.InfrastructureRef.Kind, infrastructureProvisioned),
 			},
 		)
-		if err != nil {
-			conditions.Set(machine, metav1.Condition{
-				Type:    clusterv1.MachineInfrastructureReadyCondition,
-				Status:  metav1.ConditionUnknown,
-				Reason:  clusterv1.MachineInfrastructureInvalidConditionReportedReason,
-				Message: err.Error(),
-			})
-			return
-		}
 
 		// In case condition has NoReasonReported and status true, we assume it is a v1beta1 condition
 		// and replace the reason with something less confusing.

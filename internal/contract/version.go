@@ -174,7 +174,8 @@ func GetGKMetadata(ctx context.Context, c client.Reader, gk schema.GroupKind) (*
 	meta := &metav1.PartialObjectMetadata{}
 	meta.SetName(contract.CalculateCRDName(gk.Group, gk.Kind))
 	meta.SetGroupVersionKind(apiextensionsv1.SchemeGroupVersion.WithKind("CustomResourceDefinition"))
-	if err := c.Get(ctx, client.ObjectKeyFromObject(meta), meta); err != nil {
+	// Reading CRDs allocated a lot of memory, disabling deep copy here as we are only reading and not mutating the CRD. // FIXME: only return labels or whatever we need and clone the label map
+	if err := c.Get(ctx, client.ObjectKeyFromObject(meta), meta, client.UnsafeDisableDeepCopyOption(true)); err != nil {
 		return meta, errors.Wrap(err, "failed to get CustomResourceDefinition metadata")
 	}
 	return meta, nil

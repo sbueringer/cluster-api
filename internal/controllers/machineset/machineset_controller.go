@@ -19,10 +19,14 @@ package machineset
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
+	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -33,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -42,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	runtimehooksv1 "sigs.k8s.io/cluster-api/api/runtime/hooks/v1alpha1"
@@ -58,6 +64,7 @@ import (
 	"sigs.k8s.io/cluster-api/internal/webhooks"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
+	acclusterv1 "sigs.k8s.io/cluster-api/util/applyconfigurations/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
@@ -99,8 +106,9 @@ type Reconciler struct {
 	// WatchFilterValue is the label value used to filter events prior to reconciliation.
 	WatchFilterValue string
 
-	ssaCache ssa.Cache
-	recorder record.EventRecorder
+	ssaCache                   ssa.Cache
+	ssaApplyConfigurationCache ssa.Cache
+	recorder                   record.EventRecorder
 
 	// Note: This field is only used for unit tests that use fake client because the fake client does not properly set resourceVersion
 	//       on BootstrapConfig/InfraMachine after ssa.Patch and then ssa.RemoveManagedFieldsForLabelsAndAnnotations would fail.
@@ -156,6 +164,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 
 	r.recorder = mgr.GetEventRecorderFor("machineset-controller")
 	r.ssaCache = ssa.NewCache("machineset")
+	r.ssaApplyConfigurationCache = ssa.NewCache("machineset-applyconfiguration")
 	return nil
 }
 
@@ -439,7 +448,7 @@ func (r *Reconciler) completeMoveMachine(ctx context.Context, s *scope, currentM
 	desiredMachine.Spec.FailureDomain = s.machineSet.Spec.Template.Spec.FailureDomain
 
 	// Compute desiredInfraMachine.
-	currentInfraMachine, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, currentMachine.Spec.InfrastructureRef, currentMachine.Namespace)
+	currentInfraMachine, err := external.GetContractObjectFromContractVersionedRef(ctx, r.Client, currentMachine.Spec.InfrastructureRef, currentMachine.Namespace, external.ExternalTypeInfraMachine)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get InfraMachine %s", klog.KRef(currentMachine.Namespace, currentMachine.Spec.InfrastructureRef.Name))
 	}
@@ -458,10 +467,10 @@ func (r *Reconciler) completeMoveMachine(ctx context.Context, s *scope, currentM
 		clusterv1.UpdateInProgressAnnotation: "",
 	})
 
-	var desiredBootstrapConfig, currentBootstrapConfig *unstructured.Unstructured
+	var desiredBootstrapConfig *unstructured.Unstructured
 	if currentMachine.Spec.Bootstrap.ConfigRef.IsDefined() {
 		// Compute desiredBootstrapConfig.
-		currentBootstrapConfig, err = external.GetObjectFromContractVersionedRef(ctx, r.Client, currentMachine.Spec.Bootstrap.ConfigRef, currentMachine.Namespace)
+		currentBootstrapConfig, err := external.GetContractObjectFromContractVersionedRef(ctx, r.Client, currentMachine.Spec.Bootstrap.ConfigRef, currentMachine.Namespace, external.ExternalTypeBootstrapConfig)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get BootstrapConfig %s", klog.KRef(currentMachine.Namespace, currentMachine.Spec.Bootstrap.ConfigRef.Name))
 		}
@@ -685,15 +694,51 @@ func (r *Reconciler) syncMachines(ctx context.Context, s *scope) (ctrl.Result, b
 			if err != nil {
 				return ctrl.Result{}, true, errors.Wrap(err, "failed to update Machine: failed to compute desired Machine")
 			}
-			err = ssa.Patch(ctx, r.Client, machineSetManagerName, updatedMachine, ssa.WithCachingProxy{Cache: r.ssaCache, Original: m})
+
+			// CHECK VIA Applyconfiguration IF WE HAVE TO CALL ssa.Patch
+			// FIXME: this should be all moved into a new SSA util and used for Machine, labels/annotations, MS, topology: MHC, MD, MP
+			// FIXME: The new util should probably used in all cases where ssa.Cache is used today with ssa.Patch and ssa.Cache can maybe then be removed from ssa.Patch
+
+			requestIdentifier, err := ssa.ComputeRequestIdentifier(r.Client.Scheme(), m.ResourceVersion, updatedMachine)
 			if err != nil {
-				log.Error(err, "Failed to update Machine", "Machine", klog.KObj(updatedMachine))
-				return ctrl.Result{}, true, errors.Wrapf(err, "failed to update Machine %q", klog.KObj(updatedMachine))
+				return ctrl.Result{}, true, errors.Wrapf(err, "failed to apply Machine")
 			}
-			machines[i] = updatedMachine
+			if r.ssaApplyConfigurationCache.Has(requestIdentifier, "Machine") {
+				// Nothing to do
+				machines[i] = m
+				// Refresh the cache
+				r.ssaApplyConfigurationCache.Add(requestIdentifier)
+			} else {
+				updatedMachineApplyConfiguration := &acclusterv1.MachineApplyConfiguration{}
+				updatedMachineBytes, err := json.Marshal(updatedMachine)
+				if err != nil {
+					return ctrl.Result{}, true, err
+				}
+				if err := json.Unmarshal(updatedMachineBytes, updatedMachineApplyConfiguration); err != nil {
+					return ctrl.Result{}, true, err
+				}
+				currentMachineApplyConfiguration, err := acclusterv1.ExtractMachine(m, machineSetManagerName)
+				if err != nil {
+					return ctrl.Result{}, true, err // FIXME: decide what to do on errors
+				}
+				currentMachineApplyConfiguration.UID = ptr.To(m.UID) // FIXME: why does Extract not set UID? (probably no ownership, but we need it in updateMachine)
+
+				if reflect.DeepEqual(currentMachineApplyConfiguration, updatedMachineApplyConfiguration) {
+					// Nothing to do
+					machines[i] = m
+					r.ssaApplyConfigurationCache.Add(requestIdentifier)
+				} else {
+					err = ssa.Patch(ctx, r.Client, machineSetManagerName, updatedMachine, ssa.WithCachingProxy{Cache: r.ssaCache, Original: m})
+					if err != nil {
+						log.Error(err, "Failed to update Machine", "Machine", klog.KObj(updatedMachine))
+						return ctrl.Result{}, true, errors.Wrapf(err, "failed to update Machine %q", klog.KObj(updatedMachine))
+					}
+					machines[i] = updatedMachine
+				}
+			}
 		}
 
-		infraMachine, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, m.Spec.InfrastructureRef, m.Namespace)
+		infraMachine, err := external.GetContractObjectFromContractVersionedRef(ctx, r.Client, m.Spec.InfrastructureRef, m.Namespace, external.ExternalTypeInfraMachine)
 		if err != nil {
 			return ctrl.Result{}, true, errors.Wrapf(err, "failed to get InfrastructureMachine %s %s",
 				m.Spec.InfrastructureRef.Kind, klog.KRef(m.Namespace, m.Spec.InfrastructureRef.Name))
@@ -720,7 +765,7 @@ func (r *Reconciler) syncMachines(ctx context.Context, s *scope) (ctrl.Result, b
 		}
 
 		if m.Spec.Bootstrap.ConfigRef.IsDefined() {
-			bootstrapConfig, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, m.Spec.Bootstrap.ConfigRef, m.Namespace)
+			bootstrapConfig, err := external.GetContractObjectFromContractVersionedRef(ctx, r.Client, m.Spec.Bootstrap.ConfigRef, m.Namespace, external.ExternalTypeBootstrapConfig)
 			if err != nil {
 				return ctrl.Result{}, true, errors.Wrapf(err, "failed to get BootstrapConfig %s %s",
 					m.Spec.Bootstrap.ConfigRef.Kind, klog.KRef(m.Namespace, m.Spec.Bootstrap.ConfigRef.Name))
@@ -1187,7 +1232,7 @@ func (r *Reconciler) computeDesiredMachine(machineSet *clusterv1.MachineSet, exi
 
 // updateLabelsAndAnnotations updates the external object passed in with the
 // updated labels and annotations from the MachineSet.
-func (r *Reconciler) updateLabelsAndAnnotations(ctx context.Context, obj client.Object, machineSet *clusterv1.MachineSet) error {
+func (r *Reconciler) updateLabelsAndAnnotations(ctx context.Context, obj client.Object, machineSet *clusterv1.MachineSet) error { // FIXME: consider moving this func into the ssa package and reuse with KCP
 	updatedObject := &unstructured.Unstructured{}
 	updatedObject.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
 	updatedObject.SetNamespace(obj.GetNamespace())
@@ -1199,8 +1244,118 @@ func (r *Reconciler) updateLabelsAndAnnotations(ctx context.Context, obj client.
 	updatedObject.SetLabels(machineLabelsFromMachineSet(machineSet))
 	updatedObject.SetAnnotations(machineAnnotationsFromMachineSet(machineSet))
 
+	requestIdentifier, err := ssa.ComputeRequestIdentifier(r.Client.Scheme(), obj.GetResourceVersion(), updatedObject)
+	if err != nil {
+		return errors.Wrapf(err, "failed to apply labels/annotations of %s", obj.GetObjectKind().GroupVersionKind().Kind)
+	}
+	if r.ssaApplyConfigurationCache.Has(requestIdentifier, obj.GetObjectKind().GroupVersionKind().Kind) {
+		// Nothing to do
+		// Refresh the cache
+		r.ssaApplyConfigurationCache.Add(requestIdentifier)
+		return nil
+	}
+
+	currentPartialObjectMetadata := &metav1.PartialObjectMetadata{}
+	currentPartialObjectMetadata.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
+	currentPartialObjectMetadata.SetLabels(obj.GetLabels())
+	currentPartialObjectMetadata.SetAnnotations(obj.GetAnnotations())
+	currentPartialObjectMetadata.SetManagedFields(obj.GetManagedFields())
+
+	// FIXME: Optimize all cases where we call Unstructured.GetManagedFields and try to block further usage with forbidigo
+	// FIXME: use a custom type + applyconfiguration gen here instead of writing a schema manually
+	currentPartialObjectMetaOwnedByFieldManager := &metav1.PartialObjectMetadata{}
+	currentPartialObjectMetaOwnedByFieldManager.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
+	err = managedfields.ExtractInto(currentPartialObjectMetadata, Parser().Type("io.k8s.apimachinery.pkg.apis.meta.v1.PartialObjectMeta"), machineSetMetadataManagerName, currentPartialObjectMetaOwnedByFieldManager, "")
+	if err != nil {
+		return err // FIXME: decide what to do on errors
+	}
+
+	if maps.Equal(currentPartialObjectMetaOwnedByFieldManager.Labels, updatedObject.GetLabels()) &&
+		maps.Equal(currentPartialObjectMetaOwnedByFieldManager.Annotations, updatedObject.GetAnnotations()) {
+		r.ssaApplyConfigurationCache.Add(requestIdentifier)
+		return nil
+	}
+
 	return ssa.Patch(ctx, r.Client, machineSetMetadataManagerName, updatedObject, ssa.WithCachingProxy{Cache: r.ssaCache, Original: obj})
 }
+
+var parserOnce sync.Once
+var parser *typed.Parser
+
+func Parser() *typed.Parser {
+	parserOnce.Do(func() {
+		var err error
+		parser, err = typed.NewParser(schemaYAML)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to parse schema: %v", err))
+		}
+	})
+	return parser
+}
+
+var schemaYAML = typed.YAMLObject(`types:
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.PartialObjectMeta
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+  map:
+    fields:
+    - name: annotations
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: labels
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: managedFields
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
+          elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_deduced_
+    elementRelationship: separable
+- name: __untyped_atomic_
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+- name: __untyped_deduced_
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_deduced_
+    elementRelationship: separable
+`)
 
 func (r *Reconciler) getOwnerMachineDeployment(ctx context.Context, machineSet *clusterv1.MachineSet) (*clusterv1.MachineDeployment, error) {
 	mdName := machineSet.Labels[clusterv1.MachineDeploymentNameLabel]
@@ -1802,7 +1957,7 @@ func (r *Reconciler) createBootstrapConfig(ctx context.Context, ms *clusterv1.Ma
 	}, nil
 }
 
-func (r *Reconciler) computeDesiredBootstrapConfig(ctx context.Context, ms *clusterv1.MachineSet, machine *clusterv1.Machine, existingBootstrapConfig *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (r *Reconciler) computeDesiredBootstrapConfig(ctx context.Context, ms *clusterv1.MachineSet, machine *clusterv1.Machine, existingBootstrapConfig client.Object) (*unstructured.Unstructured, error) {
 	var ownerReference *metav1.OwnerReference
 	if existingBootstrapConfig == nil || !util.HasOwner(existingBootstrapConfig.GetOwnerReferences(), clusterv1.GroupVersion.String(), []string{"Machine"}) {
 		ownerReference = &metav1.OwnerReference{
@@ -1880,7 +2035,7 @@ func (r *Reconciler) createInfraMachine(ctx context.Context, ms *clusterv1.Machi
 	}, nil
 }
 
-func (r *Reconciler) computeDesiredInfraMachine(ctx context.Context, ms *clusterv1.MachineSet, machine *clusterv1.Machine, existingInfraMachine *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (r *Reconciler) computeDesiredInfraMachine(ctx context.Context, ms *clusterv1.MachineSet, machine *clusterv1.Machine, existingInfraMachine client.Object) (*unstructured.Unstructured, error) {
 	var ownerReference *metav1.OwnerReference
 	if existingInfraMachine == nil || !util.HasOwner(existingInfraMachine.GetOwnerReferences(), clusterv1.GroupVersion.String(), []string{"Machine"}) {
 		ownerReference = &metav1.OwnerReference{

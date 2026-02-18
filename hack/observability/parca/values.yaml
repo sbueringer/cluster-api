@@ -7,6 +7,9 @@ object_storage:
       directory: "./tmp"
 
 server:
+  image:
+    repository: docker.io/stefanburinger405/parca
+    tag: v0.25.0
   scrapeConfigs:
   - job_name: 'capi-providers'
     scrape_interval: 1m
@@ -41,6 +44,9 @@ server:
     - source_labels: [__meta_kubernetes_pod_name]
       action: replace
       target_label: pod
+    - source_labels: [__meta_kubernetes_pod_container_port_name]
+      action: keep
+      regex: metrics # All pprof endpoints are served on the diagnostics endpoint
 
 agent:
   # Doesn't seem to work in kind, not sure why.

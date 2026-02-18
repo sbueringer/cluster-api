@@ -24,6 +24,7 @@ import (
 	"os"
 	"regexp"
 	goruntime "runtime"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -57,6 +58,7 @@ import (
 
 	addonsv1beta1 "sigs.k8s.io/cluster-api/api/addons/v1beta1"
 	addonsv1 "sigs.k8s.io/cluster-api/api/addons/v1beta2"
+	contractv1 "sigs.k8s.io/cluster-api/api/contract/v1beta2"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/api/core/v1beta2/index"
@@ -78,6 +80,7 @@ import (
 	runtimeregistry "sigs.k8s.io/cluster-api/internal/runtime/registry"
 	"sigs.k8s.io/cluster-api/util/apiwarnings"
 	"sigs.k8s.io/cluster-api/util/flags"
+	"sigs.k8s.io/cluster-api/util/secret"
 	"sigs.k8s.io/cluster-api/version"
 	"sigs.k8s.io/cluster-api/webhooks"
 )
@@ -148,6 +151,10 @@ func init() {
 	_ = ipamv1alpha1.AddToScheme(scheme)
 	_ = ipamv1beta1.AddToScheme(scheme)
 	_ = ipamv1.AddToScheme(scheme)
+
+	// FIXME: Add object to the scheme so the controller can work, we might be able to get rid of the dependency on the scheme as this is not concurrency safe
+	//  and would require us to create a new cache with a new scheme when we find a new object / GVK
+	_ = contractv1.AddToScheme(scheme)
 
 	// Register the RuntimeHook types into the catalog.
 	_ = runtimehooksv1.AddToCatalog(catalog)
@@ -235,10 +242,10 @@ func InitFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
 
-	fs.Float32Var(&restConfigQPS, "kube-api-qps", 100,
+	fs.Float32Var(&restConfigQPS, "kube-api-qps", 1000,
 		"Maximum queries per second from the controller client to the Kubernetes API server.")
 
-	fs.IntVar(&restConfigBurst, "kube-api-burst", 200,
+	fs.IntVar(&restConfigBurst, "kube-api-burst", 1000,
 		"Maximum number of queries that should be allowed in one burst from the controller client to the Kubernetes API server.")
 
 	fs.Float32Var(&clusterCacheClientQPS, "clustercache-client-qps", 20,
@@ -367,6 +374,7 @@ func main() {
 
 	ctrlOptions := ctrl.Options{
 		Controller: config.Controller{
+			CacheSyncTimeout: 10 * time.Minute, // FIXME
 			UsePriorityQueue: ptr.To[bool](feature.Gates.Enabled(feature.PriorityQueue)),
 		},
 		Scheme:                     scheme,
@@ -388,6 +396,16 @@ func main() {
 				// The cached secrets will only be used by the secretCachingClient we create below.
 				&corev1.Secret{}: {
 					Label: clusterSecretCacheSelector,
+					Transform: func(in any) (any, error) {
+						if s, ok := in.(*corev1.Secret); ok {
+							s.SetManagedFields(nil)
+							if !strings.HasSuffix(s.Name, fmt.Sprintf("-%s", secret.Kubeconfig)) ||
+								!strings.HasSuffix(s.Name, fmt.Sprintf("-%s", secret.ClusterCA)) {
+								s.Data = nil
+							}
+						}
+						return in, nil
+					},
 				},
 			},
 		},
@@ -468,6 +486,16 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager, watchNamespaces map
 		SecretClient: secretCachingClient,
 		Cache: clustercache.CacheOptions{
 			Indexes: []clustercache.CacheOptionsIndex{clustercache.NodeProviderIDIndex},
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Node{}: {
+					Transform: func(in any) (any, error) {
+						if n, ok := in.(*corev1.Node); ok {
+							n.SetManagedFields(nil)
+						}
+						return in, nil
+					},
+				},
+			},
 		},
 		Client: clustercache.ClientOptions{
 			QPS:       clusterCacheClientQPS,
