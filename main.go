@@ -54,6 +54,7 @@ import (
 
 	addonsv1beta1 "sigs.k8s.io/cluster-api/api/addons/v1beta1"
 	addonsv1 "sigs.k8s.io/cluster-api/api/addons/v1beta2"
+	contractv1 "sigs.k8s.io/cluster-api/api/contract/v1beta2"
 	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/api/core/v1beta2/index"
@@ -147,6 +148,10 @@ func init() {
 	_ = ipamv1beta1.AddToScheme(scheme)
 	_ = ipamv1.AddToScheme(scheme)
 
+	// FIXME: Add object to the scheme so the controller can work, we might be able to get rid of the dependency on the scheme as this is not concurrency safe
+	//  and would require us to create a new cache with a new scheme when we find a new object / GVK
+	_ = contractv1.AddToScheme(scheme)
+
 	// Register the RuntimeHook types into the catalog.
 	_ = runtimehooksv1.AddToCatalog(catalog)
 }
@@ -233,10 +238,10 @@ func InitFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
 
-	fs.Float32Var(&restConfigQPS, "kube-api-qps", 100,
+	fs.Float32Var(&restConfigQPS, "kube-api-qps", 1000,
 		"Maximum queries per second from the controller client to the Kubernetes API server.")
 
-	fs.IntVar(&restConfigBurst, "kube-api-burst", 200,
+	fs.IntVar(&restConfigBurst, "kube-api-burst", 1000,
 		"Maximum number of queries that should be allowed in one burst from the controller client to the Kubernetes API server.")
 
 	fs.Float32Var(&clusterCacheClientQPS, "clustercache-client-qps", 20,

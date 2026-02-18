@@ -287,8 +287,8 @@ help:  # Display this help
 ALL_GENERATE_MODULES = core kubeadm-bootstrap kubeadm-control-plane docker-infrastructure test-extension
 
 .PHONY: generate
-generate: ## Run all generate-manifests-*, generate-go-deepcopy-*, generate-go-conversions-* and generate-go-openapi targets
-	$(MAKE) generate-modules generate-manifests generate-go-deepcopy generate-go-conversions generate-go-openapi
+generate: ## Run all generate-manifests-*, generate-go-deepcopy-*, generate-go-conversions-*, generate-go-applyconfigurations and generate-go-openapi targets
+	$(MAKE) generate-modules generate-manifests generate-go-deepcopy generate-go-conversions generate-go-applyconfigurations generate-go-openapi
 
 .PHONY: generate-manifests
 generate-manifests: $(addprefix generate-manifests-,$(ALL_GENERATE_MODULES)) ## Run all generate-manifests-* targets
@@ -408,6 +408,7 @@ generate-go-deepcopy-core: $(CONTROLLER_GEN) ## Generate deepcopy go code for co
 	$(CONTROLLER_GEN) \
 		object:headerFile=./hack/boilerplate/boilerplate.generatego.txt \
 		paths=./api/addons/... \
+		paths=./api/contract/... \
 		paths=./api/core/... \
 		paths=./api/ipam/... \
 		paths=./api/runtime/... \
@@ -533,6 +534,15 @@ generate-go-conversions-docker-infrastructure: $(CONVERSION_GEN) ## Generate con
 
 .PHONY: generate-go-conversions-test-extension
 generate-go-conversions-test-extension: $(CONVERSION_GEN) ## Generate conversions go code for test runtime extension provider
+
+.PHONY: generate-go-applyconfigurations
+generate-go-applyconfigurations: $(CONTROLLER_GEN) ## Generate applyconfigurations go code for core
+	rm -rf ./util/applyconfigurations
+	$(CONTROLLER_GEN) \
+		object:headerFile=./hack/boilerplate/boilerplate.generatego.txt \
+		paths=./api/core/... \
+		paths=./api/contract/... \
+		applyconfiguration
 
 # The tmp/sigs.k8s.io/cluster-api symlink is a workaround to make this target run outside of GOPATH
 .PHONY: generate-go-openapi

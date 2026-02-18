@@ -30,7 +30,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	contractv1 "sigs.k8s.io/cluster-api/api/contract/v1beta2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/api/core/v1beta2/index"
 	"sigs.k8s.io/cluster-api/controllers/clustercache"
@@ -53,7 +53,6 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/noderefutil"
 	runtimeclient "sigs.k8s.io/cluster-api/exp/runtime/client"
 	"sigs.k8s.io/cluster-api/feature"
-	"sigs.k8s.io/cluster-api/internal/contract"
 	"sigs.k8s.io/cluster-api/internal/controllers/machine/drain"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
@@ -410,14 +409,14 @@ type scope struct {
 
 	// infraMachine is the Infrastructure Machine object that is referenced by the
 	// Machine. It is set after reconcileInfrastructure is called.
-	infraMachine *unstructured.Unstructured
+	infraMachine *contractv1.InfraMachine
 
 	// infraMachineNotFound is true if getting the infra machine object failed with an NotFound err
 	infraMachineIsNotFound bool
 
 	// bootstrapConfig is the BootstrapConfig object that is referenced by the
 	// Machine. It is set after reconcileBootstrap is called.
-	bootstrapConfig *unstructured.Unstructured
+	bootstrapConfig *contractv1.BootstrapConfig
 
 	// bootstrapConfigNotFound is true if getting the BootstrapConfig object failed with an NotFound err
 	bootstrapConfigIsNotFound bool
@@ -746,7 +745,7 @@ func (r *Reconciler) nodeVolumeDetachTimeoutExceeded(machine *clusterv1.Machine)
 
 // isDeleteNodeAllowed returns nil only if the Machine's NodeRef is not nil
 // and if the Machine is not the last control plane node in the cluster.
-func (r *Reconciler) isDeleteNodeAllowed(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, infraMachine *unstructured.Unstructured) error {
+func (r *Reconciler) isDeleteNodeAllowed(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, infraMachine *contractv1.InfraMachine) error {
 	log := ctrl.LoggerFrom(ctx)
 	// Return early if the cluster is being deleted.
 	if !cluster.DeletionTimestamp.IsZero() {
@@ -756,11 +755,9 @@ func (r *Reconciler) isDeleteNodeAllowed(ctx context.Context, cluster *clusterv1
 	var providerID string
 	if machine.Spec.ProviderID != "" {
 		providerID = machine.Spec.ProviderID
-	} else if infraMachine != nil {
+	} else if infraMachine != nil && infraMachine.Spec.ProviderID != "" {
 		// Fallback to retrieve from infraMachine.
-		if providerIDFromInfraMachine, err := contract.InfrastructureMachine().ProviderID().Get(infraMachine); err == nil {
-			providerID = *providerIDFromInfraMachine
-		}
+		providerID = infraMachine.Spec.ProviderID
 	}
 
 	if !machine.Status.NodeRef.IsDefined() && providerID != "" {
