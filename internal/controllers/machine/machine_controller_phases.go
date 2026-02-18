@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -33,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
+	contractv1 "sigs.k8s.io/cluster-api/api/contract/v1beta2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	capierrors "sigs.k8s.io/cluster-api/errors"
@@ -46,8 +46,8 @@ import (
 var externalReadyWait = 30 * time.Second
 
 // reconcileExternal handles generic unstructured objects referenced by a Machine.
-func (r *Reconciler) reconcileExternal(ctx context.Context, cluster *clusterv1.Cluster, m *clusterv1.Machine, ref clusterv1.ContractVersionedObjectReference) (*unstructured.Unstructured, error) {
-	obj, err := r.ensureExternalOwnershipAndWatch(ctx, cluster, m, ref)
+func (r *Reconciler) reconcileExternal(ctx context.Context, cluster *clusterv1.Cluster, m *clusterv1.Machine, ref clusterv1.ContractVersionedObjectReference, eType ExternalType) (client.Object, error) {
+	obj, err := r.ensureExternalOwnershipAndWatch(ctx, cluster, m, ref, eType)
 	if err != nil {
 		return nil, err
 	}
@@ -75,20 +75,28 @@ func (r *Reconciler) reconcileExternal(ctx context.Context, cluster *clusterv1.C
 			m.Status.Deprecated.V1Beta1 = &clusterv1.MachineV1Beta1DeprecatedStatus{}
 		}
 		m.Status.Deprecated.V1Beta1.FailureMessage = ptr.To(
-			fmt.Sprintf("Failure detected from referenced resource %v with name %q: %s",
-				obj.GroupVersionKind(), obj.GetName(), failureMessage),
+			fmt.Sprintf("Failure detected from %v %s: %s",
+				obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName(), failureMessage),
 		)
 	}
 
 	return obj, nil
 }
 
+type ExternalType string
+
+var (
+	ExternalTypeInfraMachine ExternalType = "InfraMachine"
+
+	ExternalTypeBootstrapConfig ExternalType = "BootstrapConfig"
+)
+
 // ensureExternalOwnershipAndWatch ensures that only the Machine owns the external object,
 // adds a watch to the external object if one does not already exist and adds the necessary labels.
-func (r *Reconciler) ensureExternalOwnershipAndWatch(ctx context.Context, cluster *clusterv1.Cluster, m *clusterv1.Machine, ref clusterv1.ContractVersionedObjectReference) (*unstructured.Unstructured, error) {
+func (r *Reconciler) ensureExternalOwnershipAndWatch(ctx context.Context, cluster *clusterv1.Cluster, m *clusterv1.Machine, ref clusterv1.ContractVersionedObjectReference, eType ExternalType) (client.Object, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	obj, err := external.GetObjectFromContractVersionedRef(ctx, r.Client, ref, m.Namespace)
+	obj, err := external.GetContractObjectFromContractVersionedRef(ctx, r.Client, ref, m.Namespace, external.ExternalType(eType))
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +164,7 @@ func (r *Reconciler) reconcileBootstrap(ctx context.Context, s *scope) (ctrl.Res
 	}
 
 	// Call generic external reconciler if we have an external reference.
-	obj, err := r.reconcileExternal(ctx, cluster, m, m.Spec.Bootstrap.ConfigRef)
+	obj, err := r.reconcileExternal(ctx, cluster, m, m.Spec.Bootstrap.ConfigRef, ExternalTypeBootstrapConfig)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			s.bootstrapConfigIsNotFound = true
@@ -172,7 +180,12 @@ func (r *Reconciler) reconcileBootstrap(ctx context.Context, s *scope) (ctrl.Res
 		}
 		return ctrl.Result{}, err
 	}
-	s.bootstrapConfig = obj
+
+	bootstrapConfigV1Beta2, ok := obj.(*contractv1.BootstrapConfig)
+	if !ok {
+		return ctrl.Result{}, errors.New("unknown type") // FIXME: implement v1beta1
+	}
+	s.bootstrapConfig = bootstrapConfigV1Beta2
 
 	// If the bootstrap data is populated, set ready and return.
 	if m.Spec.Bootstrap.DataSecretName != nil {
@@ -188,21 +201,14 @@ func (r *Reconciler) reconcileBootstrap(ctx context.Context, s *scope) (ctrl.Res
 	}
 
 	// Determine if the data secret was created.
-	var dataSecretCreated bool
-	if dataSecretCreatedPtr, err := contract.Bootstrap().DataSecretCreated(contractVersion).Get(s.bootstrapConfig); err != nil {
-		if !errors.Is(err, contract.ErrFieldNotFound) {
-			return ctrl.Result{}, err
-		}
-	} else {
-		dataSecretCreated = *dataSecretCreatedPtr
-	}
+	dataSecretCreated := ptr.Deref(s.bootstrapConfig.Status.Initialization.DataSecretCreated, false)
 
 	// Report a summary of current status of the bootstrap object defined for this machine.
 	fallBack := v1beta1conditions.WithFallbackValue(dataSecretCreated, clusterv1.WaitingForDataSecretFallbackV1Beta1Reason, clusterv1.ConditionSeverityInfo, "")
 	if !s.machine.DeletionTimestamp.IsZero() {
 		fallBack = v1beta1conditions.WithFallbackValue(dataSecretCreated, clusterv1.DeletingV1Beta1Reason, clusterv1.ConditionSeverityInfo, "")
 	}
-	v1beta1conditions.SetMirror(m, clusterv1.BootstrapReadyV1Beta1Condition, v1beta1conditions.UnstructuredGetter(s.bootstrapConfig), fallBack)
+	v1beta1conditions.SetMirror(m, clusterv1.BootstrapReadyV1Beta1Condition, s.bootstrapConfig, fallBack)
 
 	if !s.bootstrapConfig.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
@@ -214,27 +220,21 @@ func (r *Reconciler) reconcileBootstrap(ctx context.Context, s *scope) (ctrl.Res
 		if util.IsControlPlaneMachine(m) || conditions.IsTrue(s.cluster, clusterv1.ClusterControlPlaneInitializedCondition) {
 			log.Info(fmt.Sprintf("Waiting for bootstrap provider to generate data secret and set %s",
 				contract.Bootstrap().DataSecretCreated(contractVersion).Path().String()),
-				s.bootstrapConfig.GetKind(), klog.KObj(s.bootstrapConfig))
+				s.bootstrapConfig.Kind, klog.KObj(s.bootstrapConfig))
 		}
 		return ctrl.Result{}, nil
 	}
 
 	// Get and set the dataSecretName containing the bootstrap data.
-	secretName, err := contract.Bootstrap().DataSecretName().Get(s.bootstrapConfig)
-	switch {
-	case err != nil:
-		return ctrl.Result{}, errors.Wrapf(err, "failed to read dataSecretName from %s %s",
-			s.bootstrapConfig.GetKind(), klog.KObj(s.bootstrapConfig))
-	case *secretName == "":
+	if s.bootstrapConfig.Status.DataSecretName == "" {
 		return ctrl.Result{}, errors.Errorf("got empty %s field from %s %s",
 			contract.Bootstrap().DataSecretName().Path().String(),
-			s.bootstrapConfig.GetKind(), klog.KObj(s.bootstrapConfig))
-	default:
-		m.Spec.Bootstrap.DataSecretName = secretName
+			s.bootstrapConfig.Kind, klog.KObj(s.bootstrapConfig))
 	}
+	m.Spec.Bootstrap.DataSecretName = ptr.To(s.bootstrapConfig.Status.DataSecretName)
 
 	if !ptr.Deref(m.Status.Initialization.BootstrapDataSecretCreated, false) {
-		log.Info("Bootstrap provider generated data secret", s.bootstrapConfig.GetKind(), klog.KObj(s.bootstrapConfig), "Secret", klog.KRef(m.Namespace, *secretName))
+		log.Info("Bootstrap provider generated data secret", s.bootstrapConfig.Kind, klog.KObj(s.bootstrapConfig), "Secret", klog.KRef(m.Namespace, s.bootstrapConfig.Status.DataSecretName))
 	}
 	m.Status.Initialization.BootstrapDataSecretCreated = ptr.To(true)
 	return ctrl.Result{}, nil
@@ -247,7 +247,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
 	m := s.machine
 
 	// Call generic external reconciler.
-	obj, err := r.reconcileExternal(ctx, cluster, m, m.Spec.InfrastructureRef)
+	obj, err := r.reconcileExternal(ctx, cluster, m, m.Spec.InfrastructureRef, ExternalTypeInfraMachine)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			s.infraMachineIsNotFound = true
@@ -276,25 +276,23 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
 		}
 		return ctrl.Result{}, err
 	}
-	s.infraMachine = obj
+
+	infraMachineV1Beta2, ok := obj.(*contractv1.InfraMachine)
+	if !ok {
+		return ctrl.Result{}, errors.New("unknown type") // FIXME: implement v1beta1
+	}
+	s.infraMachine = infraMachineV1Beta2
 
 	// Determine contract version used by the InfraMachine.
-	contractVersion, err := contract.GetContractVersion(ctx, r.Client, s.infraMachine.GroupVersionKind().GroupKind())
+	contractVersion, err := contract.GetContractVersion(ctx, r.Client, s.infraMachine.GroupVersionKind().GroupKind()) // FIXME
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Determine if the InfrastructureMachine is provisioned.
-	var provisioned bool
-	if provisionedPtr, err := contract.InfrastructureMachine().Provisioned(contractVersion).Get(s.infraMachine); err != nil {
-		if !errors.Is(err, contract.ErrFieldNotFound) {
-			return ctrl.Result{}, err
-		}
-	} else {
-		provisioned = *provisionedPtr
-	}
+	provisioned := ptr.Deref(s.infraMachine.Status.Initialization.Provisioned, false)
 	if provisioned && !ptr.Deref(m.Status.Initialization.InfrastructureProvisioned, false) {
-		log.Info("Infrastructure provider has completed provisioning", s.infraMachine.GetKind(), klog.KObj(s.infraMachine))
+		log.Info("Infrastructure provider has completed provisioning", s.infraMachine.Kind, klog.KObj(s.infraMachine))
 	}
 
 	// Report a summary of current status of the InfrastructureMachine for this Machine.
@@ -302,7 +300,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
 	if !s.machine.DeletionTimestamp.IsZero() {
 		fallBack = v1beta1conditions.WithFallbackValue(provisioned, clusterv1.DeletingV1Beta1Reason, clusterv1.ConditionSeverityInfo, "")
 	}
-	v1beta1conditions.SetMirror(m, clusterv1.InfrastructureReadyV1Beta1Condition, v1beta1conditions.UnstructuredGetter(s.infraMachine), fallBack)
+	v1beta1conditions.SetMirror(m, clusterv1.InfrastructureReadyV1Beta1Condition, s.infraMachine, fallBack)
 
 	if !s.infraMachine.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
@@ -313,65 +311,38 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
 		// Only log if the Machine is a control plane Machine or the Cluster is already initialized to reduce noise.
 		if util.IsControlPlaneMachine(m) || conditions.IsTrue(s.cluster, clusterv1.ClusterControlPlaneInitializedCondition) {
 			log.Info(fmt.Sprintf("Waiting for infrastructure provider to set %s on %s",
-				contract.InfrastructureMachine().Provisioned(contractVersion).Path().String(), s.infraMachine.GetKind()),
-				s.infraMachine.GetKind(), klog.KObj(s.infraMachine))
+				contract.InfrastructureMachine().Provisioned(contractVersion).Path().String(), s.infraMachine.Kind),
+				s.infraMachine.Kind, klog.KObj(s.infraMachine))
 		}
 		return ctrl.Result{}, nil
 	}
 
 	// Get providerID from the InfrastructureMachine (intentionally not setting it on the Machine yet).
-	providerID, err := contract.InfrastructureMachine().ProviderID().Get(s.infraMachine)
-	switch {
-	case err != nil && !errors.Is(err, contract.ErrFieldNotFound):
-		return ctrl.Result{}, errors.Wrapf(err, "failed to read %s from %s %s",
-			contract.InfrastructureMachine().ProviderID().Path().String(),
-			s.infraMachine.GetKind(), klog.KObj(s.infraMachine))
-	case ptr.Deref(providerID, "") == "":
+	providerID := s.infraMachine.Spec.ProviderID
+	if providerID == "" {
 		log.Info(fmt.Sprintf("Waiting for infrastructure provider to set %s on %s",
-			contract.InfrastructureMachine().ProviderID().Path().String(), s.infraMachine.GetKind()),
-			s.infraMachine.GetKind(), klog.KObj(s.infraMachine))
+			contract.InfrastructureMachine().ProviderID().Path().String(), s.infraMachine.Kind),
+			s.infraMachine.Kind, klog.KObj(s.infraMachine))
 		// Slow down reconcile frequency, provisioning infrastructure takes some time.
 		r.controller.DeferNextReconcileForObject(s.machine, time.Now().Add(5*time.Second))
 		return ctrl.Result{}, nil // Note: Requeue is not needed, changes to InfraMachine trigger another reconcile.
 	}
 
 	// Get and set addresses from the InfrastructureMachine.
-	addresses, err := contract.InfrastructureMachine().Addresses().Get(s.infraMachine)
-	switch {
-	case errors.Is(err, contract.ErrFieldNotFound): // no-op
-	case err != nil:
-		return ctrl.Result{}, errors.Wrapf(err, "failed to read addresses from %s %s",
-			s.infraMachine.GetKind(), klog.KObj(s.infraMachine))
-	default:
-		m.Status.Addresses = *addresses
+	m.Status.Addresses = s.infraMachine.Status.Addresses
+
+	if s.infraMachine.Spec.FailureDomain != nil {
+		m.Spec.FailureDomain = *s.infraMachine.Spec.FailureDomain
 	}
 
-	// Get deprecatedFailureDomain from the InfrastructureMachine.
-	deprecatedFailureDomain, err := contract.InfrastructureMachine().DeprecatedFailureDomain().Get(s.infraMachine)
-	switch {
-	case errors.Is(err, contract.ErrFieldNotFound): // no-op
-	case err != nil:
-		return ctrl.Result{}, errors.Wrapf(err, "failed to read spec.failureDomain from %s %s",
-			s.infraMachine.GetKind(), klog.KObj(s.infraMachine))
-	default:
-		m.Spec.FailureDomain = ptr.Deref(deprecatedFailureDomain, "")
-	}
-
-	// Get failureDomain from the InfrastructureMachine.
-	failureDomain, err := contract.InfrastructureMachine().FailureDomain().Get(s.infraMachine)
-	switch {
-	case errors.Is(err, contract.ErrFieldNotFound): // no-op
-	case err != nil:
-		return ctrl.Result{}, errors.Wrapf(err, "failed to read status.failureDomain from %s %s",
-			s.infraMachine.GetKind(), klog.KObj(s.infraMachine))
-	default:
-		m.Status.FailureDomain = ptr.Deref(failureDomain, "")
+	if s.infraMachine.Status.FailureDomain != "" {
+		m.Spec.FailureDomain = s.infraMachine.Status.FailureDomain
 	}
 
 	// When we hit this point providerID is set, and either:
 	// - the infra machine is reporting provisioned for the first time
 	// - the infra machine already reported provisioned (and thus m.Status.InfrastructureReady is already true and it should not flip back)
-	m.Spec.ProviderID = *providerID
+	m.Spec.ProviderID = providerID
 	m.Status.Initialization.InfrastructureProvisioned = ptr.To(true)
 	return ctrl.Result{}, nil
 }
@@ -423,12 +394,12 @@ func (r *Reconciler) reconcileCertificateExpiry(_ context.Context, s *scope) (ct
 }
 
 // removeOnCreateOwnerRefs will remove any MachineSet or control plane owner references from passed objects.
-func removeOnCreateOwnerRefs(cluster *clusterv1.Cluster, m *clusterv1.Machine, obj *unstructured.Unstructured) error {
+func removeOnCreateOwnerRefs(cluster *clusterv1.Cluster, m *clusterv1.Machine, obj client.Object) error {
 	cpGK := getControlPlaneGKForMachine(cluster, m)
 	for _, owner := range obj.GetOwnerReferences() {
 		ownerGV, err := schema.ParseGroupVersion(owner.APIVersion)
 		if err != nil {
-			return errors.Wrapf(err, "could not remove ownerReference %v from object %s/%s", owner.String(), obj.GetKind(), obj.GetName())
+			return errors.Wrapf(err, "could not remove ownerReference %v from object %s/%s", owner.String(), obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName())
 		}
 		if (ownerGV.Group == clusterv1.GroupVersion.Group && owner.Kind == "MachineSet") ||
 			(cpGK != nil && ownerGV.Group == cpGK.Group && owner.Kind == cpGK.Kind) {
@@ -440,12 +411,12 @@ func removeOnCreateOwnerRefs(cluster *clusterv1.Cluster, m *clusterv1.Machine, o
 }
 
 // hasOnCreateOwnerRefs will check if any MachineSet or control plane owner references from passed objects are set.
-func hasOnCreateOwnerRefs(cluster *clusterv1.Cluster, m *clusterv1.Machine, obj *unstructured.Unstructured) (bool, error) {
+func hasOnCreateOwnerRefs(cluster *clusterv1.Cluster, m *clusterv1.Machine, obj client.Object) (bool, error) {
 	cpGK := getControlPlaneGKForMachine(cluster, m)
 	for _, owner := range obj.GetOwnerReferences() {
 		ownerGV, err := schema.ParseGroupVersion(owner.APIVersion)
 		if err != nil {
-			return false, errors.Wrapf(err, "could not remove ownerReference %v from object %s/%s", owner.String(), obj.GetKind(), obj.GetName())
+			return false, errors.Wrapf(err, "could not remove ownerReference %v from object %s/%s", owner.String(), obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName())
 		}
 		if (ownerGV.Group == clusterv1.GroupVersion.Group && owner.Kind == "MachineSet") ||
 			(cpGK != nil && ownerGV.Group == cpGK.Group && owner.Kind == cpGK.Kind) {

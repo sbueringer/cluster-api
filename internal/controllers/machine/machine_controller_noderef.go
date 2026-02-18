@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -128,16 +127,16 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result, 
 
 	// Get interruptible instance status from the infrastructure provider and set the interruptible label on the node.
 	interruptible := false
-	found := false
+	//found := false // FIXME: add this field to the InfraMachine type + update contract if necesary
 	if infraMachine != nil {
-		interruptible, found, err = unstructured.NestedBool(infraMachine.Object, "status", "interruptible")
-		if err != nil {
-			return ctrl.Result{}, errors.Wrapf(err, "failed to get status interruptible from infra machine %s", klog.KObj(infraMachine))
-		}
-		// If interruptible is set and is true add the interruptible label to the node labels.
-		if found && interruptible {
-			nodeLabels[clusterv1.InterruptibleLabel] = ""
-		}
+		//interruptible, found, err = unstructured.NestedBool(infraMachine.Object, "status", "interruptible")
+		//if err != nil {
+		//	return ctrl.Result{}, errors.Wrapf(err, "failed to get status interruptible from infra machine %s", klog.KObj(infraMachine))
+		//}
+		//// If interruptible is set and is true add the interruptible label to the node labels.
+		//if found && interruptible {
+		//	nodeLabels[clusterv1.InterruptibleLabel] = ""
+		//}
 	}
 
 	_, nodeHadInterruptibleLabel := s.node.Labels[clusterv1.InterruptibleLabel]

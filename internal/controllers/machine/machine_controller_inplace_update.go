@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -167,13 +166,13 @@ func (r *Reconciler) callUpdateMachineHook(ctx context.Context, s *scope) (ctrl.
 	// requests as desired state; it is up to them to compare with current state and perform necessary actions.
 	request := &runtimehooksv1.UpdateMachineRequest{
 		Desired: runtimehooksv1.UpdateMachineRequestObjects{
-			Machine:               *cleanupMachine(s.machine),
-			InfrastructureMachine: runtime.RawExtension{Object: cleanupUnstructured(s.infraMachine)},
+			Machine: *cleanupMachine(s.machine),
+			//InfrastructureMachine: runtime.RawExtension{Object: cleanupUnstructured(s.infraMachine)}, FIXME: use cache with TTL with refresh on cache hit + based on resourceVersion => then live read
 		},
 	}
 
 	if s.bootstrapConfig != nil {
-		request.Desired.BootstrapConfig = runtime.RawExtension{Object: cleanupUnstructured(s.bootstrapConfig)}
+		//request.Desired.BootstrapConfig = runtime.RawExtension{Object: cleanupUnstructured(s.bootstrapConfig)} FIXME: use cache with TTL with refresh on cache hit + based on resourceVersion => then live read
 	}
 
 	response := &runtimehooksv1.UpdateMachineResponse{}

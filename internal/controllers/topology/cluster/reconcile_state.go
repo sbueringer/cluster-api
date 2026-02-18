@@ -18,8 +18,10 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"strings"
 	"time"
 
@@ -49,7 +51,9 @@ import (
 	"sigs.k8s.io/cluster-api/internal/topology/clustershim"
 	topologynames "sigs.k8s.io/cluster-api/internal/topology/names"
 	"sigs.k8s.io/cluster-api/internal/topology/ownerrefs"
+	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
+	acclusterv1 "sigs.k8s.io/cluster-api/util/applyconfigurations/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/cache"
 	capicontrollerutil "sigs.k8s.io/cluster-api/util/controller"
 )
@@ -476,6 +480,36 @@ func (r *Reconciler) reconcileMachineHealthCheck(ctx context.Context, current, d
 	log = log.WithValues("MachineHealthCheck", klog.KObj(current))
 	ctx = ctrl.LoggerInto(ctx, log)
 
+	requestIdentifier, err := ssa.ComputeRequestIdentifier(r.Client.Scheme(), current.ResourceVersion, desired)
+	if err != nil {
+		return errors.Wrapf(err, "failed to apply MachineHealthCheck")
+	}
+	if r.ssaApplyConfigurationCache.Has(requestIdentifier, "MachineHealthCheck") {
+		// Nothing to do
+		// Refresh the cache
+		r.ssaApplyConfigurationCache.Add(requestIdentifier)
+		return nil
+	}
+
+	updatedMachineHealthCheckApplyConfiguration := &acclusterv1.MachineHealthCheckApplyConfiguration{}
+	updatedMachineHealthCheckBytes, err := json.Marshal(desired)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(updatedMachineHealthCheckBytes, updatedMachineHealthCheckApplyConfiguration); err != nil {
+		return err
+	}
+	currentMachineHealthCheckApplyConfiguration, err := acclusterv1.ExtractMachineHealthCheck(current, structuredmerge.TopologyManagerName)
+	if err != nil {
+		return err // FIXME: decide what to do on errors
+	}
+	if reflect.DeepEqual(updatedMachineHealthCheckApplyConfiguration, currentMachineHealthCheckApplyConfiguration) {
+		log.V(3).Info("No changes for MachineHealthCheck (based on ApplyConfiguration comparison)")
+		// Nothing to do
+		r.ssaApplyConfigurationCache.Add(requestIdentifier)
+		return nil
+	}
+
 	// Check differences between current and desired MachineHealthChecks, and patch if required.
 	// NOTE: we want to be authoritative on the entire spec because the users are
 	// expected to change MHC fields from the ClusterClass only.
@@ -775,6 +809,36 @@ func (r *Reconciler) updateMachineDeployment(ctx context.Context, s *scope.Scope
 				bootstrapLog.Error(err, "WARNING! Failed to cleanup BootstrapTemplate for MachineDeployment while handling update error. The object will be garbage collected when the cluster is deleted.")
 			}
 		}
+	}
+
+	requestIdentifier, err := ssa.ComputeRequestIdentifier(r.Client.Scheme(), currentMD.Object.ResourceVersion, desiredMD.Object)
+	if err != nil {
+		return errors.Wrapf(err, "failed to apply MachineDeployment")
+	}
+	if r.ssaApplyConfigurationCache.Has(requestIdentifier, "MachineDeployment") {
+		// Nothing to do
+		// Refresh the cache
+		r.ssaApplyConfigurationCache.Add(requestIdentifier)
+		return nil
+	}
+
+	updatedMachineDeploymentApplyConfiguration := &acclusterv1.MachineDeploymentApplyConfiguration{}
+	updatedMachineDeploymentBytes, err := json.Marshal(desiredMD.Object)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(updatedMachineDeploymentBytes, updatedMachineDeploymentApplyConfiguration); err != nil {
+		return err
+	}
+	currentMachineDeploymentApplyConfiguration, err := acclusterv1.ExtractMachineDeployment(currentMD.Object, structuredmerge.TopologyManagerName)
+	if err != nil {
+		return err // FIXME: decide what to do on errors
+	}
+	if reflect.DeepEqual(updatedMachineDeploymentApplyConfiguration, currentMachineDeploymentApplyConfiguration) {
+		log.V(3).Info("No changes for MachineDeployment (based on ApplyConfiguration comparison)")
+		// Nothing to do
+		r.ssaApplyConfigurationCache.Add(requestIdentifier)
+		return nil
 	}
 
 	// Check differences between current and desired MachineDeployment, and eventually patch the current object.

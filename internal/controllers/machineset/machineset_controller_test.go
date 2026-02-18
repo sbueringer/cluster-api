@@ -1490,6 +1490,9 @@ func TestMachineSetReconciler_syncMachines(t *testing.T) {
 	_, stopReconcile, err := reconciler.syncMachines(ctx, s)
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(stopReconcile).To(BeFalse())
+	_, stopReconcile, err = reconciler.syncMachines(ctx, s)
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(stopReconcile).To(BeFalse())
 
 	updatedInPlaceMutatingMachine := inPlaceMutatingMachine.DeepCopy()
 	g.Eventually(func(g Gomega) {

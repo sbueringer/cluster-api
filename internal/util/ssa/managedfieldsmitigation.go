@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -189,11 +190,25 @@ func MitigateManagedFieldsIssue(ctx context.Context, c client.Client, obj client
 		return false, nil
 	}
 
-	managedFields := obj.GetManagedFields()
+	needsMitigation, err := needsManagedFieldsMitigation(obj)
+	if err != nil {
+		return false, err
+	}
 
-	if len(managedFields) > 0 && !slices.ContainsFunc(managedFields, isManager(beforeFirstApplyManager)) {
+	if !needsMitigation {
 		// Return if object has managedFields and no before-first-apply entry.
 		return false, nil
+	}
+
+	var managedFields []metav1.ManagedFieldsEntry
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		var err error
+		managedFields, err = GetUnstructuredManagedFields(u, "")
+		if err != nil {
+			return false, err
+		}
+	} else {
+		managedFields = obj.GetManagedFields()
 	}
 
 	log := ctrl.LoggerFrom(ctx)
