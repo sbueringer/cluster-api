@@ -18,7 +18,9 @@ package machinedeployment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -44,6 +46,7 @@ import (
 	clientutil "sigs.k8s.io/cluster-api/internal/util/client"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
+	acclusterv1 "sigs.k8s.io/cluster-api/util/applyconfigurations/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/cache"
 	"sigs.k8s.io/cluster-api/util/collections"
 	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
@@ -81,8 +84,9 @@ type Reconciler struct {
 	// WatchFilterValue is the label value used to filter events prior to reconciliation.
 	WatchFilterValue string
 
-	recorder record.EventRecorder
-	ssaCache ssa.Cache
+	recorder                   record.EventRecorder
+	ssaCache                   ssa.Cache
+	ssaApplyConfigurationCache ssa.Cache
 
 	canUpdateMachineSetCache cache.Cache[CanUpdateMachineSetCacheEntry]
 }
@@ -124,6 +128,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 	r.canUpdateMachineSetCache = cache.New[CanUpdateMachineSetCacheEntry](cache.HookCacheDefaultTTL)
 	r.recorder = mgr.GetEventRecorderFor("machinedeployment-controller")
 	r.ssaCache = ssa.NewCache("machinedeployment")
+	r.ssaApplyConfigurationCache = ssa.NewCache("machinedeployment-applyconfiguration")
 	return nil
 }
 
@@ -396,6 +401,45 @@ func (r *Reconciler) createOrUpdateMachineSetsAndSyncMachineDeploymentRevision(c
 			continue
 		}
 
+		requestIdentifier, err := ssa.ComputeRequestIdentifier(r.Client.Scheme(), diff.OriginalMS.ResourceVersion, ms)
+		if err != nil {
+			return errors.Wrapf(err, "failed to apply MachineSet")
+		}
+
+		if r.ssaApplyConfigurationCache.Has(requestIdentifier, "MachineSet") {
+			// Nothing to do
+			// FIXME: check if we have to update ms with originalMS like ssa.Patch would do even for no-ops (not sure if we depend on that later)
+			// Refresh the cache
+			r.ssaApplyConfigurationCache.Add(requestIdentifier)
+			continue
+		}
+
+		updatedMachineSetApplyConfiguration := &acclusterv1.MachineSetApplyConfiguration{}
+		updatedMachineSetBytes, err := json.Marshal(ms)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(updatedMachineSetBytes, updatedMachineSetApplyConfiguration); err != nil {
+			return err
+		}
+		updatedMachineSetApplyConfiguration.Status = nil            // FIXME: Cleanup status, not sure why there is a status in the first place
+		updatedMachineSetApplyConfiguration.CreationTimestamp = nil // cleanup creationTimestamp as it is not present incurrentMachineSetApplyConfiguration
+		updatedMachineSetApplyConfiguration.Finalizers = nil        // cleanup creationTimestamp, we sort of adopt it today, maybe we should stop doing that?
+
+		currentMachineSetApplyConfiguration, err := acclusterv1.ExtractMachineSet(diff.OriginalMS, machineDeploymentManagerName)
+		if err != nil {
+			return err // FIXME: decide what to do on errors
+		}
+		currentMachineSetApplyConfiguration.UID = ptr.To(diff.OriginalMS.UID) // FIXME: why does Extract not set UID? (probably no ownership, but we need it in updateMachine)
+		currentMachineSetApplyConfiguration.Finalizers = nil                  // cleanup creationTimestamp, we sort of adopt it today, maybe we should stop doing that?
+
+		if reflect.DeepEqual(currentMachineSetApplyConfiguration, updatedMachineSetApplyConfiguration) {
+			// Nothing to do
+			// FIXME: check if we have to update ms with originalMS like ssa.Patch would do even for no-ops (not sure if we depend on that later)
+			r.ssaApplyConfigurationCache.Add(requestIdentifier)
+			continue
+		}
+
 		// Add to the log kv pairs providing context and details about changes in this MachineSet (reason, diff)
 		// Note: Those values should not be added to the context to prevent propagation to other func.
 		statusToLogKeyAndValues := []any{
@@ -410,7 +454,7 @@ func (r *Reconciler) createOrUpdateMachineSetsAndSyncMachineDeploymentRevision(c
 		}
 		log = log.WithValues(statusToLogKeyAndValues...)
 
-		err := ssa.Patch(ctx, r.Client, machineDeploymentManagerName, ms, ssa.WithCachingProxy{Cache: r.ssaCache, Original: diff.OriginalMS})
+		err = ssa.Patch(ctx, r.Client, machineDeploymentManagerName, ms, ssa.WithCachingProxy{Cache: r.ssaCache, Original: diff.OriginalMS})
 		if err != nil {
 			// Note: If we are Applying a MachineSet with UID set and the MachineSet does not exist anymore, the
 			// kube-apiserver returns a conflict error.

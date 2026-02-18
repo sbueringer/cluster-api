@@ -23,7 +23,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -52,7 +54,7 @@ func ManagerCacheOptions(watchNamespace string, syncPeriod time.Duration) cache.
 	req, _ = labels.NewRequirement(clusterv1.MachineControlPlaneLabel, selection.Exists, nil)
 	controlPlaneMachineSelector := labels.NewSelector().Add(*req)
 
-	return cache.Options{
+	cacheOptions := cache.Options{
 		DefaultNamespaces: watchNamespaces,
 		SyncPeriod:        &syncPeriod,
 		ByObject: map[client.Object]cache.ByObject{
@@ -91,6 +93,50 @@ func ManagerCacheOptions(watchNamespace string, syncPeriod time.Duration) cache.
 			},
 		},
 	}
+
+	// FIXME: Instead of using a command-line arg here we can consider starting caches dynamically on demand and then specify the cache configuration there
+	infraMachineGVKs := []schema.GroupVersionKind{
+		{
+			Group:   "vmware.infrastructure.cluster.x-k8s.io",
+			Version: "v1beta2",
+			Kind:    "VSphereMachine",
+		},
+	}
+	for _, infraMachineGVK := range infraMachineGVKs {
+		im := &unstructured.Unstructured{}
+		im.SetGroupVersionKind(infraMachineGVK)
+		cacheOptions.ByObject[im] = cache.ByObject{
+			// Only cache CP Machine InfraMachines.
+			Label: controlPlaneMachineSelector,
+		}
+	}
+
+	infraMachineTemplateGVKs := []schema.GroupVersionKind{
+		{
+			Group:   "vmware.infrastructure.cluster.x-k8s.io",
+			Version: "v1beta2",
+			Kind:    "VSphereMachineTemplate",
+		},
+	}
+	for _, infraMachineTemplateGVK := range infraMachineTemplateGVKs {
+		u := &unstructured.Unstructured{}
+		u.SetGroupVersionKind(infraMachineTemplateGVK)
+		cacheOptions.ByObject[u] = cache.ByObject{
+			// Drop data of MD InfraMachineTemplates.
+			Transform: func(in any) (any, error) {
+				if imt, ok := in.(*unstructured.Unstructured); ok {
+					imt.SetManagedFields(nil)
+					if _, ok := imt.GetLabels()[clusterv1.ClusterTopologyMachineDeploymentNameLabel]; ok {
+						delete(imt.Object, "spec")
+						delete(imt.Object, "status")
+					}
+				}
+				return in, nil
+			},
+		}
+	}
+
+	return cacheOptions
 }
 
 // ManagerClientOptions provides client.Options for the manager.

@@ -2060,6 +2060,9 @@ func TestKubeadmControlPlaneReconciler_syncMachines(t *testing.T) {
 	stopReconcile, err := reconciler.syncMachines(ctx, controlPlane)
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(stopReconcile).To(BeFalse())
+	stopReconcile, err = reconciler.syncMachines(ctx, controlPlane)
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(stopReconcile).To(BeFalse())
 
 	updatedInPlaceMutatingMachine := inPlaceMutatingMachine.DeepCopy()
 	g.Eventually(func(g Gomega) {

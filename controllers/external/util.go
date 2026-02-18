@@ -28,8 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	contractv1 "sigs.k8s.io/cluster-api/api/contract/v1beta2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/internal/contract"
 )
@@ -77,6 +79,55 @@ func GetObjectFromContractVersionedRef(ctx context.Context, c client.Reader, ref
 	obj.SetNamespace(namespace)
 	if err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
 		return nil, errors.Wrapf(err, "failed to retrieve %s %s", obj.GetKind(), klog.KRef(namespace, ref.Name))
+	}
+	return obj, nil
+}
+
+
+type ExternalType string
+
+var (
+	ExternalTypeInfraMachine ExternalType = "InfraMachine"
+
+	ExternalTypeBootstrapConfig ExternalType = "BootstrapConfig"
+)
+
+// GetContractObjectFromContractVersionedRef TODO.
+func GetContractObjectFromContractVersionedRef(ctx context.Context, c client.Client, ref clusterv1.ContractVersionedObjectReference, namespace string, eType ExternalType) (client.Object, error) {
+	if !ref.IsDefined() {
+		return nil, errors.Errorf("cannot get object - object reference not set")
+	}
+
+	metadata, err := contract.GetGKMetadata(ctx, c, schema.GroupKind{Group: ref.APIGroup, Kind: ref.Kind})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// We want to surface the NotFound error only for the referenced object, so we use a generic error in case CRD is not found.
+			return nil, errors.Errorf("failed to get object from ref: %v", err.Error())
+		}
+		return nil, errors.Wrapf(err, "failed to get object from ref")
+	}
+	contractVersion, latestAPIVersion, err := contract.GetLatestContractAndAPIVersionFromContract(metadata, contract.Version)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get object from ref")
+	}
+	gvk := schema.GroupVersionKind{Group: ref.APIGroup, Version: latestAPIVersion, Kind: ref.Kind}
+
+	var obj client.Object
+	switch {
+	case contractVersion == "v1beta2" && eType == ExternalTypeInfraMachine:
+		obj = &contractv1.InfraMachine{}
+	case contractVersion == "v1beta2" && eType == ExternalTypeBootstrapConfig:
+		obj = &contractv1.BootstrapConfig{}
+	// FIXME: implement other code paths
+	default:
+		return nil, errors.New("Unknown contract version or external type")
+	}
+	obj.GetObjectKind().SetGroupVersionKind(gvk)
+	obj.SetName(ref.Name)
+	obj.SetNamespace(namespace)
+
+	if err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
+		return nil, errors.Wrapf(err, "failed to retrieve %s %s", gvk.Kind, klog.KRef(namespace, ref.Name))
 	}
 	return obj, nil
 }
@@ -253,18 +304,35 @@ func GenerateTemplate(in *GenerateTemplateInput) (*unstructured.Unstructured, er
 }
 
 // FailuresFrom returns the FailureReason and FailureMessage fields from the external object status.
-func FailuresFrom(obj *unstructured.Unstructured) (string, string, error) {
-	failureReason, _, err := unstructured.NestedString(obj.Object, "status", "failureReason")
-	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to determine failureReason on %v %q",
-			obj.GroupVersionKind(), obj.GetName())
+func FailuresFrom(obj client.Object) (string, string, error) {
+	if obj, ok := obj.(*unstructured.Unstructured); ok {
+		failureReason, _, err := unstructured.NestedString(obj.Object, "status", "failureReason")
+		if err != nil {
+			return "", "", errors.Wrapf(err, "failed to determine failureReason on %v %q",
+				obj.GroupVersionKind(), obj.GetName())
+		}
+		failureMessage, _, err := unstructured.NestedString(obj.Object, "status", "failureMessage")
+		if err != nil {
+			return "", "", errors.Wrapf(err, "failed to determine failureMessage on %v %q",
+				obj.GroupVersionKind(), obj.GetName())
+		}
+		return failureReason, failureMessage, nil
 	}
-	failureMessage, _, err := unstructured.NestedString(obj.Object, "status", "failureMessage")
-	if err != nil {
-		return "", "", errors.Wrapf(err, "failed to determine failureMessage on %v %q",
-			obj.GroupVersionKind(), obj.GetName())
+
+	if obj, ok := obj.(*contractv1.InfraMachine); ok {
+		if obj.Status.Deprecated != nil && obj.Status.Deprecated.V1Beta1 != nil {
+			return string(ptr.Deref(obj.Status.Deprecated.V1Beta1.FailureReason, "")), ptr.Deref(obj.Status.Deprecated.V1Beta1.FailureMessage, ""), nil
+		}
+		return "", "", nil
 	}
-	return failureReason, failureMessage, nil
+	if obj, ok := obj.(*contractv1.BootstrapConfig); ok {
+		if obj.Status.Deprecated != nil && obj.Status.Deprecated.V1Beta1 != nil {
+			return string(ptr.Deref(obj.Status.Deprecated.V1Beta1.FailureReason, "")), ptr.Deref(obj.Status.Deprecated.V1Beta1.FailureMessage, ""), nil
+		}
+		return "", "", nil
+	}
+
+	return "", "", errors.New("Unknown object type")
 }
 
 // IsReady returns true if the Status.Ready field on an external object is true.

@@ -96,7 +96,8 @@ type Reconciler struct {
 	// desiredStateGenerator is used to generate the desired state.
 	desiredStateGenerator desiredstate.Generator
 
-	ssaCache ssa.Cache
+	ssaCache                   ssa.Cache
+	ssaApplyConfigurationCache ssa.Cache
 }
 
 func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -166,6 +167,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 
 	r.recorder = mgr.GetEventRecorderFor("topology/cluster-controller")
 	r.ssaCache = ssa.NewCache("topology/cluster")
+	r.ssaApplyConfigurationCache = ssa.NewCache("topology/cluster-applyconfiguration")
 	return nil
 }
 
