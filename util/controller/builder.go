@@ -23,11 +23,13 @@ import (
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/priorityqueue"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -214,17 +216,34 @@ func (blder *Builder) Build(r reconcile.TypedReconciler[reconcile.Request]) (Con
 		rateLimitInterval = blder.rateLimitInterval
 	}
 
+	priorityQueue := &trackingPriorityQueue{
+		PriorityQueue: priorityqueue.New(controllerName, func(o *priorityqueue.Opts[reconcile.Request]) {
+			o.Log = blder.mgr.GetLogger().WithValues(
+				"controller", controllerName,
+			)
+			// This RateLimiter should not be used, but adding it to ensure we don't hit panics in the PriorityQueue if it is used somehow.
+			o.RateLimiter = workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second)
+		}),
+		PriorityCache: cache.New[priorityCacheEntry](cache.DefaultTTL),
+	}
+
+	blder.options.NewQueue = func(controllerName string, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) workqueue.TypedRateLimitingInterface[reconcile.Request] {
+		return priorityQueue
+	}
+
 	// Passing the options to the underlying builder here because we modified them above.
 	blder.builder.WithOptions(blder.options)
 
 	// Create reconcileCache.
 	reconcileCache := cache.New[reconcileCacheEntry](cache.DefaultTTL)
 
-	c, err := blder.builder.Build(reconcilerWrapper{
+	c, err := blder.builder.Build(&reconcilerWrapper{
 		name:              controllerName,
 		reconciler:        r,
 		reconcileCache:    reconcileCache,
 		rateLimitInterval: rateLimitInterval,
+		Queue:             priorityQueue,
+		RateLimiter:       workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second),
 	})
 	if err != nil {
 		return nil, err
@@ -237,9 +256,38 @@ func (blder *Builder) Build(r reconcile.TypedReconciler[reconcile.Request]) (Con
 	reconcileTotal.WithLabelValues(controllerName, labelRequeueAfter).Add(0)
 	reconcileTotal.WithLabelValues(controllerName, labelRequeue).Add(0)
 	reconcileTotal.WithLabelValues(controllerName, labelSuccess).Add(0)
+	reconcileErrors.WithLabelValues(controllerName).Add(0)
+	terminalReconcileErrors.WithLabelValues(controllerName).Add(0)
 
 	return &controllerWrapper{
 		TypedController: c,
 		reconcileCache:  reconcileCache,
 	}, nil
+}
+
+type trackingPriorityQueue struct {
+	PriorityCache cache.Cache[priorityCacheEntry]
+	priorityqueue.PriorityQueue[reconcile.Request]
+}
+
+func (q *trackingPriorityQueue) GetWithPriority() (reconcile.Request, int, bool) {
+	request, priority, shutdown := q.PriorityQueue.GetWithPriority()
+	if shutdown {
+		return request, priority, shutdown
+	}
+
+	q.PriorityCache.Add(priorityCacheEntry{
+		Request:  request,
+		Priority: priority,
+	})
+	return request, priority, shutdown
+}
+
+type priorityCacheEntry struct {
+	Request  reconcile.Request
+	Priority int
+}
+
+func (p priorityCacheEntry) Key() string {
+	return p.Request.String()
 }

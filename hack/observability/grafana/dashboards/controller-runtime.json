@@ -1640,7 +1640,7 @@
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "sum(rate(controller_runtime_reconcile_errors_total{pod=~\"$Pod\",controller=~\"$Controller\"}[5m])) by (pod)",
+              "expr": "sum(rate(capi_reconcile_errors_total{pod=~\"$Pod\",controller=~\"$Controller\"}[5m])) by (pod) or sum(rate(controller_runtime_reconcile_errors_total{pod=~\"$Pod\",controller=~\"$Controller\"}[5m])) by (pod)",
               "legendFormat": "{{pod}}",
               "range": true,
               "refId": "A"
@@ -1732,7 +1732,7 @@
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "sum(rate(controller_runtime_reconcile_errors_total{pod=~\"$Pod\",controller=~\"$Controller\"}[5m])) by (pod,controller)",
+              "expr": "sum(rate(capi_reconcile_errors_total{pod=~\"$Pod\",controller=~\"$Controller\"}[5m])) by (pod,controller) or sum(rate(controller_runtime_reconcile_errors_total{pod=~\"$Pod\",controller=~\"$Controller\"}[5m])) by (pod,controller)",
               "legendFormat": "{{pod}}: {{controller}}",
               "range": true,
               "refId": "A"

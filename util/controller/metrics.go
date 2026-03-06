@@ -23,10 +23,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
-// Note: Additional metrics have been added because the ReconcileTotal & ReconcileTime
-// controller-runtime metrics are also counting the Requeues for rate-limiting.
+// Note: Additional metrics have been added because the ReconcileTotal, ReconcileErrors,
+// TerminalReconcileErrors, & ReconcileTime controller-runtime metrics are incorrect as they
+// are also counting the Requeues for rate-limiting and the ReconcileWrapper always returns success
+// to controller-runtime.
 // Note: The following controller-runtime metrics are correct even with rate-limiting:
-// ReconcileErrors, TerminalReconcileErrors, ReconcilePanics, WorkerCount, ActiveWorkers.
+// ReconcilePanics, ReconcileTimeouts, WorkerCount, ActiveWorkers.
 
 var (
 	// reconcileTotal is a prometheus counter metrics which holds the total
@@ -39,6 +41,20 @@ var (
 		Name: "capi_reconcile_total",
 		Help: "Total number of reconciliations per controller",
 	}, []string{"controller", "result"})
+
+	// reconcileErrors is a prometheus counter metrics which holds the total
+	// number of errors from the Reconciler.
+	reconcileErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "capi_reconcile_errors_total",
+		Help: "Total number of reconciliation errors per controller",
+	}, []string{"controller"})
+
+	// terminalReconcileErrors is a prometheus counter metrics which holds the total
+	// number of terminal errors from the Reconciler.
+	terminalReconcileErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "capi_terminal_reconcile_errors_total",
+		Help: "Total number of terminal reconciliation errors per controller",
+	}, []string{"controller"})
 
 	// reconcileTime is a prometheus metric which keeps track of the duration
 	// of reconciliations.
@@ -63,5 +79,5 @@ const (
 )
 
 func init() {
-	metrics.Registry.MustRegister(reconcileTotal, reconcileTime)
+	metrics.Registry.MustRegister(reconcileTotal, reconcileErrors, terminalReconcileErrors, reconcileTime)
 }

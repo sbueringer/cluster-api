@@ -18,7 +18,9 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 	"unsafe"
@@ -26,7 +28,9 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -38,6 +42,89 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/predicates"
 )
+
+func TestRateLimiter(t *testing.T) {
+	rateLimiter := workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second)
+
+	rateLimiter2 := NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second)
+
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: "default",
+			Name:      "cluster",
+		},
+	}
+
+	total := time.Duration(0)
+	total2 := time.Duration(0)
+	for i := range 100 {
+		backoff := rateLimiter.When(req)
+		total += backoff + 1*time.Second
+
+		backoff2 := rateLimiter2.When(req)
+		total2 += backoff2
+
+		fmt.Printf("%3d: %s %s, %s %s\n", i+1, total, backoff+1*time.Second, total2, backoff2)
+	}
+}
+
+func NewTypedItemExponentialFailureRateLimiter[T comparable](baseDelay time.Duration, maxDelay time.Duration) workqueue.TypedRateLimiter[T] {
+	return &TypedItemExponentialFailureRateLimiter[T]{
+		failures:  map[T]int{},
+		baseDelay: baseDelay,
+		maxDelay:  maxDelay,
+	}
+}
+
+type TypedItemExponentialFailureRateLimiter[T comparable] struct {
+	failuresLock sync.Mutex
+	failures     map[T]int
+
+	baseDelay time.Duration
+	maxDelay  time.Duration
+}
+
+// Deprecated: DefaultItemBasedRateLimiter is deprecated, use DefaultTypedItemBasedRateLimiter instead.
+func DefaultItemBasedRateLimiter() workqueue.RateLimiter {
+	return DefaultTypedItemBasedRateLimiter[any]()
+}
+
+func DefaultTypedItemBasedRateLimiter[T comparable]() workqueue.TypedRateLimiter[T] {
+	return NewTypedItemExponentialFailureRateLimiter[T](time.Millisecond, 1000*time.Second)
+}
+
+func (r *TypedItemExponentialFailureRateLimiter[T]) When(item T) time.Duration {
+	r.failuresLock.Lock()
+	defer r.failuresLock.Unlock()
+
+	r.failures[item] = r.failures[item] + 1
+
+	failures := r.failures[item]
+	switch {
+	case failures >= 1 && failures <= 5:
+		return 1 * time.Second
+	case failures >= 6 && failures <= 10:
+		return 5 * time.Second
+	case failures >= 11 && failures <= 15:
+		return 10 * time.Second
+	default:
+		return 10 * time.Minute
+	}
+}
+
+func (r *TypedItemExponentialFailureRateLimiter[T]) NumRequeues(item T) int {
+	r.failuresLock.Lock()
+	defer r.failuresLock.Unlock()
+
+	return r.failures[item]
+}
+
+func (r *TypedItemExponentialFailureRateLimiter[T]) Forget(item T) {
+	r.failuresLock.Lock()
+	defer r.failuresLock.Unlock()
+
+	delete(r.failures, item)
+}
 
 func TestBuilder(t *testing.T) {
 	g := NewWithT(t)
