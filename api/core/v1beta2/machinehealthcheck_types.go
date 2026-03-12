@@ -108,7 +108,7 @@ type MachineHealthCheckChecks struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MinItems=0
 	// +kubebuilder:validation:MaxItems=100
 	UnhealthyNodeConditions []UnhealthyNodeCondition `json:"unhealthyNodeConditions,omitempty"`
 
@@ -118,7 +118,7 @@ type MachineHealthCheckChecks struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MinItems=0
 	// +kubebuilder:validation:MaxItems=100
 	UnhealthyMachineConditions []UnhealthyMachineCondition `json:"unhealthyMachineConditions,omitempty"`
 }

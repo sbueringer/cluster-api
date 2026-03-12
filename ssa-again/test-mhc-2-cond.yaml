@@ -1,0 +1,27 @@
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: MachineHealthCheck
+metadata:
+  name: default
+  namespace: default
+spec:
+  checks:
+    nodeStartupTimeoutSeconds: 600
+    unhealthyMachineConditions:
+      - status: "False"
+        timeoutSeconds: 300
+        type: e2e.clusterclass.condition
+      - status: "False"
+        timeoutSeconds: 300
+        type: e2e.clusterclass.condition.two
+    unhealthyNodeConditions:
+      - status: "False"
+        timeoutSeconds: 20
+        type: e2e.remediation.condition
+      - status: "False"
+        timeoutSeconds: 20
+        type: e2e.remediation.condition.two
+  clusterName: clusterclass-rollout-gnt8b0
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/control-plane: ""
+      topology.cluster.x-k8s.io/owned: ""

@@ -18,6 +18,8 @@ package webhooks
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,6 +55,9 @@ var _ admission.Defaulter[*clusterv1.Machine] = &Machine{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type.
 func (webhook *Machine) Default(_ context.Context, m *clusterv1.Machine) error {
+	out, _ := json.Marshal(m)
+	fmt.Printf("=> default: %s\n", out)
+
 	if m.Labels == nil {
 		m.Labels = make(map[string]string)
 	}

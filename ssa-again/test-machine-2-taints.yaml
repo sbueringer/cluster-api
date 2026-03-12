@@ -1,0 +1,35 @@
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Machine
+metadata:
+  name: default
+  namespace: default
+spec:
+  bootstrap:
+    dataSecretName: default-md-0-5hfhz-fpxs6-d78nn
+  clusterName: default
+  deletion:
+    nodeDeletionTimeoutSeconds: 10
+    nodeDrainTimeoutSeconds: 10
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: DockerMachine
+    name: default-md-0-5hfhz-fpxs6-d78nn
+  taints:
+  - effect: PreferNoSchedule
+    key: taint
+    propagation: Always
+    value: value
+  - effect: PreferNoSchedule
+    key: taint-to-remove
+    propagation: Always
+    value: value
+  taintsBackported:
+  - effect: PreferNoSchedule
+    key: taint
+    propagation: Always
+    value: value
+  - effect: PreferNoSchedule
+    key: taint-to-remove-backported
+    propagation: Always
+    value: value
+  version: v1.35.0

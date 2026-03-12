@@ -66,6 +66,7 @@ import (
 	bootstrapv1 "sigs.k8s.io/cluster-api/api/bootstrap/kubeadm/v1beta2"
 	controlplanev1beta1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta1"
 	controlplanev1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ipamv1 "sigs.k8s.io/cluster-api/api/ipam/v1beta2"
 	runtimev1 "sigs.k8s.io/cluster-api/api/runtime/v1beta2"
@@ -73,7 +74,6 @@ import (
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/log"
 	controlplanewebhooks "sigs.k8s.io/cluster-api/controlplane/kubeadm/webhooks"
 	"sigs.k8s.io/cluster-api/feature"
-	"sigs.k8s.io/cluster-api/internal/contract"
 	internalwebhooks "sigs.k8s.io/cluster-api/internal/webhooks"
 	"sigs.k8s.io/cluster-api/util/kubeconfig"
 	"sigs.k8s.io/cluster-api/util/test/builder"
@@ -120,6 +120,7 @@ func registerSchemes(s *runtime.Scheme) {
 	utilruntime.Must(addonsv1.AddToScheme(s))
 	utilruntime.Must(bootstrapv1.AddToScheme(s))
 	utilruntime.Must(clusterv1.AddToScheme(s))
+	utilruntime.Must(clusterv1beta1.AddToScheme(s))
 	utilruntime.Must(controlplanev1.AddToScheme(s))
 	utilruntime.Must(controlplanev1beta1.AddToScheme(s))
 	utilruntime.Must(ipamv1.AddToScheme(s))
@@ -378,8 +379,9 @@ func newEnvironment(ctx context.Context, scheme *runtime.Scheme, additionalCRDDi
 
 	// Setup the func to retrieve apiVersion for a GroupKind for conversion webhooks.
 	apiVersionGetter := func(gk schema.GroupKind) (string, error) {
-		return contract.GetAPIVersion(ctx, mgr.GetClient(), gk)
+		return "v1beta1", nil
 	}
+	clusterv1beta1.SetAPIVersionGetter(apiVersionGetter)
 	controlplanev1beta1.SetAPIVersionGetter(apiVersionGetter)
 
 	if err := (&webhooks.Cluster{Client: mgr.GetClient()}).SetupWebhookWithManager(mgr); err != nil {

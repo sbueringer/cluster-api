@@ -1,0 +1,7 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Machine
+metadata:
+  name: default
+  namespace: default
+spec:
+  nodeVolumeDetachTimeout: 20s

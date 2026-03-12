@@ -1,0 +1,39 @@
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: clusterclass-rollout-gnt8b0
+    topology.cluster.x-k8s.io/owned: ""
+  name: default
+  namespace: default
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - 192.168.0.0/16
+    serviceDomain: cluster.local
+    services:
+      cidrBlocks:
+        - 10.128.0.0/12
+  controlPlaneEndpoint:
+    host: 172.18.0.7
+    port: 6443
+  controlPlaneRef:
+    apiGroup: controlplane.cluster.x-k8s.io
+    kind: KubeadmControlPlane
+    name: clusterclass-rollout-gnt8b0-c8hdt
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: DockerCluster
+    name: clusterclass-rollout-gnt8b0-zc84h
+  topology:
+    classRef:
+      name: quick-start
+      namespace: clusterclass-rollout-h5vm7g
+    variables:
+      - name: preLoadImages
+        value:
+          testArray:
+          - kindest/kindnetd:v20250214-acbabc1a
+          - kindest/kindnetd:v20250214-test
+    version: v1.35.0

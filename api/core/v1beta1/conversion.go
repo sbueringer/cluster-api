@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -413,6 +414,9 @@ func (dst *ClusterClass) ConvertFrom(srcRaw conversion.Hub) error {
 func (src *Machine) ConvertTo(dstRaw conversion.Hub) error {
 	dst := dstRaw.(*clusterv1.Machine)
 
+	out, _ := json.Marshal(src)
+	fmt.Printf("Convert v1beta1 => v1beta2: %s\n", out)
+
 	if err := Convert_v1beta1_Machine_To_v1beta2_Machine(src, dst, nil); err != nil {
 		return err
 	}
@@ -440,7 +444,7 @@ func (src *Machine) ConvertTo(dstRaw conversion.Hub) error {
 	// Recover other values.
 	if ok {
 		dst.Spec.MinReadySeconds = restored.Spec.MinReadySeconds
-		dst.Spec.Taints = restored.Spec.Taints
+		//dst.Spec.Taints = restored.Spec.Taints
 		// Restore the phase, this also means that any client using v1beta1 during a round-trip
 		// won't be able to write the Phase field. But that's okay as the only client writing the Phase
 		// field should be the Machine controller.
@@ -453,6 +457,9 @@ func (src *Machine) ConvertTo(dstRaw conversion.Hub) error {
 
 func (dst *Machine) ConvertFrom(srcRaw conversion.Hub) error {
 	src := srcRaw.(*clusterv1.Machine)
+
+	out, _ := json.Marshal(src)
+	fmt.Printf("Convert v1beta2 => v1beta1: %s\n", out)
 
 	if err := Convert_v1beta2_Machine_To_v1beta1_Machine(src, dst, nil); err != nil {
 		return err
@@ -1232,6 +1239,14 @@ func Convert_v1beta1_MachineSpec_To_v1beta2_MachineSpec(in *MachineSpec, out *cl
 	out.Deletion.NodeDrainTimeoutSeconds = clusterv1.ConvertToSeconds(in.NodeDrainTimeout)
 	out.Deletion.NodeVolumeDetachTimeoutSeconds = clusterv1.ConvertToSeconds(in.NodeVolumeDetachTimeout)
 	out.Deletion.NodeDeletionTimeoutSeconds = clusterv1.ConvertToSeconds(in.NodeDeletionTimeout)
+	for _, taint := range in.TaintsBackportedOldField {
+		out.TaintsBackported = append(out.TaintsBackported, clusterv1.MachineTaint{
+			Key:         taint.Key,
+			Value:       taint.Value,
+			Effect:      taint.Effect,
+			Propagation: clusterv1.MachineTaintPropagation(taint.Propagation),
+		})
+	}
 	return nil
 }
 
@@ -1842,6 +1857,14 @@ func Convert_v1beta2_MachineSpec_To_v1beta1_MachineSpec(in *clusterv1.MachineSpe
 	out.NodeDrainTimeout = clusterv1.ConvertFromSeconds(in.Deletion.NodeDrainTimeoutSeconds)
 	out.NodeVolumeDetachTimeout = clusterv1.ConvertFromSeconds(in.Deletion.NodeVolumeDetachTimeoutSeconds)
 	out.NodeDeletionTimeout = clusterv1.ConvertFromSeconds(in.Deletion.NodeDeletionTimeoutSeconds)
+	for _, taint := range in.TaintsBackported {
+		out.TaintsBackportedOldField = append(out.TaintsBackportedOldField, MachineTaint{
+			Key:         taint.Key,
+			Value:       taint.Value,
+			Effect:      taint.Effect,
+			Propagation: MachineTaintPropagation(taint.Propagation),
+		})
+	}
 	return nil
 }
 
