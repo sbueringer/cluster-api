@@ -368,6 +368,13 @@ func (r *KubeadmConfigReconciler) refreshBootstrapTokenIfNeeded(ctx context.Cont
 
 	remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(cluster))
 	if err != nil {
+		// If connection is down, ignore the error (there is nothing we can do, the token might expire before connection is back up).
+		// Note: when connection state will change, a reconcile will be triggered automatically.
+		// FIXME: log (without making it noisy)
+		// if errors.Is(err, clustercache.ErrClusterNotConnected) {
+		// 	return ctrl.Result{}, nil
+		// }
+
 		return ctrl.Result{}, err
 	}
 
@@ -440,6 +447,13 @@ func (r *KubeadmConfigReconciler) rotateMachinePoolBootstrapToken(ctx context.Co
 	log.V(2).Info("Config is owned by a MachinePool, checking if token should be rotated")
 	remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(cluster))
 	if err != nil {
+		// If connection is down, ignore the error (there is nothing we can do, the token might expire before connection is back up).
+		// Note: when connection state will change, a reconcile will be triggered automatically.
+		// FIXME: log (without making it noisy)
+		// if errors.Is(err, clustercache.ErrClusterNotConnected) {
+		// 	return ctrl.Result{}, nil
+		// }
+
 		return ctrl.Result{}, err
 	}
 
@@ -684,7 +698,17 @@ func (r *KubeadmConfigReconciler) joinWorker(ctx context.Context, scope *Scope) 
 	} else if !res.IsZero() {
 		return res, nil
 	}
-
+	//
+	// if res, err := r.reconcileDiscovery(ctx, scope.Cluster, scope.Config, certificates); err != nil || !res.IsZero() {
+	// 	return res, err
+	// }
+	//
+	// // If at this point there is not a discovery configuration, it does not make sense to continue.
+	// if !(scope.Config.Spec.JoinConfiguration.Discovery.File.KubeConfig.IsDefined() || scope.Config.Spec.JoinConfiguration.Discovery.BootstrapToken.Token != "") {
+	// 	// FIXME: log (without making it noisy)
+	// 	return ctrl.Result{}, nil
+	// }
+	//
 	kubernetesVersion := scope.ConfigOwner.KubernetesVersion()
 	parsedVersion, err := semver.ParseTolerant(kubernetesVersion)
 	if err != nil {
@@ -860,6 +884,16 @@ func (r *KubeadmConfigReconciler) joinControlplane(ctx context.Context, scope *S
 		return res, nil
 	}
 
+	// if res, err := r.reconcileDiscovery(ctx, scope.Cluster, scope.Config, certificates); err != nil || !res.IsZero() {
+	// 	return res, err
+	// }
+	//
+	// // If at this point there is not a discovery configuration, it does not make sense to continue.
+	// if !(scope.Config.Spec.JoinConfiguration.Discovery.File.KubeConfig.IsDefined() || scope.Config.Spec.JoinConfiguration.Discovery.BootstrapToken.Token != "") {
+	// 	// FIXME: log (without making it noisy)
+	// 	return ctrl.Result{}, nil
+	// }
+	//
 	kubernetesVersion := scope.ConfigOwner.KubernetesVersion()
 	parsedVersion, err := semver.ParseTolerant(kubernetesVersion)
 	if err != nil {
@@ -1246,6 +1280,13 @@ func (r *KubeadmConfigReconciler) reconcileDiscovery(ctx context.Context, cluste
 	if config.Spec.JoinConfiguration.Discovery.BootstrapToken.Token == "" {
 		remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(cluster))
 		if err != nil {
+			// If connection is down, ignore the error (the token will be created as soon as connection is up again).
+			// Note: when connection state will change, a reconcile will be triggered automatically.
+			// FIXME: log (without making it noisy)
+			if errors.Is(err, clustercache.ErrClusterNotConnected) {
+				return ctrl.Result{}, nil
+			}
+
 			return ctrl.Result{}, err
 		}
 

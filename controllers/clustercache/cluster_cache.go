@@ -521,6 +521,9 @@ func (cc *clusterCache) Reconcile(ctx context.Context, req reconcile.Request) (r
 	if connected {
 		healthCheckingState := accessor.GetHealthCheckingState(ctx)
 
+		// FIXME: "exponential slow down"
+		//  e.g. 10 tries at accessor.config.HealthProbe.Interval (30 sec each, 5m)  --> (# of tries % 10) 2 * interval
+
 		// Requeue, if health probe was already run within the HealthProbe.Interval.
 		if requeueAfter, requeue := shouldRequeue(time.Now(), healthCheckingState.LastProbeTime, accessor.config.HealthProbe.Interval); requeue {
 			log.V(6).Info(fmt.Sprintf("Requeuing after %s as health probe was already run within the last %s",

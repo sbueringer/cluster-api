@@ -213,6 +213,8 @@ func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, con
 			controlPlane.PreflightCheckResults.TopologyVersionMismatch = true
 			// Slow down reconcile frequency, as deferring a version upgrade waits for slow processes,
 			// e.g. workers are completing a previous upgrade step.
+
+			// FIXME: "exponential slow down" (same below)
 			r.controller.DeferNextReconcileForObject(controlPlane.KCP, time.Now().Add(5*time.Second))
 			return ctrl.Result{RequeueAfter: preflightFailedRequeueAfter}
 		}
@@ -256,6 +258,7 @@ func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, con
 	}
 
 	if err != nil {
+		// FIXME: exponential slow down
 		r.recorder.Eventf(controlPlane.KCP, corev1.EventTypeWarning, "ControlPlaneUnhealthy",
 			"Waiting for control plane to pass preflight checks to continue reconciliation: %v", err)
 		log.Info("Waiting for control plane to pass preflight checks", "failures", err.Error())

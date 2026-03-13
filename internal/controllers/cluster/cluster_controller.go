@@ -212,6 +212,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (retRes ct
 	if cluster.Spec.Topology.IsDefined() {
 		if !cluster.Spec.ControlPlaneRef.IsDefined() || !cluster.Spec.InfrastructureRef.IsDefined() {
 			// TODO: add a condition to surface this scenario
+
+			// FIXME: Delay this message after x seconds from creation.
 			log.Info("Waiting for the topology to be generated")
 			return ctrl.Result{}, nil
 		}
