@@ -135,6 +135,7 @@ func (r *Reconciler) runPreflightChecks(ctx context.Context, cluster *clusterv1.
 		for _, v := range preflightCheckErrs {
 			preflightCheckErrStrings = append(preflightCheckErrStrings, *v)
 		}
+		// FIXME: Exponential slow down
 		log.Info(fmt.Sprintf("%s on hold because %s. The operation will continue after the preflight check(s) pass", action, strings.Join(preflightCheckErrStrings, "; ")))
 		return preflightCheckErrStrings, nil
 	}

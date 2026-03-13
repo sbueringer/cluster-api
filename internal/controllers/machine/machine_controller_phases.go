@@ -216,6 +216,7 @@ func (r *Reconciler) reconcileBootstrap(ctx context.Context, s *scope) (ctrl.Res
 
 	// If the data secret was not created yet, return.
 	if !dataSecretCreated {
+		// FIXME: exponential slow down
 		// Only log if the Machine is a control plane Machine or the Cluster is already initialized to reduce noise.
 		if util.IsControlPlaneMachine(m) || conditions.IsTrue(s.cluster, clusterv1.ClusterControlPlaneInitializedCondition) {
 			log.Info(fmt.Sprintf("Waiting for bootstrap provider to generate data secret and set %s",
@@ -272,6 +273,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
 				return ctrl.Result{}, errors.Errorf("could not find %s %s for Machine %s", m.Spec.InfrastructureRef.Kind, klog.KRef(m.Namespace, m.Spec.InfrastructureRef.Name), klog.KObj(m))
 			}
 			log.Info("Could not find InfrastructureMachine, requeuing", m.Spec.InfrastructureRef.Kind, klog.KRef(m.Namespace, m.Spec.InfrastructureRef.Name))
+			// FIXME Think about dropping this requeue
 			return ctrl.Result{RequeueAfter: externalReadyWait}, nil
 		}
 		return ctrl.Result{}, err
@@ -308,7 +310,9 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
 
 	// If the InfrastructureMachine is not provisioned (and it wasn't already provisioned before), return.
 	if !provisioned && !ptr.Deref(m.Status.Initialization.InfrastructureProvisioned, false) {
-		// Only log if the Machine is a control plane Machine or the Cluster is already initialized to reduce noise.
+		// FIXME Exponential slow down
+		// Only log if the bootstrap secret has been already created, the Machine is a control plane Machine or the Cluster is already initialized to reduce noise.
+		// if ptr.Deref(m.Status.Initialization.BootstrapDataSecretCreated, false) && (util.IsControlPlaneMachine(m) || conditions.IsTrue(s.cluster, clusterv1.ClusterControlPlaneInitializedCondition)) {
 		if util.IsControlPlaneMachine(m) || conditions.IsTrue(s.cluster, clusterv1.ClusterControlPlaneInitializedCondition) {
 			log.Info(fmt.Sprintf("Waiting for infrastructure provider to set %s on %s",
 				contract.InfrastructureMachine().Provisioned(contractVersion).Path().String(), s.infraMachine.Kind),
@@ -320,6 +324,7 @@ func (r *Reconciler) reconcileInfrastructure(ctx context.Context, s *scope) (ctr
 	// Get providerID from the InfrastructureMachine (intentionally not setting it on the Machine yet).
 	providerID := s.infraMachine.Spec.ProviderID
 	if providerID == "" {
+		// FIXME Exponential slow down
 		log.Info(fmt.Sprintf("Waiting for infrastructure provider to set %s on %s",
 			contract.InfrastructureMachine().ProviderID().Path().String(), s.infraMachine.Kind),
 			s.infraMachine.Kind, klog.KObj(s.infraMachine))

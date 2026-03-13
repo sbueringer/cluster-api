@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/cluster-api/controllers/clustercache"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -75,6 +76,15 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result, 
 
 	remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(cluster))
 	if err != nil {
+		// FIXME: think a little bit more about this.
+		//  it is probably ok to do nothing when node ref is not set (it will pop up when connection is back)
+		//  when node ref is set, we should probably set node MachineNodeHealthy / MachineNodeReady to unknown after some time -> May be it is ok to ignore here, because it is handled when we compute tstatus
+		// If connection is down, ignore the error (the node ref will be read as soon as connection is up again).
+		// Note: when connection state will change, a reconcile will be triggered automatically.
+		//if errors.Is(err, clustercache.ErrClusterNotConnected) {
+		//	return ctrl.Result{}, nil
+		//}
+
 		s.nodeGetError = err
 		return ctrl.Result{}, err
 	}
@@ -94,6 +104,7 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result, 
 				return ctrl.Result{}, errors.Wrapf(err, "no matching Node for Machine %q in namespace %q", machine.Name, machine.Namespace)
 			}
 			v1beta1conditions.MarkFalse(machine, clusterv1.MachineNodeHealthyV1Beta1Condition, clusterv1.NodeProvisioningV1Beta1Reason, clusterv1.ConditionSeverityWarning, "Waiting for a node with matching ProviderID to exist")
+			// FIXME: exponential slow down
 			log.Info("Infrastructure provider reporting spec.providerID, matching Kubernetes Node is not yet available", machine.Spec.InfrastructureRef.Kind, klog.KRef(machine.Namespace, machine.Spec.InfrastructureRef.Name), "providerID", machine.Spec.ProviderID)
 			// No need to requeue here. Nodes emit an event that triggers reconciliation.
 			return ctrl.Result{}, nil
@@ -110,6 +121,7 @@ func (r *Reconciler) reconcileNode(ctx context.Context, s *scope) (ctrl.Result, 
 		machine.Status.NodeRef = clusterv1.MachineNodeReference{
 			Name: s.node.Name,
 		}
+		// FIXME: exponential slow down
 		log.Info("Infrastructure provider reporting spec.providerID, Kubernetes Node is now available", machine.Spec.InfrastructureRef.Kind, klog.KRef(machine.Namespace, machine.Spec.InfrastructureRef.Name), "providerID", machine.Spec.ProviderID, "Node", klog.KRef("", machine.Status.NodeRef.Name))
 		r.recorder.Event(machine, corev1.EventTypeNormal, "SuccessfulSetNodeRef", machine.Status.NodeRef.Name)
 	}

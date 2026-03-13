@@ -84,6 +84,7 @@ type ClusterTestActionConfig struct {
 type ClusterActionConfig struct {
 	Upgrade              *ClusterUpgradeActionConfig       `json:"upgrade,omitempty"`
 	ControlPlaneEndpoint *ControlPlaneEndpointActionConfig `json:"controlPlaneEndpoint,omitempty"`
+	Delete               *ClusterDeleteActionConfig        `json:"delete,omitempty"`
 }
 
 // ClusterUpgradeActionConfig defines configuration for a Cluster upgrade action.
@@ -95,6 +96,11 @@ type ClusterUpgradeActionConfig struct {
 type ControlPlaneEndpointActionConfig struct {
 	Start *bool `json:"start,omitempty"`
 	Stop  *bool `json:"stop,omitempty"`
+}
+
+// ClusterDeleteActionConfig defines configuration for a Cluster delete action.
+type ClusterDeleteActionConfig struct {
+	// FIXME: add option to delete ns
 }
 
 // ControlPlaneActionConfig defines configuration for a control plane test action.

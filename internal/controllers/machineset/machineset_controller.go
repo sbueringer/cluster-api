@@ -1549,6 +1549,10 @@ func (r *Reconciler) reconcileV1Beta1Status(ctx context.Context, s *scope) error
 
 		node, err := r.getMachineNode(ctx, cluster, machine)
 		if err != nil && machine.GetDeletionTimestamp().IsZero() {
+
+			//if errors.Is(err, clustercache.ErrClusterNotConnected) {
+			//	continue
+			//}
 			log.Error(err, "Unable to retrieve Node status", "Node", klog.KObj(node))
 			continue
 		}
