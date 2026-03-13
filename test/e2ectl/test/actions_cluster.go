@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -54,11 +55,17 @@ func runClusterActions(ctx context.Context, c client.Client, input runClusterAct
 
 			if s.Cluster.ControlPlaneEndpoint != nil {
 				up := true
-				if ptr.Deref(s.Cluster.ControlPlaneEndpoint.Stop, true) {
+				if ptr.Deref(s.Cluster.ControlPlaneEndpoint.Stop, false) {
 					up = false
 				}
 				if err := runClusterControlPlaneEndpointAction(ctx, input.cluster, up, ptr.Deref(s.SkipWait, false), dryRun); err != nil {
 					return nil, errors.Wrapf(err, "failed to run Cluster %s upgrade action", klog.KObj(input.cluster))
+				}
+			}
+
+			if s.Cluster.Delete != nil {
+				if err := runClusterDeleteAction(ctx, c, input.cluster, ptr.Deref(s.SkipWait, false), dryRun); err != nil {
+					return nil, errors.Wrapf(err, "failed to run Cluster %s delete action", klog.KObj(input.cluster))
 				}
 			}
 		}
@@ -159,7 +166,7 @@ func runClusterControlPlaneEndpointAction(ctx context.Context, cluster *clusterv
 	}
 
 	// FIXME: make ip and port configurable
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://127.0.0.1:19000/cluster/%s/%s/listener/%s", cluster.Namespace, cluster.Name, action), http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://127.0.0.1:19000/clusters/%s/%s/listener/%s", cluster.Namespace, cluster.Name, action), http.NoBody)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create request to call the endpoint to %s listener for Cluster %s", action, klog.KObj(cluster))
 	}
@@ -174,5 +181,45 @@ func runClusterControlPlaneEndpointAction(ctx context.Context, cluster *clusterv
 	}
 
 	log.Info(fmt.Sprintf("%s listener for Cluster control plane endpoint completed", action))
+	return nil
+}
+
+func runClusterDeleteAction(ctx context.Context, c client.Client, cluster *clusterv1.Cluster, skipWait, dryRun bool) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	if !cluster.DeletionTimestamp.IsZero() {
+		log.Info("Upgrade Cluster action skipped, Cluster already is deleting")
+		return nil
+	}
+
+	log.Info("Deleting Cluster")
+	if dryRun {
+		return nil
+	}
+
+	if err := c.Delete(ctx, cluster); err != nil {
+		return errors.Wrapf(err, "failed to delete Cluster %s", klog.KObj(cluster))
+	}
+
+	if skipWait {
+		return nil
+	}
+
+	log.Info("Waiting for Cluster to be deleted")
+	var retryErr error
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 5*time.Minute, false, func(ctx context.Context) (done bool, err error) {
+		tmpCluster := &clusterv1.Cluster{}
+		if err := c.Get(ctx, client.ObjectKeyFromObject(cluster), tmpCluster); err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	}); err != nil || retryErr != nil {
+		return kerrors.NewAggregate([]error{retryErr, err})
+	}
+
+	log.Info("Deleted Cluster")
 	return nil
 }
