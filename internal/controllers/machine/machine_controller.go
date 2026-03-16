@@ -160,6 +160,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 			predicates.ClusterControlPlaneInitialized(mgr.GetScheme(), *r.predicateLog),
 			predicates.ResourceHasFilterLabel(mgr.GetScheme(), *r.predicateLog, r.WatchFilterValue),
 		).
+		// FIXME: Check WatchForProbeFailure
 		WatchesRawSource(r.ClusterCache.GetClusterSource("machine", clusterToMachines, clustercache.WatchForProbeFailure(r.RemoteConditionsGracePeriod))).
 		Watches(
 			&clusterv1.MachineSet{},
@@ -769,7 +770,9 @@ func (r *Reconciler) isDeleteNodeAllowed(ctx context.Context, cluster *clusterv1
 		// even if the node cannot be retrieved.
 		remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(cluster))
 		if err != nil {
+			// if !errors.Is(err, clustercache.ErrClusterNotConnected) {
 			log.Error(err, "Failed to get cluster client while deleting Machine and checking for nodes")
+			// }
 		} else {
 			node, err := r.getNode(ctx, remoteClient, providerID)
 			if err != nil && err != ErrNodeNotFound {
@@ -844,8 +847,12 @@ func (r *Reconciler) drainNode(ctx context.Context, s *scope) (ctrl.Result, erro
 	ctx = ctrl.LoggerInto(ctx, log)
 
 	remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(cluster))
+	// FIXME: what we do if connection is down?
+	//  - Keep logging error + wait for drain timeout (if set)
+	//  - Slow down reconcile
+	//  - ??
 	if err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to drain Node %s", nodeName)
+		return ctrl.Result{}, errors.WithMessagef(err, "failed to drain Node %s", nodeName)
 	}
 
 	node := &corev1.Node{}
@@ -947,6 +954,10 @@ func (r *Reconciler) shouldWaitForNodeVolumes(ctx context.Context, s *scope) (ct
 	machine := s.machine
 
 	remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(cluster))
+	// FIXME: what we do if connection is down?
+	//  - Keep logging error + wait for volume detach timeout (if set)
+	//  - Slow down reconcile
+	//  - ??
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1012,6 +1023,10 @@ func (r *Reconciler) shouldWaitForNodeVolumes(ctx context.Context, s *scope) (ct
 
 func (r *Reconciler) deleteNode(ctx context.Context, cluster *clusterv1.Cluster, name string) error {
 	remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(cluster))
+	// FIXME: what we do if connection is down?
+	//  - Keep logging error + wait for timeout (if set)
+	//  - Slow down reconcile
+	//  - ??
 	if err != nil {
 		return errors.Wrapf(err, "failed deleting Node because connection to the workload cluster is down")
 	}
@@ -1097,13 +1112,20 @@ func (r *Reconciler) watchClusterNodes(ctx context.Context, cluster *clusterv1.C
 		return nil
 	}
 
-	return r.ClusterCache.Watch(ctx, util.ObjectKey(cluster), clustercache.NewWatcher(clustercache.WatcherOptions{
+	err := r.ClusterCache.Watch(ctx, util.ObjectKey(cluster), clustercache.NewWatcher(clustercache.WatcherOptions{
 		Name:         "machine-watchNodes",
 		Watcher:      r.controller,
 		Kind:         &corev1.Node{},
 		EventHandler: handler.EnqueueRequestsFromMapFunc(r.nodeToMachine),
 		Predicates:   []predicate.TypedPredicate[client.Object]{predicates.TypedResourceIsChanged[client.Object](r.Client.Scheme(), *r.predicateLog)},
 	}))
+
+	// If connection is down, ignore the error (the watch will be created as soon as connection is up again).
+	// Note: when connection state will change, a reconcile will be triggered automatically.
+	//if errors.Is(err, clustercache.ErrClusterNotConnected) {
+	//	return nil
+	//}
+	return err
 }
 
 func (r *Reconciler) nodeToMachine(ctx context.Context, o client.Object) []reconcile.Request {

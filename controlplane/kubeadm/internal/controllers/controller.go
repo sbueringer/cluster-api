@@ -203,6 +203,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, errors.Wrapf(err, "failed to retrieve owner Cluster")
 	}
 	if cluster == nil {
+		// FIXME: wait some time after creation before starting logging + exponential slow down
 		log.Info("Cluster Controller has not yet set OwnerRef")
 		return ctrl.Result{}, nil
 	}
@@ -235,6 +236,8 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 	defer func() {
 		// Always attempt to update status.
 		if err := r.updateStatus(ctx, controlPlane); err != nil {
+			// FIXME: check this.
+			//
 			var connFailure *internal.RemoteClusterConnectionError
 			if errors.As(err, &connFailure) {
 				log.Info(fmt.Sprintf("Could not connect to workload cluster to fetch status: %s", err.Error()))
@@ -244,6 +247,7 @@ func (r *KubeadmControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.
 		}
 
 		if err := r.updateV1Beta1Status(ctx, controlPlane); err != nil {
+			// FIXME: check this.
 			var connFailure *internal.RemoteClusterConnectionError
 			if errors.As(err, &connFailure) {
 				log.Info(fmt.Sprintf("Could not connect to workload cluster to fetch deprecated v1beta1 status: %s", err.Error()))
@@ -411,6 +415,7 @@ func (r *KubeadmControlPlaneReconciler) reconcile(ctx context.Context, controlPl
 			Message: "Waiting for Cluster status.infrastructureReady to be true",
 		})
 
+		// FIXME: exponential slow down
 		log.Info("Cluster infrastructure is not ready yet")
 		return ctrl.Result{}, nil
 	}
@@ -1030,6 +1035,7 @@ func (r *KubeadmControlPlaneReconciler) reconcileControlPlaneAndMachinesConditio
 			EtcdMemberHealthyReason:             controlplanev1.KubeadmControlPlaneMachineEtcdMemberConnectionDownReason,
 			Message:                             "Remote connection not established yet",
 		})
+		// FIXME: What to do here? (is this an error?)
 		return errors.Errorf("connection to the workload cluster not established yet")
 	}
 
@@ -1045,6 +1051,7 @@ func (r *KubeadmControlPlaneReconciler) reconcileControlPlaneAndMachinesConditio
 			EtcdMemberHealthyReason:             controlplanev1.KubeadmControlPlaneMachineEtcdMemberConnectionDownReason,
 			Message:                             lastProbeSuccessMessage(healthCheckingState.LastProbeSuccessTime),
 		})
+		// FIXME: What to do here?
 		return errors.Errorf("connection to the workload cluster is down")
 	}
 

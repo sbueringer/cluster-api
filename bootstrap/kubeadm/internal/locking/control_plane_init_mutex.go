@@ -83,7 +83,9 @@ func (c *ControlPlaneInitMutex) Lock(ctx context.Context, cluster *clusterv1.Clu
 				c.Unlock(ctx, cluster)
 			}
 		}
-		log.Info(fmt.Sprintf("Waiting for Machine %s to initialize", info.MachineName))
+
+		// FIXME: exponential slow down
+		log.Info(fmt.Sprintf("Waiting for Machine %s to initialize", klog.KRef(cluster.Namespace, info.MachineName)))
 		return false
 	}
 
