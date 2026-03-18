@@ -22,6 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/openapi3"
+	"k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -58,6 +61,41 @@ func TestMain(m *testing.M) {
 }
 
 func TestReconcile(t *testing.T) {
-	t.Skip() // Skipping the test, otherwise it would block CI.
+
+	FetchSchemaForGVK(env.Config)
+
+	//t.Skip() // Skipping the test, otherwise it would block CI.
 	time.Sleep(10 * time.Hour)
+}
+
+// FetchSchemaForGVK fetches the OpenAPI v3 schema for the given GVK from the
+// API server. The CRD is still used to register the API (via envtest), but
+// schema discovery for fuzzing comes from the server's published OpenAPI.
+// See https://kubernetes.io/docs/concepts/overview/kubernetes-api/
+func FetchSchemaForGVK(cfg *rest.Config) (error, error) {
+	disc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("discovery client: %w", err)
+	}
+	if groups, err := disc.ServerGroups(); err == nil {
+		fmt.Fprintf(os.Stderr, "\n\nGROUPS -- BEGIN\n")
+		for i := range groups.Groups {
+			fmt.Fprintf(os.Stderr, "  * group: %s\n", groups.Groups[i].Name)
+		}
+		fmt.Fprintf(os.Stderr, "\nGROUPS -- END\n\n")
+	}
+	openapiClient := disc.OpenAPIV3()
+	if openapiClient == nil {
+		return nil, fmt.Errorf("OpenAPI v3 not supported")
+	}
+	root := openapi3.NewRoot(openapiClient)
+
+	if gvs, err := root.GroupVersions(); err == nil {
+		fmt.Fprintf(os.Stderr, "\n\nGVS -- BEGIN\n")
+		for i := range gvs {
+			fmt.Fprintf(os.Stderr, "  * groupVersion: %s\n", gvs[i].String())
+		}
+		fmt.Fprintf(os.Stderr, "\nGVS -- END\n\n")
+	}
+	return nil, nil
 }
