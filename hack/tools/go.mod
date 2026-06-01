@@ -177,7 +177,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiserver v0.36.1 // indirect
 	k8s.io/cluster-bootstrap v0.36.1 // indirect
-	k8s.io/component-base v0.36.1 // indirect
 	k8s.io/release v0.16.9
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.2 // indirect
