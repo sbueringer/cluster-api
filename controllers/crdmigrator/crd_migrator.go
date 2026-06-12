@@ -490,7 +490,7 @@ func (r *CRDMigrator) reconcileCleanupManagedFields(ctx context.Context, crd *ap
 					APIVersion: schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion}.String(),
 					Time:       ptr.To(metav1.Now()),
 					FieldsType: "FieldsV1",
-					FieldsV1:   &metav1.FieldsV1{Raw: fieldV1},
+					FieldsV1:    metav1.NewFieldsV1(string(fieldV1)),
 				})
 			}
 

@@ -98,9 +98,7 @@ func GetUnstructuredManagedFields(u *unstructured.Unstructured, fieldManager str
 			FieldsType:  field["fieldsType"].(string),
 			Subresource: subresource,
 			Time:        ptr.To(metav1.Now()),
-			FieldsV1: &metav1.FieldsV1{
-				Raw: fieldsV1Raw,
-			},
+			FieldsV1:    metav1.NewFieldsV1(string(fieldsV1Raw)),
 		})
 	}
 	return managedFields, nil
