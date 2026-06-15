@@ -179,7 +179,7 @@ func (r *KubeadmControlPlaneReconciler) reconcileUnhealthyMachines(ctx context.C
 	// Before starting remediation, run preflight checks in order to verify it is safe to remediate.
 	// If any of the following checks fails, we'll surface the reason in the MachineOwnerRemediated condition.
 
-	if feature.Gates.Enabled(feature.ClusterTopology) {
+	if features.Gates.Enabled(features.ClusterTopology) {
 		// Skip remediation when we expect an upgrade to be propagated from the cluster topology.
 		if controlPlane.Cluster.Spec.Topology.IsDefined() && controlPlane.Cluster.Spec.Topology.Version != controlPlane.KCP.Spec.Version {
 			message := fmt.Sprintf("KubeadmControlPlane can't remediate while waiting for a version upgrade to %s to be propagated from Cluster.spec.topology", controlPlane.Cluster.Spec.Topology.Version)

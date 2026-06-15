@@ -139,7 +139,7 @@ func (r *KubeadmControlPlaneReconciler) rollingUpdate(
 	// If the selected Machine is eligible for in-place update and we don't already have enough up-to-date replicas, try in-place update.
 	// Note: To be safe we only try an in-place update when we would otherwise delete a Machine. This ensures we could
 	// afford if the in-place update fails and the Machine becomes unavailable (and eventually MHC kicks in and the Machine is recreated).
-	if feature.Gates.Enabled(feature.InPlaceUpdates) &&
+	if features.Gates.Enabled(features.InPlaceUpdates) &&
 		machineUpToDateResult.EligibleForInPlaceUpdate &&
 		currentUpToDateReplicas < desiredReplicas {
 		fallbackToScaleDown, res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, machineUpToDateResult)

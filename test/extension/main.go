@@ -151,7 +151,7 @@ func InitFlags(fs *pflag.FlagSet) {
 
 	flags.AddManagerOptions(fs, &managerOptions)
 
-	feature.MutableGates.AddFlag(fs)
+	features.MutableGates.AddFlag(fs)
 
 	// Add test-extension specific flags
 	// NOTE: it is not mandatory to use the same flag names in all RuntimeExtension, but it is recommended when
@@ -193,7 +193,7 @@ func main() {
 	ctrl.SetLogger(klog.Background())
 
 	// Note: setupLog can only be used after ctrl.SetLogger was called
-	setupLog.Info(fmt.Sprintf("Version: %s (git commit: %s)", version.Get().String(), version.Get().GitCommit))
+	setupLog.Info(fmt.Sprintf("Version: %s (git commit: %s)", buildversion.Get().String(), buildversion.Get().GitCommit))
 
 	restConfig := ctrl.GetConfigOrDie()
 	restConfig.QPS = restConfigQPS
@@ -226,7 +226,7 @@ func main() {
 
 	ctrlOptions := ctrl.Options{
 		Controller: config.Controller{
-			UsePriorityQueue: ptr.To[bool](feature.Gates.Enabled(feature.PriorityQueue)),
+			UsePriorityQueue: ptr.To[bool](features.Gates.Enabled(features.PriorityQueue)),
 		},
 		Scheme:                     scheme,
 		LeaderElection:             enableLeaderElection,
@@ -276,7 +276,7 @@ func main() {
 	setupReconcilers(ctx, mgr)
 	setupWebhooks(mgr)
 
-	setupLog.Info("Starting manager", "version", version.Get().String())
+	setupLog.Info("Starting manager", "version", buildversion.Get().String())
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "Problem running manager")
 		os.Exit(1)

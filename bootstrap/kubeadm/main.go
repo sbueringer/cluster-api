@@ -170,7 +170,7 @@ func InitFlags(fs *pflag.FlagSet) {
 
 	flags.AddManagerOptions(fs, &managerOptions)
 
-	feature.MutableGates.AddFlag(fs)
+	features.MutableGates.AddFlag(fs)
 }
 
 // Add RBAC for the authorized diagnostics endpoint.
@@ -206,7 +206,7 @@ func main() {
 	ctrl.SetLogger(klog.Background())
 
 	// Note: setupLog can only be used after ctrl.SetLogger was called
-	setupLog.Info(fmt.Sprintf("Version: %s (git commit: %s)", version.Get().String(), version.Get().GitCommit))
+	setupLog.Info(fmt.Sprintf("Version: %s (git commit: %s)", buildversion.Get().String(), buildversion.Get().GitCommit))
 
 	restConfig := ctrl.GetConfigOrDie()
 	restConfig.QPS = restConfigQPS
@@ -226,7 +226,7 @@ func main() {
 
 	ctrlOptions := ctrl.Options{
 		Controller: config.Controller{
-			UsePriorityQueue: ptr.To[bool](feature.Gates.Enabled(feature.PriorityQueue)),
+			UsePriorityQueue: ptr.To[bool](features.Gates.Enabled(features.PriorityQueue)),
 			// Give the manager more time to sync the caches during startup. This is required
 			// in high scale environments when they are more objects in the system (default is 3m).
 			CacheSyncTimeout: 5 * time.Minute,
@@ -267,7 +267,7 @@ func main() {
 	setupWebhooks(mgr)
 	setupReconcilers(ctx, mgr)
 
-	setupLog.Info("Starting manager", "version", version.Get().String())
+	setupLog.Info("Starting manager", "version", buildversion.Get().String())
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

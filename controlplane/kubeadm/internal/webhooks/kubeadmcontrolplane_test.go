@@ -299,7 +299,7 @@ func TestKubeadmControlPlaneValidateCreate(t *testing.T) {
 			if tt.enableIgnitionFeature {
 				// NOTE: KubeadmBootstrapFormatIgnition feature flag is disabled by default.
 				// Enabling the feature flag temporarily for this test.
-				utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.KubeadmBootstrapFormatIgnition, true)
+				utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.KubeadmBootstrapFormatIgnition, true)
 			}
 
 			g := NewWithT(t)
@@ -1164,12 +1164,12 @@ func TestKubeadmControlPlaneValidateUpdate(t *testing.T) {
 			if tt.enableIgnitionFeature {
 				// NOTE: KubeadmBootstrapFormatIgnition feature flag is disabled by default.
 				// Enabling the feature flag temporarily for this test.
-				utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.KubeadmBootstrapFormatIgnition, true)
+				utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.KubeadmBootstrapFormatIgnition, true)
 			}
 			if tt.enableTaintsFeature {
 				// NOTE: MachineTaintPropagation feature flag is disabled by default.
 				// Enabling the feature flag temporarily for this test.
-				utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.MachineTaintPropagation, true)
+				utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.MachineTaintPropagation, true)
 			}
 
 			g := NewWithT(t)

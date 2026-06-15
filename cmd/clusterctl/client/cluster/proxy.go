@@ -123,12 +123,12 @@ func (k *proxy) ValidateKubernetesVersion() error {
 		return err
 	}
 
-	minVer := version.MinimumKubernetesVersion
+	minVer := buildversion.MinimumKubernetesVersion
 	if clusterTopologyFeatureGate, _ := strconv.ParseBool(os.Getenv("CLUSTER_TOPOLOGY")); clusterTopologyFeatureGate {
-		minVer = version.MinimumKubernetesVersionClusterTopology
+		minVer = buildversion.MinimumKubernetesVersionClusterTopology
 	}
 
-	return version.CheckKubernetesVersion(config, minVer)
+	return buildversion.CheckKubernetesVersion(config, minVer)
 }
 
 // GetConfig returns the config for a kubernetes client.
@@ -150,7 +150,7 @@ func (k *proxy) GetConfig() (*rest.Config, error) {
 			return nil, errors.Wrapf(kerrors.NewAggregate([]error{err, inClusterErr}), "clusterctl requires either a valid kubeconfig or in cluster config to connect to the management cluster")
 		}
 	}
-	restConfig.UserAgent = fmt.Sprintf("clusterctl/%s (%s)", version.Get().GitVersion, version.Get().Platform)
+	restConfig.UserAgent = fmt.Sprintf("clusterctl/%s (%s)", buildversion.Get().GitVersion, buildversion.Get().Platform)
 
 	// Set QPS and Burst to a threshold that ensures the controller runtime client/client go doesn't generate throttling log messages
 	restConfig.QPS = 20

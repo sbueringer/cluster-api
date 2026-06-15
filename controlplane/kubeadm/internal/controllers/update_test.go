@@ -445,7 +445,7 @@ func Test_rollingUpdate(t *testing.T) {
 			g := NewWithT(t)
 
 			if tt.enableInPlaceUpdatesFeatureGate {
-				utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.InPlaceUpdates, true)
+				utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.InPlaceUpdates, true)
 			}
 
 			var inPlaceUpdateCalled bool

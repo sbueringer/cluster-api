@@ -550,7 +550,7 @@ func TestSelectMachineForInPlaceUpdateOrScaleDown(t *testing.T) {
 }
 
 func TestPreflightChecks(t *testing.T) {
-	utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.ClusterTopology, true)
+	utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.ClusterTopology, true)
 	testCases := []struct {
 		name                     string
 		cluster                  *clusterv1.Cluster

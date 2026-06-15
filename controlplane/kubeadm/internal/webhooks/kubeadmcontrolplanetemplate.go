@@ -55,7 +55,7 @@ var _ admission.Validator[*controlplanev1.KubeadmControlPlaneTemplate] = &Kubead
 func (webhook *KubeadmControlPlaneTemplate) ValidateCreate(_ context.Context, k *controlplanev1.KubeadmControlPlaneTemplate) (admission.Warnings, error) {
 	// NOTE: KubeadmControlPlaneTemplate is behind ClusterTopology feature gate flag; the web hook
 	// must prevent creating new objects in case the feature flag is disabled.
-	if !feature.Gates.Enabled(feature.ClusterTopology) {
+	if !features.Gates.Enabled(features.ClusterTopology) {
 		return nil, field.Forbidden(
 			field.NewPath("spec"),
 			"can be set only if the ClusterTopology feature flag is enabled",

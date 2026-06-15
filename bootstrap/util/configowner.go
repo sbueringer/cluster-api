@@ -145,7 +145,7 @@ func getConfigOwner(ctx context.Context, c client.Client, obj metav1.Object, get
 		},
 	}
 
-	if feature.Gates.Enabled(feature.MachinePool) {
+	if features.Gates.Enabled(features.MachinePool) {
 		allowedGKs = append(allowedGKs, schema.GroupKind{
 			Group: clusterv1.GroupVersion.Group,
 			Kind:  "MachinePool",

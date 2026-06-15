@@ -47,7 +47,7 @@ var (
 
 type versionChecker struct {
 	versionFilePath string
-	cliVersion      func() version.Info
+	cliVersion      func() buildversion.Info
 	githubClient    *github.Client
 	goproxyClient   *goproxy.Client
 }
@@ -79,7 +79,7 @@ func newVersionChecker(ctx context.Context, vc config.VariablesClient) (*version
 
 	return &versionChecker{
 		versionFilePath: filepath.Join(configDirectory, "version.yaml"),
-		cliVersion:      version.Get,
+		cliVersion:      buildversion.Get,
 		githubClient:    githubClient,
 		goproxyClient:   goproxyClient,
 	}, nil

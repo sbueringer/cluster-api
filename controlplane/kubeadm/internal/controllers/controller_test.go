@@ -4431,7 +4431,7 @@ func TestKubeadmControlPlaneReconciler_reconcileDelete(t *testing.T) {
 	})
 
 	t.Run("does not remove any control plane Machines if MachinePools exist", func(t *testing.T) {
-		utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.MachinePool, true)
+		utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.MachinePool, true)
 		g := NewWithT(t)
 
 		cluster, kcp, _ := createClusterWithControlPlane(metav1.NamespaceDefault)

@@ -49,7 +49,7 @@ func (r *KubeadmControlPlaneReconciler) canUpdateMachine(ctx context.Context, ma
 	log := ctrl.LoggerFrom(ctx).WithValues("Machine", klog.KObj(machine))
 
 	// Machine cannot be updated in-place if the feature gate is not enabled.
-	if !feature.Gates.Enabled(feature.InPlaceUpdates) {
+	if !features.Gates.Enabled(features.InPlaceUpdates) {
 		return false, nil
 	}
 

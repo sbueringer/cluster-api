@@ -71,7 +71,7 @@ func TestHandler(t *testing.T) {
 	g := NewWithT(t)
 
 	// Enable RuntimeSDK for this test so we can use RuntimeExtensions.
-	utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.RuntimeSDK, true)
+	utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.RuntimeSDK, true)
 
 	// Get a scope based on the Cluster and ClusterClass.
 	cluster := getCluster()

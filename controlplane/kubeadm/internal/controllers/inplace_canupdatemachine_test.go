@@ -148,7 +148,7 @@ func Test_canUpdateMachine(t *testing.T) {
 			g := NewWithT(t)
 
 			if tt.enableInPlaceUpdatesFeatureGate {
-				utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.InPlaceUpdates, true)
+				utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.InPlaceUpdates, true)
 			}
 
 			runtimeClient := fakeruntimeclient.NewRuntimeClientBuilder().

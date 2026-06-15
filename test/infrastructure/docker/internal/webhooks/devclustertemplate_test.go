@@ -30,7 +30,7 @@ import (
 )
 
 func TestDevClusterTemplateValidationFeatureGateEnabled(t *testing.T) {
-	utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.ClusterTopology, true)
+	utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.ClusterTopology, true)
 
 	t.Run("create decclustertemplate should pass if gate enabled and valid dockerclustertemplate", func(t *testing.T) {
 		g := NewWithT(t)
@@ -75,7 +75,7 @@ func TestDevClusterTemplateValidationFeatureGateDisabled(t *testing.T) {
 }
 
 func TestDevClusterTemplateValidationMetadata(t *testing.T) {
-	utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.ClusterTopology, true)
+	utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.ClusterTopology, true)
 
 	tests := []struct {
 		name        string

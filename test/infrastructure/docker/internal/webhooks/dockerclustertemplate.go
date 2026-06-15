@@ -58,7 +58,7 @@ var _ admission.Validator[*infrav1.DockerClusterTemplate] = &DockerClusterTempla
 func (webhook *DockerClusterTemplate) ValidateCreate(_ context.Context, clusterTemplate *infrav1.DockerClusterTemplate) (admission.Warnings, error) {
 	// NOTE: DockerClusterTemplate is behind ClusterTopology feature gate flag; the web hook
 	// must prevent creating new objects in case the feature flag is disabled.
-	if !feature.Gates.Enabled(feature.ClusterTopology) {
+	if !features.Gates.Enabled(features.ClusterTopology) {
 		return nil, field.Forbidden(
 			field.NewPath("spec"),
 			"can be set only if the ClusterTopology feature flag is enabled",

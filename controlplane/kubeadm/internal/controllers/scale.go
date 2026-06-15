@@ -202,7 +202,7 @@ func (r *KubeadmControlPlaneReconciler) preflightChecks(ctx context.Context, con
 		return ctrl.Result{}
 	}
 
-	if feature.Gates.Enabled(feature.ClusterTopology) {
+	if features.Gates.Enabled(features.ClusterTopology) {
 		// Block when we expect an upgrade to be propagated for topology clusters.
 		// NOTE: in case the cluster is performing an upgrade, allow creation of machines for the intermediate step.
 		hasSameVersionOfCurrentUpgradeStep := false

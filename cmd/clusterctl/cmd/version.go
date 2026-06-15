@@ -29,7 +29,7 @@ import (
 
 // Version provides the version information of clusterctl.
 type Version struct {
-	ClientVersion *version.Info `json:"clusterctl"`
+	ClientVersion *buildversion.Info `json:"clusterctl"`
 }
 
 type versionOptions struct {
@@ -55,7 +55,7 @@ func init() {
 }
 
 func runVersion() error {
-	clientVersion := version.Get()
+	clientVersion := buildversion.Get()
 	v := Version{
 		ClientVersion: &clientVersion,
 	}

@@ -324,7 +324,7 @@ func TestReconcileUnhealthyMachines(t *testing.T) {
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 	t.Run("reconcileUnhealthyMachines return early if there is a pending topology upgrade", func(t *testing.T) {
-		utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.ClusterTopology, true)
+		utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.ClusterTopology, true)
 
 		g := NewWithT(t)
 

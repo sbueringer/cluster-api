@@ -55,15 +55,15 @@ func TestVersionChecker_newVersionChecker(t *testing.T) {
 func TestVersionChecker(t *testing.T) {
 	tests := []struct {
 		name           string
-		cliVersion     func() version.Info
+		cliVersion     func() buildversion.Info
 		githubResponse string
 		expectErr      bool
 		expectedOutput string
 	}{
 		{
 			name: "returns error if unable to parse cli version",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "bla-version",
 				}
 			},
@@ -71,8 +71,8 @@ func TestVersionChecker(t *testing.T) {
 		},
 		{
 			name: "returns error if unable to parse latest version",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8",
 				}
 			},
@@ -81,8 +81,8 @@ func TestVersionChecker(t *testing.T) {
 		},
 		{
 			name: "returns error if github request fails",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8",
 				}
 			},
@@ -93,8 +93,8 @@ func TestVersionChecker(t *testing.T) {
 		},
 		{
 			name: "returns message if cli version is less than latest available release within minor version only",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8",
 				}
 			},
@@ -107,8 +107,8 @@ https://github.com/foo/bar/releases/v0.3.10
 		},
 		{
 			name: "returns message if cli version is a dev build deriving from latest-1 available release",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.7-45-c1aeccb679cd56",
 				}
 			},
@@ -121,8 +121,8 @@ https://github.com/foo/bar/releases/v0.3.8
 		},
 		{
 			name: "returns message if latest available release is a pre-release",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8",
 				}
 			},
@@ -135,8 +135,8 @@ https://github.com/foo/bar/releases/v0.3.9-alpha.0
 		},
 		{
 			name: "returns message if cli version is a pre-release of the latest available release",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.9-alpha.0",
 				}
 			},
@@ -149,8 +149,8 @@ https://github.com/foo/bar/releases/v0.3.9
 		},
 		{
 			name: "returns message if cli version is a pre-release and latest available release is the next pre-release",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8-alpha.0",
 				}
 			},
@@ -163,8 +163,8 @@ https://github.com/foo/bar/releases/v0.3.8-alpha.1
 		},
 		{
 			name: "does not return message if cli version is a dirty build deriving from latest available release",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8-45-c1aeccb679cd56-dirty",
 				}
 			},
@@ -175,8 +175,8 @@ https://github.com/foo/bar/releases/v0.3.8-alpha.1
 		},
 		{
 			name: "does not return message if cli version is a dev build deriving from latest available release",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8-45-c1aeccb679cd56",
 				}
 			},
@@ -187,8 +187,8 @@ https://github.com/foo/bar/releases/v0.3.8-alpha.1
 		},
 		{
 			name: "does not return message if latest available version has a higher minor version than the cli version",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8",
 				}
 			},
@@ -198,8 +198,8 @@ https://github.com/foo/bar/releases/v0.3.8-alpha.1
 		},
 		{
 			name: "does not return message if latest available version has a higher major version and same minor version than the cli version",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8",
 				}
 			},
@@ -211,8 +211,8 @@ https://github.com/foo/bar/releases/v0.3.8-alpha.1
 		},
 		{
 			name: "does not return message if cli version is greater than latest available release",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8",
 				}
 			},
@@ -222,8 +222,8 @@ https://github.com/foo/bar/releases/v0.3.8-alpha.1
 		},
 		{
 			name: "does not return message if cli version is equal to latest available release",
-			cliVersion: func() version.Info {
-				return version.Info{
+			cliVersion: func() buildversion.Info {
+				return buildversion.Info{
 					GitVersion: "v0.3.8",
 				}
 			},

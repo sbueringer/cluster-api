@@ -91,7 +91,7 @@ func TestGetConfigOwner(t *testing.T) {
 		})
 
 		t.Run("should get the owner when present (MachinePool)", func(t *testing.T) {
-			utilfeature.SetFeatureGateDuringTest(t, feature.Gates, feature.MachinePool, true)
+			utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.MachinePool, true)
 
 			g := NewWithT(t)
 			myPool := &clusterv1.MachinePool{

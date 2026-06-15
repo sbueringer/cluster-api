@@ -197,7 +197,7 @@ func validateUsers(c *bootstrapv1.KubeadmConfigSpec, pathPrefix *field.Path) fie
 func validateIgnition(c *bootstrapv1.KubeadmConfigSpec, pathPrefix *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if !feature.Gates.Enabled(feature.KubeadmBootstrapFormatIgnition) {
+	if !features.Gates.Enabled(features.KubeadmBootstrapFormatIgnition) {
 		if c.Format == bootstrapv1.Ignition {
 			allErrs = append(allErrs, field.Forbidden(
 				pathPrefix.Child("format"), kubeadmBootstrapFormatIgnitionFeatureDisabledMsg))
