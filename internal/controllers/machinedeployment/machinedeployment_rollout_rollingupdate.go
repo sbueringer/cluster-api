@@ -509,8 +509,20 @@ func (p *rolloutPlanner) reconcileInPlaceUpdateIntent(ctx context.Context) error
 	// - There are no in-place updates in progress (the rollout planner must wait for in-place updates to complete or fail/go
 	//   through remediation before creating additional machines)
 	if newScaleUpCount == 0 && !p.scalingOrInPlaceUpdateInProgress(ctx) {
-		newScaleUpCount = 1
-		p.addNotef(p.newMS, "surge 1 allowed to create availability for in-place updates")
+		if caninplaceupdateconsideringcanupdatemachineset {
+			// MD spec.replicas: 3, maxSurge: 1 maxUnavailable: 0
+			// new MS 0
+			// old MS 3
+			// decision by code before reconcileInPlaceUpdateIntent
+			// => new MS 0=>1
+			// decision around here:
+			// => new MS 0=>0 (avoid new MS scale up)
+			newScaleUpCount = 0
+			// => old MS 3=>2 (trigger old MS scale down)
+		} else {
+			newScaleUpCount = 1
+			p.addNotef(p.newMS, "surge 1 allowed to create availability for in-place updates")
+		}
 	} else {
 		p.addNotef(p.newMS, "surge %d dropped to prioritize in-place updates", maxSurgeUsed)
 	}

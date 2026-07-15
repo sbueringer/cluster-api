@@ -117,6 +117,27 @@ func (r *KubeadmControlPlaneReconciler) rollingUpdate(
 	// If currentReplicas < maxReplicas we have to scale up
 	// Note: This is done to ensure we have as many Machines as allowed during rollout to maximize fault tolerance.
 	if currentReplicas < maxReplicas {
+		// Try to avoid scale ups if the RX tells us in-place update is okay
+		// Note: When we are here len(machinesNeedingRollout) is always > 0
+		machineToInPlaceUpdateOrScaleDown, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, machinesNeedingRollout)
+		if err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "failed to select next Machine for rollout")
+		}
+		machineUpToDateResult, ok := machinesUpToDateResults[machineToInPlaceUpdateOrScaleDown.Name]
+		if !ok {
+			// Note: This should never happen as we store results for all Machines in machinesUpToDateResults.
+			return ctrl.Result{}, errors.Errorf("failed to check if Machine %s is UpToDate", machineToInPlaceUpdateOrScaleDown.Name)
+		}
+
+		preflightChecks
+
+		canUpdateMachine
+
+		if canUpdateMachine {
+			r.triggerInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdate, machineUpToDateResult)
+		}
+		// some returns
+
 		// Note: scaleUpControlPlane ensures that we don't continue scaling up while waiting for Machines to have NodeRefs.
 		return r.scaleUpControlPlane(ctx, controlPlane)
 	}
