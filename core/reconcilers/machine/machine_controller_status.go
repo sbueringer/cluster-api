@@ -744,6 +744,8 @@ func setUpToDateCondition(_ context.Context, m *clusterv1.Machine, ms *clusterv1
 func setReadyCondition(ctx context.Context, machine *clusterv1.Machine) {
 	log := ctrl.LoggerFrom(ctx)
 
+	// MachineUpdatingCondition should be ignored if it is only true because of in-place-update in progress
+	// & the RX told us that the update does not affect availability
 	defaultReadinessGates := []string{
 		clusterv1.MachineDeletingCondition,
 		clusterv1.MachineUpdatingCondition,

@@ -147,6 +147,7 @@ func (h *ExtensionHandlers) DoCanUpdateMachine(ctx context.Context, req *runtime
 	}
 
 	resp.Status = runtimehooksv1.ResponseStatusSuccess
+	resp.AffectsAvailability = new(false)
 }
 
 // DoCanUpdateMachineSet implements the CanUpdateMachineSet hook.

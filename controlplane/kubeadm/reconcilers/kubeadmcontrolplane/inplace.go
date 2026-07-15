@@ -60,7 +60,7 @@ func (r *Reconciler) tryInPlaceUpdate(
 	// If it returns false, we are going to fall back to scale down which will delete the Machine.
 	// We only have to repeat the canUpdateMachine call if the write call to set UpdateInProgressAnnotation
 	// fails or if we fail to delete the Machine.
-	canUpdate, err := r.canUpdateMachine(ctx, machineToInPlaceUpdate, machineUpToDateResult)
+	canUpdate, _, err := r.canUpdateMachine(ctx, machineToInPlaceUpdate, machineUpToDateResult)
 	if err != nil {
 		return false, ctrl.Result{}, pkgerrors.Wrapf(err, "failed to determine if Machine %s can be updated in-place", machineToInPlaceUpdate.Name)
 	}
