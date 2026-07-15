@@ -120,8 +120,8 @@ type Reconciler struct {
 	overrideScaleUpControlPlaneFunc    func(ctx context.Context, controlPlane *pkg.ControlPlane) (ctrl.Result, error)
 	overrideScaleDownControlPlaneFunc  func(ctx context.Context, controlPlane *pkg.ControlPlane, machineToDelete *clusterv1.Machine) (ctrl.Result, error)
 	overridePreflightChecksFunc        func(ctx context.Context, controlPlane *pkg.ControlPlane, excludeFor ...*clusterv1.Machine) ctrl.Result
-	overrideCanUpdateMachineFunc       func(ctx context.Context, machine *clusterv1.Machine, machineUpToDateResult pkg.UpToDateResult) (bool, error)
-	overrideCanExtensionsUpdateMachine func(ctx context.Context, machine *clusterv1.Machine, machineUpToDateResult pkg.UpToDateResult, extensionHandlers []string) (bool, []string, error)
+	overrideCanUpdateMachineFunc       func(ctx context.Context, machine *clusterv1.Machine, machineUpToDateResult pkg.UpToDateResult) (bool, bool, error)
+	overrideCanExtensionsUpdateMachine func(ctx context.Context, machine *clusterv1.Machine, machineUpToDateResult pkg.UpToDateResult, extensionHandlers []string) (bool, bool, []string, error)
 	overrideTriggerInPlaceUpdate       func(ctx context.Context, machine *clusterv1.Machine, machineUpToDateResult pkg.UpToDateResult) error
 	// Note: This field is only used for unit tests that use fake client because the fake client does not properly set resourceVersion
 	//       on BootstrapConfig/InfraMachine after ssa.Patch and then ssa.RemoveManagedFieldsForLabelsAndAnnotations would fail.

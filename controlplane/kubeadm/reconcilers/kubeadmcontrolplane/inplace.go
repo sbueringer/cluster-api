@@ -19,7 +19,6 @@ package kubeadmcontrolplane
 import (
 	"context"
 
-	pkgerrors "github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -31,7 +30,7 @@ func (r *Reconciler) tryInPlaceUpdate(
 	controlPlane *pkg.ControlPlane,
 	machineToInPlaceUpdate *clusterv1.Machine,
 	machineUpToDateResult pkg.UpToDateResult,
-) (fallbackToScaleDown bool, _ ctrl.Result, _ error) {
+) (onlyMachineToInPlaceUpdateFailsPreflightChecks bool, _ ctrl.Result, _ error) {
 	if r.overrideTryInPlaceUpdateFunc != nil {
 		return r.overrideTryInPlaceUpdateFunc(ctx, controlPlane, machineToInPlaceUpdate, machineUpToDateResult)
 	}
@@ -52,21 +51,6 @@ func (r *Reconciler) tryInPlaceUpdate(
 		}
 
 		return false, resultForAllMachines, nil
-	}
-
-	// Note: Usually canUpdateMachine is only called once for a single Machine rollout.
-	// If it returns true, the code below will mark the in-place update as in progress via
-	// UpdateInProgressAnnotation. From this point forward we are not going to call canUpdateMachine again.
-	// If it returns false, we are going to fall back to scale down which will delete the Machine.
-	// We only have to repeat the canUpdateMachine call if the write call to set UpdateInProgressAnnotation
-	// fails or if we fail to delete the Machine.
-	canUpdate, err := r.canUpdateMachine(ctx, machineToInPlaceUpdate, machineUpToDateResult)
-	if err != nil {
-		return false, ctrl.Result{}, pkgerrors.Wrapf(err, "failed to determine if Machine %s can be updated in-place", machineToInPlaceUpdate.Name)
-	}
-
-	if !canUpdate {
-		return true, ctrl.Result{}, nil
 	}
 
 	return false, ctrl.Result{}, r.triggerInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdate, machineUpToDateResult)
