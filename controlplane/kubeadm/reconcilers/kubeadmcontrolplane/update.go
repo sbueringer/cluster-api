@@ -114,39 +114,8 @@ func (r *Reconciler) rollingUpdate(
 	// Note: As MaxSurge is validated to be either 0 or 1, maxReplicas will be either desiredReplicas or desiredReplicas+1.
 	maxReplicas := desiredReplicas + maxSurge
 
-	// If currentReplicas < maxReplicas we have to scale up
-	// Note: This is done to ensure we have as many Machines as allowed during rollout to maximize fault tolerance.
-	if currentReplicas < maxReplicas {
-		// Try to avoid scale ups if the RX tells us in-place update is okay
-		// Note: When we are here len(machinesNeedingRollout) is always > 0
-		machineToInPlaceUpdateOrScaleDown, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, machinesNeedingRollout)
-		if err != nil {
-			return ctrl.Result{}, errors.Wrap(err, "failed to select next Machine for rollout")
-		}
-		machineUpToDateResult, ok := machinesUpToDateResults[machineToInPlaceUpdateOrScaleDown.Name]
-		if !ok {
-			// Note: This should never happen as we store results for all Machines in machinesUpToDateResults.
-			return ctrl.Result{}, errors.Errorf("failed to check if Machine %s is UpToDate", machineToInPlaceUpdateOrScaleDown.Name)
-		}
-
-		preflightChecks
-
-		canUpdateMachine
-
-		if canUpdateMachine {
-			r.triggerInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdate, machineUpToDateResult)
-		}
-		// some returns
-
-		// Note: scaleUpControlPlane ensures that we don't continue scaling up while waiting for Machines to have NodeRefs.
-		return r.scaleUpControlPlane(ctx, controlPlane)
-	}
-
-	// If currentReplicas >= maxReplicas we have to scale down.
-	// Note: If we are already at or above the maximum Machines we have to in-place update or delete a Machine
-	// to make progress with the update (as we cannot create additional new Machines above the maximum).
-
 	// Pick the Machine that we should in-place update or scale down.
+	// Note: When we are here len(machinesNeedingRollout) is always > 0
 	machineToInPlaceUpdateOrScaleDown, err := selectMachineForInPlaceUpdateOrScaleDown(ctx, controlPlane, machinesNeedingRollout)
 	if err != nil {
 		return ctrl.Result{}, pkgerrors.Wrap(err, "failed to select next Machine for rollout")
@@ -157,20 +126,56 @@ func (r *Reconciler) rollingUpdate(
 		return ctrl.Result{}, pkgerrors.Errorf("failed to check if Machine %s is UpToDate", machineToInPlaceUpdateOrScaleDown.Name)
 	}
 
+	if currentUpToDateReplicas >= desiredReplicas {
+		return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown)
+	}
+
+	var canInPlaceUpdate, affectsAvailability bool
+	if feature.Gates.Enabled(feature.InPlaceUpdates) &&
+		machineUpToDateResult.EligibleForInPlaceUpdate {
+		canInPlaceUpdate, affectsAvailability, err = r.canUpdateMachine(ctx, machineToInPlaceUpdateOrScaleDown, machineUpToDateResult)
+		if err != nil {
+			return ctrl.Result{}, pkgerrors.Wrapf(err, "failed to determine if Machine %s can be updated in-place", machineToInPlaceUpdateOrScaleDown.Name)
+		}
+	}
+
+	if canInPlaceUpdate && !affectsAvailability {
+		onlyMachineToInPlaceUpdateFailsPreflightChecks, res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, machineUpToDateResult)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !res.IsZero() {
+			return res, nil // TODO: tryInPlaceUpdate is currently running preflightChecks with scaleUp: false (which is not correct for scale up)
+		}
+		if !onlyMachineToInPlaceUpdateFailsPreflightChecks {
+			// In-place update triggered
+			return ctrl.Result{}, nil // Note: Requeue is not needed, changes to Machines trigger another reconcile.
+		}
+	}
+
+	// If currentReplicas < maxReplicas we have to scale up
+	// Note: This is done to ensure we have as many Machines as allowed during rollout to maximize fault tolerance.
+	if currentReplicas < maxReplicas {
+		// Note: scaleUpControlPlane ensures that we don't continue scaling up while waiting for Machines to have NodeRefs.
+		return r.scaleUpControlPlane(ctx, controlPlane)
+	}
+
+	// If currentReplicas >= maxReplicas we have to scale down.
+	// Note: If we are already at or above the maximum Machines we have to in-place update or delete a Machine
+	// to make progress with the update (as we cannot create additional new Machines above the maximum).
+
 	// If the selected Machine is eligible for in-place update and we don't already have enough up-to-date replicas, try in-place update.
 	// Note: To be safe we only try an in-place update when we would otherwise delete a Machine. This ensures we could
 	// afford if the in-place update fails and the Machine becomes unavailable (and eventually MHC kicks in and the Machine is recreated).
-	if feature.Gates.Enabled(feature.InPlaceUpdates) &&
-		machineUpToDateResult.EligibleForInPlaceUpdate &&
-		currentUpToDateReplicas < desiredReplicas {
-		fallbackToScaleDown, res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, machineUpToDateResult)
+	if canInPlaceUpdate {
+		onlyMachineToInPlaceUpdateFailsPreflightChecks, res, err := r.tryInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, machineUpToDateResult)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		if !res.IsZero() {
 			return res, nil
 		}
-		if fallbackToScaleDown {
+		if onlyMachineToInPlaceUpdateFailsPreflightChecks {
 			return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown)
 		}
 		// In-place update triggered
