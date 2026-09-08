@@ -308,6 +308,20 @@ type ControlPlaneClassHealthCheckChecks struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=100
 	UnhealthyMachineConditions []UnhealthyMachineCondition `json:"unhealthyMachineConditions,omitempty"`
+
+	// unhealthyConditions contains a list of CEL expressions that determine whether a
+	// Machine's Node is considered unhealthy. The expressions are combined in a
+	// logical OR, i.e. if any of the expressions evaluates to true, the node is unhealthy.
+	//
+	// Each expression has access to a "node" variable, bound to node.status.conditions,
+	// a "machine" variable, bound to machine.status.conditions, and a "current_time"
+	// variable, bound to the time of evaluation.
+	//
+	// +optional
+	// +listType=atomic
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=20
+	UnhealthyConditions []UnhealthyCondition `json:"unhealthyConditions,omitempty"`
 }
 
 // ControlPlaneClassHealthCheckRemediation configures if and how remediations are triggered if a control plane Machine is unhealthy.
@@ -596,6 +610,20 @@ type MachineDeploymentClassHealthCheckChecks struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=100
 	UnhealthyMachineConditions []UnhealthyMachineCondition `json:"unhealthyMachineConditions,omitempty"`
+
+	// unhealthyConditions contains a list of CEL expressions that determine whether a
+	// Machine's Node is considered unhealthy. The expressions are combined in a
+	// logical OR, i.e. if any of the expressions evaluates to true, the node is unhealthy.
+	//
+	// Each expression has access to a "node" variable, bound to node.status.conditions,
+	// a "machine" variable, bound to machine.status.conditions, and a "current_time"
+	// variable, bound to the time of evaluation.
+	//
+	// +optional
+	// +listType=atomic
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=20
+	UnhealthyConditions []UnhealthyCondition `json:"unhealthyConditions,omitempty"`
 }
 
 // MachineDeploymentClassHealthCheckRemediation configures if and how remediations are triggered if a MachineDeployment Machine is unhealthy.

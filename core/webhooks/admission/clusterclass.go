@@ -398,6 +398,7 @@ func validateMachineHealthCheckClasses(clusterClass *clusterv1.ClusterClass) fie
 
 		allErrs = append(allErrs, validateMachineHealthCheckNodeStartupTimeoutSeconds(fldPath, clusterClass.Spec.ControlPlane.HealthCheck.Checks.NodeStartupTimeoutSeconds)...)
 		allErrs = append(allErrs, validateMachineHealthCheckUnhealthyLessThanOrEqualTo(fldPath, clusterClass.Spec.ControlPlane.HealthCheck.Remediation.TriggerIf.UnhealthyLessThanOrEqualTo)...)
+		allErrs = append(allErrs, validateMachineHealthCheckUnhealthyConditions(fldPath, clusterClass.Spec.ControlPlane.HealthCheck.Checks.UnhealthyConditions)...)
 
 		// Ensure ControlPlane does not define a MachineHealthCheck if it does not define MachineInfrastructure.
 		if !clusterClass.Spec.ControlPlane.MachineInfrastructure.TemplateRef.IsDefined() {
@@ -418,6 +419,7 @@ func validateMachineHealthCheckClasses(clusterClass *clusterv1.ClusterClass) fie
 		allErrs = append(allErrs, validateMachineHealthCheckNodeStartupTimeoutSeconds(fldPath, md.HealthCheck.Checks.NodeStartupTimeoutSeconds)...)
 		allErrs = append(allErrs, validateMachineHealthCheckUnhealthyLessThanOrEqualTo(fldPath, md.HealthCheck.Remediation.TriggerIf.UnhealthyLessThanOrEqualTo)...)
 		allErrs = append(allErrs, validateRemediationMaxInFlight(fldPath.Child("remediation"), md.HealthCheck.Remediation.MaxInFlight)...)
+		allErrs = append(allErrs, validateMachineHealthCheckUnhealthyConditions(fldPath, md.HealthCheck.Checks.UnhealthyConditions)...)
 	}
 	return allErrs
 }

@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -628,6 +629,134 @@ func TestHealthCheckTargets(t *testing.T) {
 				actualConditions := unhealthy[i].Machine.GetConditions()
 				conditionsMatcher := WithTransform(removeLastTransitionTimesV1Beta2, ContainElements(expectedMachineCondition))
 				gs.Expect(actualConditions).To(conditionsMatcher)
+			}
+		})
+	}
+}
+
+func TestUnhealthyConditionsChecks(t *testing.T) {
+	now := time.Now()
+
+	expression := `
+node.status.conditions.exists(c,
+  c.type == 'Ready' &&
+  c.status == 'False' &&
+  duration(current_time - timestamp(c.lastTransitionTime)) > duration('5m')
+) &&
+!node.status.conditions.exists(c,
+  c.type == 'InfrastructureReady' &&
+  c.status == 'False'
+)
+`
+
+	mhc := &clusterv1.MachineHealthCheck{
+		Spec: clusterv1.MachineHealthCheckSpec{
+			Checks: clusterv1.MachineHealthCheckChecks{
+				UnhealthyConditions: []clusterv1.UnhealthyCondition{
+					{Rule: expression},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		node            *corev1.Node
+		expectUnhealthy bool
+	}{
+		{
+			name:            "unhealthy when Ready has been False for more than 5m and InfrastructureReady is not False",
+			node:            newTestUnhealthyNode("node1", corev1.NodeReady, corev1.ConditionFalse, "NodeStatusUnknown", now, 10*time.Minute),
+			expectUnhealthy: true,
+		},
+		{
+			name:            "healthy when Ready has been False for less than 5m",
+			node:            newTestUnhealthyNode("node1", corev1.NodeReady, corev1.ConditionFalse, "NodeStatusUnknown", now, 1*time.Minute),
+			expectUnhealthy: false,
+		},
+		{
+			name:            "healthy when Ready is True",
+			node:            newTestUnhealthyNode("node1", corev1.NodeReady, corev1.ConditionTrue, "NodeReady", now, 10*time.Minute),
+			expectUnhealthy: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			target := &healthCheckTarget{
+				MHC:     mhc,
+				Machine: &clusterv1.Machine{},
+				Node:    tt.node,
+			}
+
+			messages := target.unhealthyConditionsChecks(logr.Discard(), now)
+
+			if tt.expectUnhealthy {
+				g.Expect(messages).To(ConsistOf(fmt.Sprintf("Rule %q matched for Node", expression)))
+			} else {
+				g.Expect(messages).To(BeEmpty())
+			}
+		})
+	}
+}
+
+func TestUnhealthyConditionsChecksWithNilNode(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name            string
+		expression      string
+		machine         *clusterv1.Machine
+		expectUnhealthy bool
+	}{
+		{
+			name:       "unhealthy when the expression only checks the machine and the node is nil",
+			expression: "machine.status.conditions.exists(c, c.type == 'NodeReady' && c.status == 'False')",
+			machine: &clusterv1.Machine{
+				Status: clusterv1.MachineStatus{
+					Conditions: []metav1.Condition{
+						{Type: "NodeReady", Status: metav1.ConditionFalse},
+					},
+				},
+			},
+			expectUnhealthy: true,
+		},
+		{
+			name:            "healthy when the expression references node conditions and the node is nil, automatically skipped without error",
+			expression:      "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')",
+			machine:         &clusterv1.Machine{},
+			expectUnhealthy: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			mhc := &clusterv1.MachineHealthCheck{
+				Spec: clusterv1.MachineHealthCheckSpec{
+					Checks: clusterv1.MachineHealthCheckChecks{
+						UnhealthyConditions: []clusterv1.UnhealthyCondition{
+							{Rule: tt.expression},
+						},
+					},
+				},
+			}
+
+			target := &healthCheckTarget{
+				MHC:     mhc,
+				Machine: tt.machine,
+				Node:    nil,
+			}
+
+			messages := target.unhealthyConditionsChecks(logr.Discard(), now)
+
+			if tt.expectUnhealthy {
+				g.Expect(messages).To(ConsistOf(fmt.Sprintf("Rule %q matched for Node", tt.expression)))
+			} else {
+				g.Expect(messages).To(BeEmpty())
 			}
 		})
 	}

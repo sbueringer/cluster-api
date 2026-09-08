@@ -15,20 +15,15 @@ spec:
         name: quick-start-control-plane
     healthCheck:
       checks:
-        unhealthyNodeConditions:
-          - type: Ready
-            status: Unknown
-            timeoutSeconds: 300
-          - type: Ready
-            status: "False"
-            timeoutSeconds: 300
-        unhealthyMachineConditions:
-          - type: "NodeReady"
-            status: Unknown
-            timeoutSeconds: 300
-          - type: "NodeReady"
-            status: "False"
-            timeoutSeconds: 300
+        unhealthyConditions:
+          - rule: >-
+              node.status.conditions.exists(c, c.type == 'Ready' &&
+              (c.status == 'Unknown' || c.status == 'False') &&
+              duration(current_time - timestamp(c.lastTransitionTime)) > duration('300s'))
+          - rule: >-
+              machine.status.conditions.exists(c, c.type == 'NodeReady' &&
+              (c.status == 'Unknown' || c.status == 'False') &&
+              duration(current_time - timestamp(c.lastTransitionTime)) > duration('300s'))
   infrastructure:
     templateRef:
       apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
@@ -49,20 +44,15 @@ spec:
           name: quick-start-default-worker-machinetemplate
       healthCheck:
         checks:
-          unhealthyNodeConditions:
-            - type: Ready
-              status: Unknown
-              timeoutSeconds: 300
-            - type: Ready
-              status: "False"
-              timeoutSeconds: 300
-          unhealthyMachineConditions:
-            - type: "NodeReady"
-              status: Unknown
-              timeoutSeconds: 300
-            - type: "NodeReady"
-              status: "False"
-              timeoutSeconds: 300
+          unhealthyConditions:
+            - rule: >-
+                node.status.conditions.exists(c, c.type == 'Ready' &&
+                (c.status == 'Unknown' || c.status == 'False') &&
+                duration(current_time - timestamp(c.lastTransitionTime)) > duration('300s'))
+            - rule: >-
+                machine.status.conditions.exists(c, c.type == 'NodeReady' &&
+                (c.status == 'Unknown' || c.status == 'False') &&
+                duration(current_time - timestamp(c.lastTransitionTime)) > duration('300s'))
     machinePools:
     - class: default-worker
       bootstrap:

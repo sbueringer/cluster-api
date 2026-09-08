@@ -786,6 +786,52 @@ func TestClusterClassValidation(t *testing.T) {
 				Build(),
 		},
 		{
+			name: "create fail if ControlPlane MachineHealthCheck UnhealthyConditions has an invalid CEL expression",
+			in: builder.ClusterClass(metav1.NamespaceDefault, "class1").
+				WithInfrastructureClusterTemplate(
+					builder.InfrastructureClusterTemplate(metav1.NamespaceDefault, "infra1").Build()).
+				WithControlPlaneTemplate(
+					builder.ControlPlaneTemplate(metav1.NamespaceDefault, "cp1").
+						Build()).
+				WithControlPlaneInfrastructureMachineTemplate(
+					builder.InfrastructureMachineTemplate(metav1.NamespaceDefault, "cp-infra1").
+						Build()).
+				WithControlPlaneMachineHealthCheck(clusterv1.ControlPlaneClassHealthCheck{
+					Checks: clusterv1.ControlPlaneClassHealthCheckChecks{
+						UnhealthyConditions: []clusterv1.UnhealthyCondition{
+							{Rule: "node.status.conditions.exists("},
+						},
+					},
+				}).
+				Build(),
+			expectErr: true,
+		},
+		{
+			name: "create fail if MachineDeployment MachineHealthCheck UnhealthyConditions has an invalid CEL expression",
+			in: builder.ClusterClass(metav1.NamespaceDefault, "class1").
+				WithInfrastructureClusterTemplate(
+					builder.InfrastructureClusterTemplate(metav1.NamespaceDefault, "infra1").Build()).
+				WithControlPlaneTemplate(
+					builder.ControlPlaneTemplate(metav1.NamespaceDefault, "cp1").
+						Build()).
+				WithWorkerMachineDeploymentClasses(
+					*builder.MachineDeploymentClass("aa").
+						WithInfrastructureTemplate(
+							builder.InfrastructureMachineTemplate(metav1.NamespaceDefault, "infra1").Build()).
+						WithBootstrapTemplate(
+							builder.BootstrapTemplate(metav1.NamespaceDefault, "bootstrap1").Build()).
+						WithMachineHealthCheckClass(clusterv1.MachineDeploymentClassHealthCheck{
+							Checks: clusterv1.MachineDeploymentClassHealthCheckChecks{
+								UnhealthyConditions: []clusterv1.UnhealthyCondition{
+									{Rule: "node.metadata.name == 'foo'"},
+								},
+							},
+						}).
+						Build()).
+				Build(),
+			expectErr: true,
+		},
+		{
 			name: "create fail if MachineDeployment MachineHealthCheck NodeStartUpTimeout is too short",
 			in: builder.ClusterClass(metav1.NamespaceDefault, "class1").
 				WithInfrastructureClusterTemplate(

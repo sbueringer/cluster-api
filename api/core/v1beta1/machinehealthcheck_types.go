@@ -77,6 +77,22 @@ type MachineHealthCheckSpec struct {
 	// +kubebuilder:validation:MaxItems=100
 	UnhealthyMachineConditions []UnhealthyMachineCondition `json:"unhealthyMachineConditions,omitempty"`
 
+	// unhealthyConditionExpressions contains a list of CEL rules that determine whether a
+	// Machine's Node is considered unhealthy. The rules are combined in a
+	// logical OR, i.e. if any of the rules evaluates to true, the node is unhealthy.
+	//
+	// Each rule has access to a "node" variable, bound to node.status.conditions,
+	// a "machine" variable, bound to machine.status.conditions, and a "current_time"
+	// variable, bound to the time of evaluation. If the Machine does not have a Node yet,
+	// rules that reference "node" are automatically treated as not matched; rules
+	// that only reference "machine" are still evaluated normally.
+	//
+	// +optional
+	// +listType=atomic
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=20
+	UnhealthyConditionExpressions []UnhealthyConditionExpression `json:"unhealthyConditionExpressions,omitempty"`
+
 	// maxUnhealthy specifies the maximum number of unhealthy machines allowed.
 	// Any further remediation is only allowed if at most "maxUnhealthy" machines selected by
 	// "selector" are not healthy.
@@ -173,6 +189,29 @@ type UnhealthyMachineCondition struct {
 	// for at least 1 hour before being considered unhealthy.
 	// +required
 	Timeout metav1.Duration `json:"timeout"`
+}
+
+// UnhealthyConditionExpression represents a CEL expression used to determine whether a
+// Machine's Node is considered unhealthy.
+type UnhealthyConditionExpression struct {
+	// rule is a CEL expression that is evaluated to determine whether a
+	// Machine's Node is unhealthy.
+	//
+	// The rule has access to a "node" variable, bound to node.status.conditions,
+	// a "machine" variable, bound to machine.status.conditions, and a "current_time"
+	// variable, bound to the time of evaluation. The rule must evaluate to a bool.
+	//
+	// If the Machine does not have a Node yet (or the Node has been deleted), the rule
+	// is automatically treated as not matched whenever it references "node"; there is no need
+	// to guard node access. Rules that only reference "machine" are evaluated normally.
+	//
+	// Example: node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False' &&
+	// duration(current_time - timestamp(c.lastTransitionTime)) > duration('5m'))
+	//
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=4096
+	Rule string `json:"rule,omitempty"`
 }
 
 // MachineHealthCheckStatus defines the observed state of MachineHealthCheck.

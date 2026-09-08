@@ -688,6 +688,7 @@ func validateMachineHealthChecks(cluster *clusterv1.Cluster, clusterClass *clust
 		}
 		allErrs = append(allErrs, validateMachineHealthCheckNodeStartupTimeoutSeconds(fldPath, cluster.Spec.Topology.ControlPlane.HealthCheck.Checks.NodeStartupTimeoutSeconds)...)
 		allErrs = append(allErrs, validateMachineHealthCheckUnhealthyLessThanOrEqualTo(fldPath, cluster.Spec.Topology.ControlPlane.HealthCheck.Remediation.TriggerIf.UnhealthyLessThanOrEqualTo)...)
+		allErrs = append(allErrs, validateMachineHealthCheckUnhealthyConditions(fldPath, cluster.Spec.Topology.ControlPlane.HealthCheck.Checks.UnhealthyConditions)...)
 	}
 
 	// If MachineHealthCheck is explicitly enabled then make sure that a MachineHealthCheck definition is
@@ -714,6 +715,7 @@ func validateMachineHealthChecks(cluster *clusterv1.Cluster, clusterClass *clust
 			allErrs = append(allErrs, validateMachineHealthCheckNodeStartupTimeoutSeconds(fldPath, md.HealthCheck.Checks.NodeStartupTimeoutSeconds)...)
 			allErrs = append(allErrs, validateMachineHealthCheckUnhealthyLessThanOrEqualTo(fldPath, md.HealthCheck.Remediation.TriggerIf.UnhealthyLessThanOrEqualTo)...)
 			allErrs = append(allErrs, validateRemediationMaxInFlight(fldPath.Child("remediation"), md.HealthCheck.Remediation.MaxInFlight)...)
+			allErrs = append(allErrs, validateMachineHealthCheckUnhealthyConditions(fldPath, md.HealthCheck.Checks.UnhealthyConditions)...)
 		}
 
 		// If MachineHealthCheck is explicitly enabled then make sure that a MachineHealthCheck definition is
