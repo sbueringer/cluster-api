@@ -282,6 +282,9 @@ func TestControlPlaneMachineHealthCheckClass(t *testing.T) {
 									TimeoutSeconds: ptr.To(int32(5 * 60)),
 								},
 							},
+							UnhealthyConditions: []clusterv1.UnhealthyCondition{
+								{Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')"},
+							},
 						},
 						Remediation: clusterv1.ControlPlaneTopologyHealthCheckRemediation{
 							TriggerIf: clusterv1.ControlPlaneTopologyHealthCheckRemediationTriggerIf{
@@ -326,6 +329,9 @@ func TestControlPlaneMachineHealthCheckClass(t *testing.T) {
 						TimeoutSeconds: ptr.To(int32(5 * 60)),
 					},
 				},
+				UnhealthyConditions: []clusterv1.UnhealthyCondition{
+					{Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')"},
+				},
 			},
 			wantRemediation: clusterv1.MachineHealthCheckRemediation{
 				TriggerIf: clusterv1.MachineHealthCheckRemediationTriggerIf{
@@ -356,6 +362,9 @@ func TestControlPlaneMachineHealthCheckClass(t *testing.T) {
 									TimeoutSeconds: ptr.To(int32(5 * 60)),
 								},
 							},
+							UnhealthyConditions: []clusterv1.UnhealthyCondition{
+								{Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')"},
+							},
 						},
 					},
 				},
@@ -374,6 +383,9 @@ func TestControlPlaneMachineHealthCheckClass(t *testing.T) {
 						Status:         metav1.ConditionFalse,
 						TimeoutSeconds: ptr.To(int32(5 * 60)),
 					},
+				},
+				UnhealthyConditions: []clusterv1.UnhealthyCondition{
+					{Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')"},
 				},
 			},
 			wantRemediation: clusterv1.MachineHealthCheckRemediation{},
@@ -662,6 +674,9 @@ func TestMachineDeploymentMachineHealthCheckClass(t *testing.T) {
 								TimeoutSeconds: ptr.To(int32(5 * 60)),
 							},
 						},
+						UnhealthyConditions: []clusterv1.UnhealthyCondition{
+							{Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')"},
+						},
 					},
 					Remediation: clusterv1.MachineDeploymentTopologyHealthCheckRemediation{
 						TriggerIf: clusterv1.MachineDeploymentTopologyHealthCheckRemediationTriggerIf{
@@ -684,6 +699,9 @@ func TestMachineDeploymentMachineHealthCheckClass(t *testing.T) {
 						Status:         metav1.ConditionFalse,
 						TimeoutSeconds: ptr.To(int32(5 * 60)),
 					},
+				},
+				UnhealthyConditions: []clusterv1.UnhealthyCondition{
+					{Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')"},
 				},
 			},
 			wantRemediation: clusterv1.MachineHealthCheckRemediation{
@@ -713,6 +731,9 @@ func TestMachineDeploymentMachineHealthCheckClass(t *testing.T) {
 										TimeoutSeconds: ptr.To(int32(5 * 60)),
 									},
 								},
+								UnhealthyConditions: []clusterv1.UnhealthyCondition{
+									{Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')"},
+								},
 							},
 						},
 					},
@@ -736,6 +757,9 @@ func TestMachineDeploymentMachineHealthCheckClass(t *testing.T) {
 						Status:         metav1.ConditionFalse,
 						TimeoutSeconds: ptr.To(int32(5 * 60)),
 					},
+				},
+				UnhealthyConditions: []clusterv1.UnhealthyCondition{
+					{Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')"},
 				},
 			},
 			wantRemediation: clusterv1.MachineHealthCheckRemediation{},

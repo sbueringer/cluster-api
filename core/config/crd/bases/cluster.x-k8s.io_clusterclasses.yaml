@@ -172,6 +172,47 @@ spec:
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
+                      unhealthyConditionExpressions:
+                        description: |-
+                          unhealthyConditionExpressions contains a list of CEL rules that determine whether a
+                          Machine's Node is considered unhealthy. The rules are combined in a
+                          logical OR, i.e. if any of the rules evaluates to true, the node is unhealthy.
+
+                          Each rule has access to a "node" variable, bound to node.status.conditions,
+                          a "machine" variable, bound to machine.status.conditions, and a "current_time"
+                          variable, bound to the time of evaluation. If the Machine does not have a Node yet,
+                          rules that reference "node" are automatically treated as not matched; rules
+                          that only reference "machine" are still evaluated normally.
+                        items:
+                          description: |-
+                            UnhealthyConditionExpression represents a CEL expression used to determine whether a
+                            Machine's Node is considered unhealthy.
+                          properties:
+                            rule:
+                              description: |-
+                                rule is a CEL expression that is evaluated to determine whether a
+                                Machine's Node is unhealthy.
+
+                                The rule has access to a "node" variable, bound to node.status.conditions,
+                                a "machine" variable, bound to machine.status.conditions, and a "current_time"
+                                variable, bound to the time of evaluation. The rule must evaluate to a bool.
+
+                                If the Machine does not have a Node yet (or the Node has been deleted), the rule
+                                is automatically treated as not matched whenever it references "node"; there is no need
+                                to guard node access. Rules that only reference "machine" are evaluated normally.
+
+                                Example: node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False' &&
+                                duration(current_time - timestamp(c.lastTransitionTime)) > duration('5m'))
+                              maxLength: 4096
+                              minLength: 1
+                              type: string
+                          required:
+                          - rule
+                          type: object
+                        maxItems: 20
+                        minItems: 1
+                        type: array
+                        x-kubernetes-list-type: atomic
                       unhealthyConditions:
                         description: |-
                           unhealthyConditions contains a list of the conditions that determine
@@ -1377,6 +1418,47 @@ spec:
                                   type: string
                               type: object
                               x-kubernetes-map-type: atomic
+                            unhealthyConditionExpressions:
+                              description: |-
+                                unhealthyConditionExpressions contains a list of CEL rules that determine whether a
+                                Machine's Node is considered unhealthy. The rules are combined in a
+                                logical OR, i.e. if any of the rules evaluates to true, the node is unhealthy.
+
+                                Each rule has access to a "node" variable, bound to node.status.conditions,
+                                a "machine" variable, bound to machine.status.conditions, and a "current_time"
+                                variable, bound to the time of evaluation. If the Machine does not have a Node yet,
+                                rules that reference "node" are automatically treated as not matched; rules
+                                that only reference "machine" are still evaluated normally.
+                              items:
+                                description: |-
+                                  UnhealthyConditionExpression represents a CEL expression used to determine whether a
+                                  Machine's Node is considered unhealthy.
+                                properties:
+                                  rule:
+                                    description: |-
+                                      rule is a CEL expression that is evaluated to determine whether a
+                                      Machine's Node is unhealthy.
+
+                                      The rule has access to a "node" variable, bound to node.status.conditions,
+                                      a "machine" variable, bound to machine.status.conditions, and a "current_time"
+                                      variable, bound to the time of evaluation. The rule must evaluate to a bool.
+
+                                      If the Machine does not have a Node yet (or the Node has been deleted), the rule
+                                      is automatically treated as not matched whenever it references "node"; there is no need
+                                      to guard node access. Rules that only reference "machine" are evaluated normally.
+
+                                      Example: node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False' &&
+                                      duration(current_time - timestamp(c.lastTransitionTime)) > duration('5m'))
+                                    maxLength: 4096
+                                    minLength: 1
+                                    type: string
+                                required:
+                                - rule
+                                type: object
+                              maxItems: 20
+                              minItems: 1
+                              type: array
+                              x-kubernetes-list-type: atomic
                             unhealthyConditions:
                               description: |-
                                 unhealthyConditions contains a list of the conditions that determine
@@ -2884,6 +2966,45 @@ spec:
                             format: int32
                             minimum: 0
                             type: integer
+                          unhealthyConditions:
+                            description: |-
+                              unhealthyConditions contains a list of CEL expressions that determine whether a
+                              Machine's Node is considered unhealthy. The expressions are combined in a
+                              logical OR, i.e. if any of the expressions evaluates to true, the node is unhealthy.
+
+                              Each expression has access to a "node" variable, bound to node.status.conditions,
+                              a "machine" variable, bound to machine.status.conditions, and a "current_time"
+                              variable, bound to the time of evaluation.
+                            items:
+                              description: |-
+                                UnhealthyCondition represents a CEL expression used to determine whether a
+                                Machine's Node is considered unhealthy.
+                              properties:
+                                rule:
+                                  description: |-
+                                    rule is a CEL expression that is evaluated to determine whether a
+                                    Machine's Node is unhealthy.
+
+                                    The rule has access to a "node" variable, bound to node.status.conditions,
+                                    a "machine" variable, bound to machine.status.conditions, and a "current_time"
+                                    variable, bound to the time of evaluation. The rule must evaluate to a bool.
+
+                                    If the Machine does not have a Node yet (or the Node has been deleted), the rule
+                                    is automatically treated as not matched whenever it references "node"; there is no need
+                                    to guard node access. Rules that only reference "machine" are evaluated normally.
+
+                                    Example: node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False' &&
+                                    duration(current_time - timestamp(c.lastTransitionTime)) > duration('5m'))
+                                  maxLength: 4096
+                                  minLength: 1
+                                  type: string
+                              required:
+                              - rule
+                              type: object
+                            maxItems: 20
+                            minItems: 1
+                            type: array
+                            x-kubernetes-list-type: atomic
                           unhealthyMachineConditions:
                             description: |-
                               unhealthyMachineConditions contains a list of the machine conditions that determine
@@ -4171,6 +4292,45 @@ spec:
                                   format: int32
                                   minimum: 0
                                   type: integer
+                                unhealthyConditions:
+                                  description: |-
+                                    unhealthyConditions contains a list of CEL expressions that determine whether a
+                                    Machine's Node is considered unhealthy. The expressions are combined in a
+                                    logical OR, i.e. if any of the expressions evaluates to true, the node is unhealthy.
+
+                                    Each expression has access to a "node" variable, bound to node.status.conditions,
+                                    a "machine" variable, bound to machine.status.conditions, and a "current_time"
+                                    variable, bound to the time of evaluation.
+                                  items:
+                                    description: |-
+                                      UnhealthyCondition represents a CEL expression used to determine whether a
+                                      Machine's Node is considered unhealthy.
+                                    properties:
+                                      rule:
+                                        description: |-
+                                          rule is a CEL expression that is evaluated to determine whether a
+                                          Machine's Node is unhealthy.
+
+                                          The rule has access to a "node" variable, bound to node.status.conditions,
+                                          a "machine" variable, bound to machine.status.conditions, and a "current_time"
+                                          variable, bound to the time of evaluation. The rule must evaluate to a bool.
+
+                                          If the Machine does not have a Node yet (or the Node has been deleted), the rule
+                                          is automatically treated as not matched whenever it references "node"; there is no need
+                                          to guard node access. Rules that only reference "machine" are evaluated normally.
+
+                                          Example: node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False' &&
+                                          duration(current_time - timestamp(c.lastTransitionTime)) > duration('5m'))
+                                        maxLength: 4096
+                                        minLength: 1
+                                        type: string
+                                    required:
+                                    - rule
+                                    type: object
+                                  maxItems: 20
+                                  minItems: 1
+                                  type: array
+                                  x-kubernetes-list-type: atomic
                                 unhealthyMachineConditions:
                                   description: |-
                                     unhealthyMachineConditions contains a list of the machine conditions that determine

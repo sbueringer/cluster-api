@@ -343,6 +343,100 @@ func TestMachineHealthCheckUnhealthyMachineConditions(t *testing.T) {
 	}
 }
 
+func TestMachineHealthCheckUnhealthyConditions(t *testing.T) {
+	tests := []struct {
+		name                string
+		unhealthyConditions []clusterv1.UnhealthyCondition
+		expectErr           bool
+	}{
+		{
+			name: "pass with a correctly defined CEL expression",
+			unhealthyConditions: []clusterv1.UnhealthyCondition{
+				{
+					Rule: "node.status.conditions.exists(c, c.type == 'Ready' && c.status == 'False')",
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "fail if the expression does not compile",
+			unhealthyConditions: []clusterv1.UnhealthyCondition{
+				{
+					Rule: "node.status.conditions.exists(",
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "fail if the expression does not evaluate to a bool",
+			unhealthyConditions: []clusterv1.UnhealthyCondition{
+				{
+					Rule: "node.status.conditions",
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "fail if the expression references a field that is not exposed to CEL",
+			unhealthyConditions: []clusterv1.UnhealthyCondition{
+				{
+					Rule: "node.metadata.name == 'foo'",
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "pass with an expression that does not access node fields at all",
+			unhealthyConditions: []clusterv1.UnhealthyCondition{
+				{
+					Rule: "machine.status.conditions.exists(c, c.type == 'HealthCheckSucceeded' && c.status == 'False')",
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name:                "do not fail if the UnhealthyConditions array is nil",
+			unhealthyConditions: nil,
+			expectErr:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+			mhc := &clusterv1.MachineHealthCheck{
+				Spec: clusterv1.MachineHealthCheckSpec{
+					Selector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+					Checks: clusterv1.MachineHealthCheckChecks{
+						UnhealthyConditions: tt.unhealthyConditions,
+					},
+				},
+			}
+			webhook := &MachineHealthCheck{}
+
+			if tt.expectErr {
+				warnings, err := webhook.ValidateCreate(ctx, mhc)
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(warnings).To(BeEmpty())
+				warnings, err = webhook.ValidateUpdate(ctx, mhc, mhc)
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(warnings).To(BeEmpty())
+			} else {
+				warnings, err := webhook.ValidateCreate(ctx, mhc)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(warnings).To(BeEmpty())
+				warnings, err = webhook.ValidateUpdate(ctx, mhc, mhc)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(warnings).To(BeEmpty())
+			}
+		})
+	}
+}
+
 func TestMachineHealthCheckNodeStartupTimeout(t *testing.T) {
 	zero := int32(0)
 	twentyNineSeconds := int32(29)

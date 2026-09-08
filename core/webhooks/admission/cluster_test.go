@@ -2452,6 +2452,30 @@ func TestClusterTopologyValidationWithClient(t *testing.T) {
 			wantErr:         false,
 		},
 		{
+			name: "Reject a cluster that has MHC override defined for control plane with an invalid CEL expression in UnhealthyConditions",
+			cluster: builder.Cluster(metav1.NamespaceDefault, "cluster1").
+				WithTopology(
+					builder.ClusterTopology().
+						WithClass("clusterclass").
+						WithVersion("v1.22.2").
+						WithControlPlaneReplicas(3).
+						WithControlPlaneMachineHealthCheck(clusterv1.ControlPlaneTopologyHealthCheck{
+							Checks: clusterv1.ControlPlaneTopologyHealthCheckChecks{
+								UnhealthyConditions: []clusterv1.UnhealthyCondition{
+									{Rule: "node.status.conditions.exists("},
+								},
+								NodeStartupTimeoutSeconds: ptr.To(int32(30)),
+							},
+						}).
+						Build()).
+				Build(),
+			class: builder.ClusterClass(metav1.NamespaceDefault, "clusterclass").
+				WithControlPlaneInfrastructureMachineTemplate(builder.InfrastructureMachineTemplate(metav1.NamespaceDefault, "cpinframachinetemplate").Build()).
+				Build(),
+			classReconciled: true,
+			wantErr:         true,
+		},
+		{
 			name: "Reject a cluster that MHC override defined for control plane but is set when control plane is missing machineInfrastructure",
 			cluster: builder.Cluster(metav1.NamespaceDefault, "cluster1").
 				WithTopology(
@@ -2606,6 +2630,37 @@ func TestClusterTopologyValidationWithClient(t *testing.T) {
 				Build(),
 			classReconciled: true,
 			wantErr:         false,
+		},
+		{
+			name: "Reject a cluster that has MHC override defined for machine deployment with an invalid CEL expression in UnhealthyConditions",
+			cluster: builder.Cluster(metav1.NamespaceDefault, "cluster1").
+				WithTopology(
+					builder.ClusterTopology().
+						WithClass("clusterclass").
+						WithVersion("v1.22.2").
+						WithControlPlaneReplicas(3).
+						WithMachineDeployment(
+							builder.MachineDeploymentTopology("md1").
+								WithClass("worker-class").
+								WithMachineHealthCheck(clusterv1.MachineDeploymentTopologyHealthCheck{
+									Checks: clusterv1.MachineDeploymentTopologyHealthCheckChecks{
+										UnhealthyConditions: []clusterv1.UnhealthyCondition{
+											{Rule: "node.metadata.name == 'foo'"},
+										},
+										NodeStartupTimeoutSeconds: ptr.To(int32(30)),
+									},
+								}).
+								Build(),
+						).
+						Build()).
+				Build(),
+			class: builder.ClusterClass(metav1.NamespaceDefault, "clusterclass").
+				WithWorkerMachineDeploymentClasses(
+					*builder.MachineDeploymentClass("worker-class").Build(),
+				).
+				Build(),
+			classReconciled: true,
+			wantErr:         true,
 		},
 		{
 			name: "Accept a cluster that has MHC enabled for machine deployment with machine deployment MHC defined in ClusterClass",

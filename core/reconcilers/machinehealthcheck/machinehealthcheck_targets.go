@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	mhccel "sigs.k8s.io/cluster-api/internal/machinehealthcheck/cel"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -109,8 +110,22 @@ func (t *healthCheckTarget) needsRemediation(logger logr.Logger, reconciliationT
 	// Check machine conditions
 	unhealthyMachineMessages, nextMachineCheck := t.machineChecks(logger, reconciliationTime)
 
+	// Evaluate unhealthyConditions CEL expressions against the node and the machine.
+	// This runs even if the node has not been set yet (t.Node == nil), so that expressions
+	// which don't strictly depend on the node (e.g. ones only checking machine conditions)
+	// can still take effect.
+	unhealthyConditionsMessages, nextCELCheck := t.unhealthyConditionsChecks(logger, reconciliationTime)
+
 	// Check node conditions
 	nodeConditionReason, nodeV1beta1ConditionReason, unhealthyNodeMessages, nextNodeCheck := t.nodeChecks(logger, reconciliationTime, timeoutForMachineToHaveNode)
+
+	unhealthyNodeMessages = append(unhealthyConditionsMessages, unhealthyNodeMessages...)
+	if len(unhealthyConditionsMessages) > 0 && nodeConditionReason == "" {
+		// FIXME: decide how CEL rules should influence the reason of the condition (especially if CEL+Node+Machine checks all fail)
+		// Maybe we should just simplify as all of them basically mean that the Machine/Node is unhealthy, why differentiate?
+		nodeConditionReason = clusterv1.MachineHealthCheckUnhealthyNodeReason
+		nodeV1beta1ConditionReason = clusterv1.UnhealthyNodeConditionV1Beta1Reason
+	}
 
 	// Combine results
 	if len(unhealthyMachineMessages) == 0 && len(unhealthyNodeMessages) == 0 {
@@ -120,6 +135,9 @@ func (t *healthCheckTarget) needsRemediation(logger logr.Logger, reconciliationT
 		}
 		if nextNodeCheck > 0 {
 			nextCheckTimes = append(nextCheckTimes, nextNodeCheck)
+		}
+		if nextCELCheck > 0 {
+			nextCheckTimes = append(nextCheckTimes, nextCELCheck)
 		}
 		result := minDuration(nextCheckTimes)
 		return false, result
@@ -290,6 +308,53 @@ func (t *healthCheckTarget) nodeChecks(logger logr.Logger, reconciliationTime ti
 		return clusterv1.MachineHealthCheckUnhealthyNodeReason, clusterv1.UnhealthyNodeConditionV1Beta1Reason, unhealthyNodeMessages, time.Duration(0)
 	}
 	return "", "", nil, minDuration(nextCheckTimes)
+}
+
+// unhealthyConditionsChecks evaluates the MachineHealthCheck's unhealthyConditions CEL
+// rules against the target's node and machine, returning a message per matched
+// rule. t.Node may be nil, e.g. if the Machine does not have a Node yet; rules
+// that don't depend on node fields (or that explicitly check for the absence of node
+// conditions) can still match in that case.
+func (t *healthCheckTarget) unhealthyConditionsChecks(logger logr.Logger, reconciliationTime time.Time) ([]string, time.Duration) {
+	var unhealthyConditionsMessages []string
+	input := mhccel.NewInput(t.Node, t.Machine, reconciliationTime)
+	// FIXME: temporarily hard-coding this because my current CAPV scale env overwrites MHC config per Cluster,
+	// so it's impossible to quickly rollout the rules => follow-up: migrate MHC config from Cluster to
+	// ClusterClass in CAPV topology-scale flavor
+	tmpRules := []clusterv1.UnhealthyCondition{
+		{
+			Rule: "node.status.conditions.exists(c, c.type == 'Ready' && (c.status == 'Unknown' || c.status == 'False') && duration(current_time - timestamp(c.lastTransitionTime)) > duration('300s'))",
+		},
+		{
+			Rule: "machine.status.conditions.exists(c, c.type == 'NodeReady' && (c.status == 'Unknown' || c.status == 'False') && duration(current_time - timestamp(c.lastTransitionTime)) > duration('300s'))",
+		},
+	}
+	for _, c := range append(t.MHC.Spec.Checks.UnhealthyConditions, tmpRules...) {
+		// FIXME: Decide how often we want to re-run the evaluation, ideas:
+		// * configurable interval (either an API field or "nextCheck" response from CEL rule), or keep it simple for now (next option)
+		//   * downside: if user configures this to run to often our perf degrades => it's preferred to don't give user a choice so we can optimize (next option)
+		// * hard-coded interval (probably requires some TTL based result caching with CEL rule + Machine namespace/name + Machine+Node RV as cache key if every 15s rateLimitInterval is too often)
+		matched, err := mhccel.Evaluate(c.Rule, input)
+		if err != nil {
+			logger.Error(err, "Failed to evaluate unhealthyConditions rule", "rule", c.Rule)
+			continue
+		}
+		if !matched {
+			continue
+		}
+		// FIXME: Decide what to use as message, putting the entire rule into the condition message is a bad idea,
+		// either use something hard-coded or something via API configurable (if message is generated via CEL that
+		// will require more CPU/memory though, but maybe that's fine)
+		unhealthyConditionsMessages = append(unhealthyConditionsMessages, "CEL Rule matched for Node")
+		logger.V(3).Info("Target is unhealthy: unhealthyConditions rule matched", "rule", c.Rule)
+	}
+	// FIXME: If we are always returning next check look up the call stack and check for consequences, e.g. doesn't make sense
+	// to log "Some targets might go unhealthy" anymore as we would always log this. Maybe also raise the controller (util)
+	// rate limit from 15s to 1m. Similar for "Target is likely to go unhealthy"
+	// FIXME: Running this every min is probably too much, maybe just every 5m or 10m? (too much memory allocations at scale at stable state)
+	// In general we should probably cache the results so that CEL is not executed more often than every 5m or 10m.
+	// But I think we can't cache it for longer because of "time since" calculations (current time moves)
+	return unhealthyConditionsMessages, 1 * time.Minute
 }
 
 // getTargetsFromMHC uses the MachineHealthCheck's selector to fetch machines

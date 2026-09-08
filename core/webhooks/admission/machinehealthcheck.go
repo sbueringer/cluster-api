@@ -29,6 +29,7 @@ import (
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/core/webhooks/conversion"
+	mhccel "sigs.k8s.io/cluster-api/internal/machinehealthcheck/cel"
 )
 
 var (
@@ -130,6 +131,7 @@ func (webhook *MachineHealthCheck) validate(oldMHC, newMHC *clusterv1.MachineHea
 
 	allErrs = append(allErrs, validateMachineHealthCheckNodeStartupTimeoutSeconds(specPath, newMHC.Spec.Checks.NodeStartupTimeoutSeconds)...)
 	allErrs = append(allErrs, validateMachineHealthCheckUnhealthyLessThanOrEqualTo(specPath, newMHC.Spec.Remediation.TriggerIf.UnhealthyLessThanOrEqualTo)...)
+	allErrs = append(allErrs, validateMachineHealthCheckUnhealthyConditions(specPath, newMHC.Spec.Checks.UnhealthyConditions)...)
 
 	if len(allErrs) == 0 {
 		return nil
@@ -158,6 +160,19 @@ func validateMachineHealthCheckUnhealthyLessThanOrEqualTo(fldPath *field.Path, u
 			allErrs = append(
 				allErrs,
 				field.Invalid(fldPath.Child("remediation", "triggerIf", "unhealthyLessThanOrEqualTo"), unhealthyLessThanOrEqualTo.String(), fmt.Sprintf("must be either an int or a percentage: %v", err.Error())),
+			)
+		}
+	}
+	return allErrs
+}
+
+func validateMachineHealthCheckUnhealthyConditions(fldPath *field.Path, unhealthyConditions []clusterv1.UnhealthyCondition) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, c := range unhealthyConditions {
+		if _, err := mhccel.Compile(c.Rule); err != nil {
+			allErrs = append(
+				allErrs,
+				field.Invalid(fldPath.Child("checks", "unhealthyConditions").Index(i).Child("rule"), c.Rule, fmt.Sprintf("must be a valid CEL expression: %v", err.Error())),
 			)
 		}
 	}
