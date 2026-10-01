@@ -183,12 +183,20 @@ func (r *Reconciler) rollingUpdate(
 		// If currentReplicas > maxReplicas, we have to scale down.
 		return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, true)
 	}
+	// Someone triggers a rollout
+	// First reconcile after to start the first rollout step (aka "update the first Machine")
+	// 1. (x) in-place update
+	// 2. (x) scale up   + (x) scale down  (maxSurge 1)
+	// 3. (x) scale down +     scale up    (maxSurge 0)
 
 	return ctrl.Result{}, fmt.Errorf("unexpected state, currentReplicas %d, minReplicas %d, maxReplicas %d", currentReplicas, minReplicas, maxReplicas)
 }
 
 func (r *Reconciler) inPlaceUpdateOrScaleUpControlPlane(ctx context.Context, controlPlane *pkg.ControlPlane, machineToInPlaceUpdate *clusterv1.Machine, machineUpToDateResult pkg.UpToDateResult) (ctrl.Result, error) {
 	// If either the InPlaceUpdates feature is not enabled or the Machine is not eligible for in-place update, scale up.
+	// TODO: if we want to allow blocking outside of in-place updates:
+	// * we have to decide if we want to call CanUpdateMachine also if the InPlaceUpdate fg is not enabled (might need another fg)
+	// * we also have to call CanUpdateMachine if EligibleForInPlaceUpdate is false
 	if !feature.Gates.Enabled(feature.InPlaceUpdates) || !machineUpToDateResult.EligibleForInPlaceUpdate {
 		return r.scaleUpControlPlane(ctx, controlPlane, true)
 	}
@@ -219,10 +227,16 @@ func (r *Reconciler) inPlaceUpdateOrScaleUpControlPlane(ctx context.Context, con
 		return ctrl.Result{}, pkgerrors.Wrapf(err, "failed to determine if Machine %s can be updated in-place", machineToInPlaceUpdate.Name)
 	}
 
-	if canUpdateMachineResult.canUpdateMachine && !canUpdateMachineResult.affectsAvailability {
+	// CanUpdateMachine now also returns allowed-operations
+
+	// allowed-operations: [] => return "we cannot rollout"
+
+	if canUpdateMachineResult.canUpdateMachine && !canUpdateMachineResult.affectsAvailability { // && allowed-operations contains in-place
 		// Note: Requeue is not needed, changes to Machines trigger another reconcile.
 		return ctrl.Result{}, r.triggerInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdate, machineUpToDateResult, canUpdateMachineResult.affectsAvailability)
 	}
+
+	// allowed-operations does not contain scale up => "we cannot rollout"
 
 	// Note: No need to run preflightChecks again, they already succeeded.
 	return r.scaleUpControlPlane(ctx, controlPlane, false)
@@ -230,6 +244,9 @@ func (r *Reconciler) inPlaceUpdateOrScaleUpControlPlane(ctx context.Context, con
 
 func (r *Reconciler) inPlaceUpdateOrScaleDownControlPlane(ctx context.Context, controlPlane *pkg.ControlPlane, machineToInPlaceUpdateOrScaleDown *clusterv1.Machine, machineUpToDateResult pkg.UpToDateResult) (ctrl.Result, error) {
 	// If either the InPlaceUpdates feature is not enabled or the Machine is not eligible for in-place update, scale down.
+	// TODO: if we want to allow blocking outside of in-place updates:
+	// * we have to decide if we want to call CanUpdateMachine also if the InPlaceUpdate fg is not enabled (might need another fg)
+	// * we also have to call CanUpdateMachine if EligibleForInPlaceUpdate is false
 	if !feature.Gates.Enabled(feature.InPlaceUpdates) || !machineUpToDateResult.EligibleForInPlaceUpdate {
 		return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, true)
 	}
@@ -267,10 +284,16 @@ func (r *Reconciler) inPlaceUpdateOrScaleDownControlPlane(ctx context.Context, c
 		return ctrl.Result{}, pkgerrors.Wrapf(err, "failed to determine if Machine %s can be updated in-place", machineToInPlaceUpdateOrScaleDown.Name)
 	}
 
-	if canUpdateMachineResult.canUpdateMachine {
+	// CanUpdateMachine now also returns allowed-operations
+
+	// allowed-operations: [] => return "we cannot rollout"
+
+	if canUpdateMachineResult.canUpdateMachine { // && allowed-operations contains in-place
 		// Note: Requeue is not needed, changes to Machines trigger another reconcile.
 		return ctrl.Result{}, r.triggerInPlaceUpdate(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, machineUpToDateResult, canUpdateMachineResult.affectsAvailability)
 	}
+
+	// allowed-operations does not contain scale down => "we cannot rollout"
 
 	// Note: No need to run preflightChecks again, they already succeeded.
 	return r.scaleDownControlPlane(ctx, controlPlane, machineToInPlaceUpdateOrScaleDown, false)
