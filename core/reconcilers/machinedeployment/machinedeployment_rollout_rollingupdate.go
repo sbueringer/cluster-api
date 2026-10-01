@@ -437,6 +437,9 @@ func (p *rolloutPlanner) scaleDownOldMSs(ctx context.Context, totalScaleDownCoun
 func (p *rolloutPlanner) reconcileInPlaceUpdateIntent(ctx context.Context) error {
 	log := ctrl.LoggerFrom(ctx)
 
+	// TODO: if we want to allow blocking outside of in-place updates:
+	// * we have to decide if we want to call CanUpdateMachine also if the InPlaceUpdate fg is not enabled (might need another fg)
+	// * we also have to call CanUpdateMachine if EligibleForInPlaceUpdate is false
 	if !feature.Gates.Enabled(feature.InPlaceUpdates) {
 		return nil
 	}
@@ -466,6 +469,46 @@ func (p *rolloutPlanner) reconcileInPlaceUpdateIntent(ctx context.Context) error
 			return pkgerrors.Wrapf(err, "failed to determine if MachineSet %s can be updated in-place", oldMS.Name)
 		}
 		log.V(5).Info(fmt.Sprintf("CanUpdate in-place decision for MachineSet %s: %t, affects availability: %t", klog.KObj(oldMS), res.canUpdateMachineSet, res.affectsAvailability), "MachineSet", klog.KObj(oldMS))
+
+		// CanUpdateMachineSet now also returns allowed-operations
+
+		// Variants just looking at one single MachineSet:
+		// * allowed-operations: [] => do nothing
+		//   * oldMS: do nothing (purge scaleIntent) => multi MS: only purge the old MS with no allowed-operations
+		//
+		// * allowed-operations: [in-place update, rollout] => just try as much in-place as we can (current behavior)
+		//   * CanUpdateMachineSet: true => go ahead with in-place update
+		//   * CanUpdateMachineSet: false => do regular rollout
+		//
+		// * allowed-operations: [rollout] => only do regular rollout
+		//   * oldMS: no change for in-place => multi MS: also works
+		//
+		// * allowed-operations: [in-place update] => only do in-place update
+		//   * CanUpdateMachineSet: true => go ahead with in-place update
+		//   * CanUpdateMachineSet: false => do nothing
+
+		// Assumption: we are only considering old MS for the combined allowed-operations below
+		//             that are actually scaling down in the current reconcile
+		//
+		// Example 1.
+		// oldMS1: allowed-operations: []
+		// oldMS2: allowed-operations: [in-place update, rollout]
+		// => newMS: current behavior below (optimize for in-place if there is >=1 MS that can be updated in-place)
+		//
+		// Example 2.
+		// oldMS1: allowed-operations: [in-place update]
+		// oldMS2: allowed-operations: [in-place update]
+		// => newMS: only trigger in-place updates and no scale ups (incl. optimize for in-place if there is >=1 MS that can be updated in-place)
+		//
+		// Example 3.
+		// oldMS1: allowed-operations: [rollout]
+		// oldMS2: allowed-operations: [rollout]
+		// => newMS: only scale up
+		//
+		// Example 4.
+		// oldMS1: allowed-operations: []
+		// oldMS2: allowed-operations: []
+		// => newMS: no in-place no scale up
 
 		if !res.canUpdateMachineSet {
 			continue
