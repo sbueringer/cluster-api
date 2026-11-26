@@ -595,6 +595,10 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, s *scope) (ctrl.Result
 			v1beta1conditions.MarkTrue(m, clusterv1.VolumeDetachSucceededV1Beta1Condition)
 			r.recorder.Eventf(m, corev1.EventTypeNormal, "NodeVolumesDetached", "success waiting for node volumes detaching Machine's node %q", m.Status.NodeRef.Name)
 		}
+
+		// Drain and wait for volume detach are either completed or skipped at this point,
+		// surface the result on the DrainInProgress and Drained Node conditions.
+		r.reconcileNodeDrainConditions(ctx, s)
 	}
 
 	// pre-term.delete lifecycle hook
@@ -941,6 +945,8 @@ func (r *Reconciler) drainNode(ctx context.Context, s *scope) (ctrl.Result, erro
 		return ctrl.Result{}, pkgerrors.Wrapf(err, "failed to cordon Node %s", node.Name)
 	}
 
+	setNodeDrainConditions(ctx, remoteClient, node, drain.NodeDrainStarted)
+
 	podDeleteList, err := drainer.GetPodsForEviction(ctx, cluster, machine, nodeName)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -1046,6 +1052,8 @@ func (r *Reconciler) shouldWaitForNodeVolumes(ctx context.Context, s *scope) (ct
 		return ctrl.Result{}, nil
 	}
 
+	setNodeDrainConditions(ctx, remoteClient, node, drain.NodeWaitingForVolumeDetach)
+
 	// Slow down the reconcile process, because volume detach is a slow process.
 	r.controller.DeferNextReconcileForObject(machine, time.Now().Add(waitForVolumeDetachRetryInterval))
 
@@ -1056,6 +1064,61 @@ func (r *Reconciler) shouldWaitForNodeVolumes(ctx context.Context, s *scope) (ct
 		attachedVolumeInformation.logKeys()...,
 	)
 	return ctrl.Result{RequeueAfter: waitForVolumeDetachRetryInterval}, nil
+}
+
+// reconcileNodeDrainConditions sets the DrainInProgress and Drained Node conditions after drain and wait for
+// volume detach are either completed or skipped. Nothing is written if neither drain nor wait for volume detach have been started.
+// Note: This is called on every reconcile until the Node is deleted, so a failed best-effort patch is retried.
+func (r *Reconciler) reconcileNodeDrainConditions(ctx context.Context, s *scope) {
+	if !features.Gates.Enabled(features.NodeLifecycleConditions) {
+		return
+	}
+
+	m := s.machine
+	if m.Status.Deletion == nil || (m.Status.Deletion.NodeDrainStartTime.IsZero() && m.Status.Deletion.WaitForNodeVolumeDetachStartTime.IsZero()) {
+		return
+	}
+
+	nodeName := m.Status.NodeRef.Name
+	log := ctrl.LoggerFrom(ctx, "Node", klog.KRef("", nodeName))
+	ctx = ctrl.LoggerInto(ctx, log)
+
+	remoteClient, err := r.ClusterCache.GetClient(ctx, util.ObjectKey(s.cluster))
+	if err != nil {
+		log.Error(err, "Failed to set drain conditions on Node")
+		return
+	}
+
+	node := &corev1.Node{}
+	if err := remoteClient.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "Failed to set drain conditions on Node")
+		}
+		return
+	}
+
+	// Note: The DrainingSucceeded and VolumeDetachSucceeded conditions are the only persisted record of whether drain
+	// and wait for volume detach completed or have been skipped after they were started (e.g. because a timeout was exceeded,
+	// the corresponding exclude annotation was added, the InfraMachine is being deleted or the pre-terminate hook started).
+	// Checking timeouts alone is not enough, because they are also exceeded on later reconciles after successful completion.
+	drainCompleted := m.Status.Deletion.NodeDrainStartTime.IsZero() || v1beta1conditions.IsTrue(m, clusterv1.DrainingSucceededV1Beta1Condition)
+	volumeDetachCompleted := m.Status.Deletion.WaitForNodeVolumeDetachStartTime.IsZero() || v1beta1conditions.IsTrue(m, clusterv1.VolumeDetachSucceededV1Beta1Condition)
+	event := drain.NodeDrainAborted
+	if drainCompleted && volumeDetachCompleted {
+		event = drain.NodeDrainCompleted
+	}
+	setNodeDrainConditions(ctx, remoteClient, node, event)
+}
+
+// setNodeDrainConditions sets the DrainInProgress and Drained Node conditions if the NodeLifecycleConditions feature gate is enabled.
+// Setting the conditions is best-effort: errors are only logged, so they never block Machine deletion (aligned to kubectl drain).
+func setNodeDrainConditions(ctx context.Context, remoteClient client.Client, node *corev1.Node, event drain.NodeDrainConditionEvent) {
+	if !features.Gates.Enabled(features.NodeLifecycleConditions) {
+		return
+	}
+	if err := drain.SetNodeDrainConditions(ctx, remoteClient, node, event); err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "Failed to set drain conditions on Node", "event", event)
+	}
 }
 
 func (r *Reconciler) deleteNode(ctx context.Context, cluster *clusterv1.Cluster, name string) error {

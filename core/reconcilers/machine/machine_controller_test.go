@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	utilfeature "k8s.io/component-base/featuregate/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -49,10 +50,12 @@ import (
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/clustercache"
+	"sigs.k8s.io/cluster-api/core/reconcilers/machine/drain"
 	"sigs.k8s.io/cluster-api/core/setup"
 	contractapi "sigs.k8s.io/cluster-api/internal/contract/api"
 	contractv1 "sigs.k8s.io/cluster-api/internal/contract/api/v1beta2"
 	"sigs.k8s.io/cluster-api/pkg/dynamiccache"
+	"sigs.k8s.io/cluster-api/pkg/features"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
@@ -4418,4 +4421,240 @@ func setAllTimesToAnyTime(status *clusterv1.MachineDeletionStatus) *clusterv1.Ma
 		}
 	}
 	return status
+}
+
+func TestReconcileDeleteNodeDrainConditions(t *testing.T) {
+	deletionTime := metav1.Now().Add(-1 * time.Second)
+
+	testCluster := &clusterv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: metav1.NamespaceDefault,
+		},
+	}
+
+	testMachine := &clusterv1.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test",
+			Namespace:         metav1.NamespaceDefault,
+			Finalizers:        []string{clusterv1.MachineFinalizer},
+			DeletionTimestamp: &metav1.Time{Time: deletionTime},
+		},
+		Spec: clusterv1.MachineSpec{
+			ClusterName: "test-cluster",
+			InfrastructureRef: clusterv1.ContractVersionedObjectReference{
+				APIGroup: clusterv1.GroupVersionInfrastructure.Group,
+				Kind:     "GenericInfrastructureMachine",
+				Name:     "infra-config1",
+			},
+			Bootstrap: clusterv1.Bootstrap{DataSecretName: new("data")},
+		},
+		Status: clusterv1.MachineStatus{
+			NodeRef: clusterv1.MachineNodeReference{Name: "test"},
+		},
+	}
+
+	// Note: cpmachine1 is an active control plane Machine, so that Node deletion is allowed for testMachine.
+	cpmachine1 := &clusterv1.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cp1",
+			Namespace: metav1.NamespaceDefault,
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel:         "test-cluster",
+				clusterv1.MachineControlPlaneLabel: "",
+			},
+			Finalizers: []string{clusterv1.MachineFinalizer},
+		},
+		Spec: clusterv1.MachineSpec{
+			ClusterName: "test-cluster",
+			Bootstrap:   clusterv1.Bootstrap{DataSecretName: new("data")},
+		},
+		Status: clusterv1.MachineStatus{
+			NodeRef: clusterv1.MachineNodeReference{Name: "cp1"},
+		},
+	}
+
+	infraMachine := &contractv1.InfraMachine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "infra-config1",
+			Namespace: metav1.NamespaceDefault,
+		},
+	}
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Status: corev1.NodeStatus{
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+			},
+		},
+	}
+
+	// Note: This Pod has to be evicted by the drain, but the fake client never removes it from the Node.
+	deploymentPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1-delete-running-deployment-pod",
+			Namespace: "test-namespace",
+			OwnerReferences: []metav1.OwnerReference{
+				{Kind: "Deployment", Controller: new(true)},
+			},
+		},
+		Status: corev1.PodStatus{Phase: corev1.PodRunning},
+		Spec:   corev1.PodSpec{NodeName: "test"},
+	}
+
+	persistentVolume := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-pv"},
+		Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{
+				Kind:      "PersistentVolumeClaim",
+				Namespace: "default",
+				Name:      "test-pvc",
+			},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{VolumeHandle: "foo", Driver: "dummy"},
+			},
+		},
+	}
+	nodeWithVolumesAttached := node.DeepCopy()
+	nodeWithVolumesAttached.Status.VolumesAttached = []corev1.AttachedVolume{
+		{Name: "kubernetes.io/csi/dummy^foo", DevicePath: "test-path"},
+	}
+
+	drainStarted := []corev1.NodeCondition{
+		{Type: corev1.NodeDrainInProgress, Status: corev1.ConditionTrue, Reason: drain.ClusterAPIDrainStartedReason, Message: "Cluster API is draining the Node"},
+		{Type: corev1.NodeDrained, Status: corev1.ConditionFalse, Reason: drain.ClusterAPIDrainStartedReason, Message: "Cluster API is draining the Node"},
+	}
+	waitingForVolumeDetach := []corev1.NodeCondition{
+		{Type: corev1.NodeDrainInProgress, Status: corev1.ConditionTrue, Reason: drain.ClusterAPIWaitingForVolumeDetachReason, Message: "Cluster API is waiting for volumes to be detached from the Node"},
+		{Type: corev1.NodeDrained, Status: corev1.ConditionFalse, Reason: drain.ClusterAPIWaitingForVolumeDetachReason, Message: "Cluster API is waiting for volumes to be detached from the Node"},
+	}
+	drainCompleted := []corev1.NodeCondition{
+		{Type: corev1.NodeDrainInProgress, Status: corev1.ConditionFalse, Reason: drain.ClusterAPIDrainCompletedReason, Message: "Cluster API drain and wait for volume detach completed"},
+		{Type: corev1.NodeDrained, Status: corev1.ConditionTrue, Reason: drain.ClusterAPIDrainCompletedReason, Message: "Cluster API drain and wait for volume detach completed"},
+	}
+	drainAborted := []corev1.NodeCondition{
+		{Type: corev1.NodeDrainInProgress, Status: corev1.ConditionFalse, Reason: drain.ClusterAPIDrainAbortedReason, Message: "Cluster API stopped draining the Node before completion (e.g. because a timeout was exceeded)"},
+		{Type: corev1.NodeDrained, Status: corev1.ConditionFalse, Reason: drain.ClusterAPIDrainAbortedReason, Message: "Cluster API stopped draining the Node before completion (e.g. because a timeout was exceeded)"},
+	}
+
+	testCases := []struct {
+		name                    string
+		featureGateDisabled     bool
+		annotations             map[string]string
+		nodeDrainTimeoutSeconds *int32
+		machineStatusDeletion   *clusterv1.MachineDeletionStatus
+		node                    *corev1.Node
+		remoteObjects           []client.Object
+		wantNodeConditions      []corev1.NodeCondition
+	}{
+		{
+			name:               "Set DrainInProgress=True while drain is in progress",
+			remoteObjects:      []client.Object{deploymentPod},
+			wantNodeConditions: drainStarted,
+		},
+		{
+			name:               "Set DrainInProgress=True while waiting for volume detach",
+			node:               nodeWithVolumesAttached,
+			remoteObjects:      []client.Object{persistentVolume},
+			wantNodeConditions: waitingForVolumeDetach,
+		},
+		{
+			name:               "Set Drained=True after drain and wait for volume detach completed",
+			wantNodeConditions: drainCompleted,
+		},
+		{
+			name:                    "Set DrainInProgress=False and Drained=False if drain timed out",
+			nodeDrainTimeoutSeconds: new(int32(60)),
+			machineStatusDeletion:   &clusterv1.MachineDeletionStatus{NodeDrainStartTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)}},
+			remoteObjects:           []client.Object{deploymentPod},
+			wantNodeConditions:      drainAborted,
+		},
+		{
+			name:                "Don't set conditions if feature gate is disabled",
+			featureGateDisabled: true,
+			remoteObjects:       []client.Object{deploymentPod},
+		},
+		{
+			name: "Don't set conditions if drain and wait for volume detach are excluded",
+			annotations: map[string]string{
+				clusterv1.ExcludeNodeDrainingAnnotation:            "",
+				clusterv1.ExcludeWaitForNodeVolumeDetachAnnotation: "",
+			},
+			remoteObjects: []client.Object{deploymentPod},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			utilfeature.SetFeatureGateDuringTest(t, features.Gates, features.NodeLifecycleConditions, !tc.featureGateDisabled)
+
+			m := testMachine.DeepCopy()
+			m.Annotations = tc.annotations
+			m.Spec.Deletion.NodeDrainTimeoutSeconds = tc.nodeDrainTimeoutSeconds
+			if tc.machineStatusDeletion != nil {
+				m.Status.Deletion = tc.machineStatusDeletion.DeepCopy()
+			}
+
+			targetNode := node.DeepCopy()
+			if tc.node != nil {
+				targetNode = tc.node.DeepCopy()
+			}
+			remoteObjs := []client.Object{
+				targetNode,
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "test-namespace",
+						Labels: map[string]string{"kubernetes.io/metadata.name": "test-namespace"},
+					},
+				},
+			}
+			for _, o := range tc.remoteObjects {
+				remoteObjs = append(remoteObjs, o.DeepCopyObject().(client.Object))
+			}
+			remoteClient := fake.NewClientBuilder().
+				WithIndex(&corev1.Pod{}, "spec.nodeName", podByNodeName).
+				WithObjects(remoteObjs...).
+				WithStatusSubresource(&corev1.Node{}).
+				Build()
+
+			infraMachineGVK := builder.InfrastructureGroupVersion.WithKind(builder.GenericInfrastructureMachineKind)
+			fakeClient := fake.NewClientBuilder().
+				WithObjects(m, cpmachine1, contractapi.ToUnstructuredForDelete(infraMachineGVK, infraMachine)).
+				WithStatusSubresource(&clusterv1.Machine{}).
+				Build()
+
+			r := &Reconciler{
+				Client:       fakeClient,
+				ClusterCache: clustercache.NewFakeClusterCache(remoteClient, client.ObjectKeyFromObject(testCluster)),
+				controller:   capicontrollerutil.NewFakeController(),
+				recorder:     record.NewFakeRecorder(10),
+			}
+			s := &scope{
+				cluster:                   testCluster,
+				machine:                   m,
+				infraMachine:              infraMachine,
+				infraMachineGVK:           infraMachineGVK,
+				bootstrapConfigIsNotFound: true,
+			}
+			_, err := r.reconcileDelete(ctx, s)
+			g.Expect(err).ToNot(HaveOccurred())
+
+			gotNode := &corev1.Node{}
+			g.Expect(remoteClient.Get(ctx, client.ObjectKeyFromObject(targetNode), gotNode)).To(Succeed())
+
+			// Drop the times for easier comparison and verify the Ready condition has been preserved.
+			wantConditions := append([]corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}, tc.wantNodeConditions...)
+			gotConditions := make([]corev1.NodeCondition, 0, len(gotNode.Status.Conditions))
+			for _, c := range gotNode.Status.Conditions {
+				c.LastHeartbeatTime = metav1.Time{}
+				c.LastTransitionTime = metav1.Time{}
+				gotConditions = append(gotConditions, c)
+			}
+			// Note: The order of conditions is not relevant (the strategic merge patch adds new conditions first).
+			g.Expect(gotConditions).To(ConsistOf(wantConditions))
+		})
+	}
 }

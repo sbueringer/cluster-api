@@ -187,3 +187,29 @@ For more information, please see:
 * [Disruptions: Pod disruption budgets](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-budgets)
 * [Specifying a Disruption Budget for your Application](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
 * [API-initiated eviction](https://kubernetes.io/docs/concepts/scheduling-eviction/api-eviction/)
+
+## Node lifecycle conditions
+
+If the alpha `NodeLifecycleConditions` feature gate is enabled, the Machine controller surfaces the progress of Node drain
+and wait for volume detach on the Node via the `DrainInProgress` and `Drained` Node conditions defined in
+[KEP-5683: Node Lifecycle Conditions](https://kep.k8s.io/5683). This is aligned with `kubectl drain`, which writes the same
+conditions (with `Kubectl*` reasons).
+
+Both conditions are always written together, with the same reason and message:
+
+| Phase                                                                  | `DrainInProgress` | `Drained` | Reason                             |
+|------------------------------------------------------------------------|-------------------|-----------|------------------------------------|
+| Node drain in progress                                                 | `True`            | `False`   | `ClusterAPIDrainStarted`           |
+| Waiting for volume detach                                              | `True`            | `False`   | `ClusterAPIWaitingForVolumeDetach` |
+| Node drain and wait for volume detach completed                        | `False`           | `True`    | `ClusterAPIDrainCompleted`         |
+| Node drain or wait for volume detach stopped before completion         | `False`           | `False`   | `ClusterAPIDrainAborted`           |
+
+Notes:
+* The conditions are only written if drain or wait for volume detach have been started, e.g. they are not written
+  if both are skipped via the `machine.cluster.x-k8s.io/exclude-node-draining` and
+  `machine.cluster.x-k8s.io/exclude-wait-for-node-volume-detach` annotations.
+* `ClusterAPIDrainAborted` is used if drain or wait for volume detach have been started but are then skipped before
+  completion, e.g. because `nodeDrainTimeoutSeconds` or `nodeVolumeDetachTimeoutSeconds` was exceeded, an exclude annotation
+  was added, the InfrastructureMachine is being deleted or the pre-terminate hook started.
+* Writing the conditions is best-effort, failures are logged but never block Machine deletion.
+* A strategic merge patch on the Node status subresource is used, so other Node conditions (e.g. the ones set by the kubelet) are preserved.
