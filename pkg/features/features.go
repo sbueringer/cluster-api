@@ -100,6 +100,14 @@ const (
 	//
 	// alpha: v1.15
 	ClusterTopologyWorkerVersionPinning featuregate.Feature = "ClusterTopologyWorkerVersionPinning"
+
+	// NodeLifecycleConditions is a feature gate that makes the Machine controller write the
+	// DrainInProgress and Drained Node conditions while draining a Node and waiting for its
+	// volumes to be detached during Machine deletion.
+	// See KEP-5683: https://kep.k8s.io/5683.
+	//
+	// alpha: v1.16
+	NodeLifecycleConditions featuregate.Feature = "NodeLifecycleConditions"
 )
 
 func init() {
@@ -120,5 +128,6 @@ var defaultClusterAPIFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ClusterTopologyWorkerVersionPinning: {Default: false, PreRelease: featuregate.Alpha},
 	InPlaceUpdates:                      {Default: false, PreRelease: featuregate.Alpha},
 	KubeadmBootstrapFormatIgnition:      {Default: false, PreRelease: featuregate.Alpha},
+	NodeLifecycleConditions:             {Default: false, PreRelease: featuregate.Alpha},
 	RuntimeSDK:                          {Default: false, PreRelease: featuregate.Alpha},
 }
